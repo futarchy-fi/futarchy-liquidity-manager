@@ -56,7 +56,9 @@ RUN_GNOSIS_FORK_TESTS=true forge test --match-path 'test/fork/*'
 Generate a deployment from explicit JSON config:
 
 ```sh
-FLM_DEPLOY_CONFIG=config/gnosis.example.json \
+tools/validate-configs.sh --deploy config/gnosis.production.json
+
+FLM_DEPLOY_CONFIG=config/gnosis.production.json \
 FLM_DEPLOY_OUTPUT=deployments/flm.gnosis.json \
 forge script script/DeployFutarchyLiquidityManager.s.sol \
   --rpc-url gnosis \
@@ -66,7 +68,9 @@ forge script script/DeployFutarchyLiquidityManager.s.sol \
 Generate a Safe transaction-builder batch:
 
 ```sh
-FLM_BATCH_CONFIG=config/safe-batch.example.json \
+tools/validate-configs.sh --batch config/batches/bootstrap.production.json
+
+FLM_BATCH_CONFIG=config/batches/bootstrap.production.json \
 FLM_BATCH_OUTPUT=out/flm-safe-batch.json \
 forge script script/BuildLiquidityOperationBatch.s.sol
 ```

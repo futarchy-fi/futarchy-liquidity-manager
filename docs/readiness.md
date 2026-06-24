@@ -15,12 +15,17 @@ This file tracks the remaining gap between this repository and a limited-funds r
 - Fork tests: env-gated Gnosis checks for Swapr Algebra NFPM, deployed proposal shape, CTF
   condition wiring, Reality question wiring, and futarchy router splitting.
 - CI: `forge build`, `forge fmt --check`, `forge test`, and coverage summary.
+- Config validation: CI checks deployment and batch example schemas, and strict mode rejects real
+  configs with placeholder addresses, missing validation, missing deadlines, or zero slippage
+  minimums.
 - Docs: audit scope, dependency surface, deployment flow, FAO integration boundary, and operation
   batch flow.
 
 ## Still Required Before Mainnet-Value Deployment
 
 - Fill and independently review a concrete deployment config for the target organization.
+- Run `tools/validate-configs.sh --deploy <final-config>` and
+  `tools/validate-configs.sh --batch <final-batch-config>` for every real batch.
 - Run `RUN_GNOSIS_FORK_TESTS=true forge test --match-path 'test/fork/*'` against the selected
   target proposal/token addresses.
 - Generate Safe batches from final operation configs and audit the calldata before signing.

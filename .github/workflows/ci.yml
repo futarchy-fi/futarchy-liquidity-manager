@@ -30,6 +30,12 @@ jobs:
       - name: API freeze guard
         run: bash tools/check-api-freeze.sh
 
+      - name: Config schema guard
+        run: |
+          bash tools/validate-configs.sh --allow-placeholders \
+            --deploy config/gnosis.example.json \
+            --batch config/safe-batch.example.json
+
       - name: Test
         run: forge test
 

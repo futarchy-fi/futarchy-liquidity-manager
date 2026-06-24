@@ -16,6 +16,18 @@ forge script script/BuildLiquidityOperationBatch.s.sol
 The script writes both the Safe transaction-builder JSON and a Markdown sidecar summary. Review the
 summary first, then decode the calldata in the JSON before signing.
 
+For real operation batches, run strict validation on the finalized config before generating or
+signing:
+
+```sh
+tools/validate-configs.sh --batch config/batches/bootstrap.json
+```
+
+Strict mode rejects placeholder Safe/owner/target addresses, zero liquidity amounts for bootstrap
+and deposit batches, missing deadlines, and zero slippage minimums on liquidity add/remove paths.
+The example config is validated in CI with `--allow-placeholders` because it is only a schema
+template.
+
 ## Supported Operations
 
 - `initializeFromBootstrap`
@@ -60,7 +72,8 @@ quote. The examples use zeros only as placeholders.
 ## Audit Procedure
 
 1. Review the JSON config.
-2. Generate the batch.
-3. Decode each `data` field with `cast calldata-decode` or a Safe UI preview.
-4. Confirm `to`, `value`, deadlines, slippage, and token approvals.
-5. Sign only after calldata matches the reviewed config.
+2. Run `tools/validate-configs.sh --batch <final-config>`.
+3. Generate the batch.
+4. Decode each `data` field with `cast calldata-decode` or a Safe UI preview.
+5. Confirm `to`, `value`, deadlines, slippage, and token approvals.
+6. Sign only after calldata matches the reviewed config.

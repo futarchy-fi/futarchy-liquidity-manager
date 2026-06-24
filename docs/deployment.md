@@ -33,6 +33,19 @@ Validation fields are explicit even when disabled. For production, prefer enabli
 setting an official proposal. If `deployDeadlineProxy` is true and `validation.trustedOracle` is
 zero, the deployment script uses the newly deployed `DeadlineBoundedRealityProxy`.
 
+## Production Preflight
+
+Example configs intentionally contain zero placeholders. Before broadcasting a real deployment,
+run strict validation on the reviewed config:
+
+```sh
+tools/validate-configs.sh --deploy config/gnosis.fao.json
+```
+
+Strict mode rejects zero deployment addresses and requires proposal validation to be enabled with
+real Reality/CTF/arbitrator bounds. CI runs the same validator in `--allow-placeholders` mode only
+to keep the example JSON schema checked.
+
 ## Broadcast
 
 ```sh
@@ -51,12 +64,14 @@ liquidity or proposal batches.
 ## Limited-Funds Deployment Order
 
 1. Deploy the FLM stack from a reviewed JSON config.
-2. Verify deployed bytecode and constructor arguments.
-3. Configure proposal validation if it was not configured during deployment.
-4. Generate and audit the bootstrap liquidity Safe batch.
-5. Execute with limited funds first.
-6. Confirm spot position token id and balances.
-7. Only then set an official proposal and generate sync batches.
+2. Run `tools/validate-configs.sh --deploy <reviewed-config>` and keep the output with the audit
+   materials.
+3. Verify deployed bytecode and constructor arguments.
+4. Configure proposal validation if it was not configured during deployment.
+5. Generate and audit the bootstrap liquidity Safe batch.
+6. Execute with limited funds first.
+7. Confirm spot position token id and balances.
+8. Only then set an official proposal and generate sync batches.
 
 ## No Docker Requirement
 
