@@ -13,6 +13,7 @@ import {
 } from "../interfaces/IFutarchyTradingCore.sol";
 
 interface IProposalSettlementOracle {
+    /// @notice Returns whether `proposal` has settled according to an external oracle.
     function isSettled(address proposal) external view returns (bool);
 }
 
@@ -40,6 +41,7 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         MinBondTooHigh
     }
 
+    /// @notice Stored official proposal slot.
     struct OfficialProposal {
         uint256 id;
         address proposal;
@@ -48,6 +50,8 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         bool manualSettled;
     }
 
+    /// @notice On-chain policy used to admit official proposals.
+    /// @dev Validation is optional for test/staging, but should be enabled for production.
     struct ProposalValidationConfig {
         bool enabled;
         address expectedProposalToken;
@@ -63,6 +67,7 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         bool requirePools;
     }
 
+    /// @notice Resolved proposal view including current settlement status and pool addresses.
     struct ProposalView {
         uint256 proposalId;
         address proposal;
@@ -79,6 +84,7 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         address noPool;
     }
 
+    /// @notice Proposal fields loaded during validation.
     struct ValidationProposal {
         address proposal;
         address proposalToken;
@@ -213,6 +219,9 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         emit OfficialProposalManualSettlementUpdated(settled);
     }
 
+    /// @notice Returns a compact view of the current official proposal.
+    /// @dev This omits wrapped outcome tokens. The liquidity manager uses
+    /// `officialProposalExtended` instead.
     function officialProposal()
         external
         view
@@ -238,6 +247,9 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         noPool = p.noPool;
     }
 
+    /// @notice Returns the current official proposal with all outcome-token addresses.
+    /// @dev Settlement is resolved through `settlementOracle` when configured, otherwise through
+    /// the manual settlement flag.
     function officialProposalExtended()
         external
         view
@@ -259,6 +271,7 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         proposalData.noPool = p.noPool;
     }
 
+    /// @notice Returns the raw stored official proposal slot.
     function currentOfficialProposal() external view returns (OfficialProposal memory) {
         return _official;
     }

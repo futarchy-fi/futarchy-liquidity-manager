@@ -22,6 +22,8 @@ This file tracks the remaining gap between this repository and a limited-funds r
   minimums.
 - Docs: audit scope, dependency surface, deployment flow, FAO integration boundary, and operation
   batch flow.
+- NatSpec: integration interfaces, proposal-source views, and adapter slippage/deadline parameters
+  are documented at the code boundary used by auditors and downstream integrators.
 
 ## Still Required Before Mainnet-Value Deployment
 

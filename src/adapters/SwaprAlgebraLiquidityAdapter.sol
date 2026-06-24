@@ -6,10 +6,21 @@ import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeE
 import {IFutarchyLiquidityAdapter} from "../interfaces/IFutarchyLiquidityAdapter.sol";
 import {ISwaprAlgebraPositionManager} from "../interfaces/ISwaprAlgebraPositionManager.sol";
 
-/// @notice Swapr Algebra V3 adapter for a single full-range position per token pair.
+/// @title SwaprAlgebraLiquidityAdapter
+/// @notice Swapr Algebra V3 adapter for a single position per ordered token pair.
+/// @dev The adapter custodies Algebra position NFTs. It is intentionally generic and has no
+/// FAO-specific logic. Callers must pass reviewed `AddParams`/`ExitParams` calldata for real
+/// execution so slippage and deadlines are explicit.
 contract SwaprAlgebraLiquidityAdapter is IFutarchyLiquidityAdapter {
     using SafeERC20 for IERC20;
 
+    /// @notice Adapter parameters for minting or increasing Algebra liquidity.
+    /// @param tickLower Lower tick for a new position; zero falls back to `DEFAULT_TICK_LOWER`.
+    /// @param tickUpper Upper tick for a new position; zero falls back to `DEFAULT_TICK_UPPER`.
+    /// @param amount0Min Minimum token0 amount to use.
+    /// @param amount1Min Minimum token1 amount to use.
+    /// @param deadline Swapr Algebra transaction deadline; zero maps to `block.timestamp`.
+    /// @param sqrtPriceX96 Optional pool initialization price for a missing pool.
     struct AddParams {
         int24 tickLower;
         int24 tickUpper;
@@ -19,7 +30,7 @@ contract SwaprAlgebraLiquidityAdapter is IFutarchyLiquidityAdapter {
         uint160 sqrtPriceX96;
     }
 
-    // Legacy v1 add params kept for backward compatibility with existing encoded calldata.
+    /// @notice Legacy v1 add params kept for backward compatibility with existing encoded calldata.
     struct LegacyAddParams {
         int24 tickLower;
         int24 tickUpper;
@@ -28,6 +39,10 @@ contract SwaprAlgebraLiquidityAdapter is IFutarchyLiquidityAdapter {
         uint256 deadline;
     }
 
+    /// @notice Adapter parameters for removing or compounding Algebra liquidity.
+    /// @param amount0Min Minimum token0 amount accepted.
+    /// @param amount1Min Minimum token1 amount accepted.
+    /// @param deadline Swapr Algebra transaction deadline; zero maps to `block.timestamp`.
     struct ExitParams {
         uint256 amount0Min;
         uint256 amount1Min;
@@ -51,6 +66,9 @@ contract SwaprAlgebraLiquidityAdapter is IFutarchyLiquidityAdapter {
     event LiquidityRemoved(bytes32 indexed pairKey, uint256 indexed tokenId, uint128 liquidity);
     event PositionBurned(bytes32 indexed pairKey, uint256 indexed tokenId);
 
+    /// @param positionManager Swapr Algebra non-fungible position manager.
+    /// @param defaultTickLower Fallback lower tick when `AddParams.tickLower` is zero.
+    /// @param defaultTickUpper Fallback upper tick when `AddParams.tickUpper` is zero.
     constructor(
         ISwaprAlgebraPositionManager positionManager,
         int24 defaultTickLower,
@@ -64,6 +82,9 @@ contract SwaprAlgebraLiquidityAdapter is IFutarchyLiquidityAdapter {
         DEFAULT_TICK_UPPER = defaultTickUpper;
     }
 
+    /// @notice Pulls tokens from the caller and adds liquidity to this adapter's pair position.
+    /// @dev Mints a new NFT on first use for the pair, otherwise increases the stored position.
+    /// Unused input amounts are refunded to the caller.
     function addFullRangeLiquidity(
         address token0,
         address token1,
@@ -99,6 +120,9 @@ contract SwaprAlgebraLiquidityAdapter is IFutarchyLiquidityAdapter {
         _refundIfAny(token1, amount1Desired, amount1Used, msg.sender);
     }
 
+    /// @notice Removes liquidity from this adapter's stored pair position.
+    /// @dev Collects all owed token balances to the caller and burns the NFT when all liquidity is
+    /// removed.
     function removeLiquidity(address token0, address token1, uint128 liquidity, bytes calldata data)
         external
         returns (uint256 amount0Out, uint256 amount1Out)
@@ -139,6 +163,8 @@ contract SwaprAlgebraLiquidityAdapter is IFutarchyLiquidityAdapter {
         }
     }
 
+    /// @notice Collects fees to this adapter and reinvests them into the existing pair position.
+    /// @dev Returns zero when no position exists or no fees are collectable.
     function compoundPosition(address token0, address token1, bytes calldata data)
         external
         returns (uint128 liquidityAdded)
@@ -169,6 +195,7 @@ contract SwaprAlgebraLiquidityAdapter is IFutarchyLiquidityAdapter {
         _refundIfAny(token1, amount1Collected, amount1Used, msg.sender);
     }
 
+    /// @notice Returns the stored Algebra position NFT for an ordered token pair.
     function getPositionTokenId(address token0, address token1) external view returns (uint256) {
         return positionTokenId[_pairKey(token0, token1)];
     }

@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/// @notice Read interface for the current official futarchy proposal.
+/// @dev The manager consumes `officialProposalExtended` so it can validate exact outcome tokens and
+/// pools before migrating liquidity.
 interface IFutarchyOfficialProposalSource {
+    /// @notice Full proposal shape needed by the liquidity manager.
     struct OfficialProposalData {
         uint256 proposalId;
         address proposal;
@@ -18,6 +22,7 @@ interface IFutarchyOfficialProposalSource {
         address noPool;
     }
 
+    /// @notice Legacy compact proposal view retained for integrations that only need pool data.
     function officialProposal()
         external
         view
@@ -32,6 +37,7 @@ interface IFutarchyOfficialProposalSource {
             address noPool
         );
 
+    /// @notice Returns the current official proposal and all wrapped outcome token addresses.
     function officialProposalExtended()
         external
         view
