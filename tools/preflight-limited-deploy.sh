@@ -5,6 +5,7 @@ ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 
 DEPLOY_CONFIG=""
+DEPLOYMENT_OUTPUT=""
 BATCH_FILES=()
 PROPOSAL_ADDRESS=""
 RUN_FORK_TESTS=false
@@ -12,17 +13,19 @@ RUN_FORK_TESTS=false
 usage() {
   cat >&2 <<'USAGE'
 Usage:
-  tools/preflight-limited-deploy.sh --deploy <file> [--batch <file> ...] \
-    [--proposal <address>] [--run-fork-tests]
+  tools/preflight-limited-deploy.sh --deploy <file> [--deployment-output <file>] \
+    [--batch <file> ...] [--proposal <address>] [--run-fork-tests]
 
 Runs the strict preflight expected before a limited-funds deployment:
   1. strict deploy/batch config validation;
   2. Safe batch JSON + Markdown summary generation for every batch;
-  3. optional final-address Gnosis fork tests when --run-fork-tests is supplied.
+  3. optional deployment-output/batch link validation;
+  4. optional final-address Gnosis fork tests when --run-fork-tests is supplied.
 
 Example:
   tools/preflight-limited-deploy.sh \
     --deploy config/gnosis.production.json \
+    --deployment-output deployments/flm.gnosis.json \
     --batch config/batches/bootstrap.production.json \
     --batch config/batches/set-proposal-validation.production.json \
     --proposal 0x1111111111111111111111111111111111111111 \
@@ -35,6 +38,11 @@ while [[ $# -gt 0 ]]; do
     --deploy)
       [[ $# -ge 2 ]] || { usage; exit 64; }
       DEPLOY_CONFIG="$2"
+      shift 2
+      ;;
+    --deployment-output)
+      [[ $# -ge 2 ]] || { usage; exit 64; }
+      DEPLOYMENT_OUTPUT="$2"
       shift 2
       ;;
     --batch)
@@ -63,7 +71,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$DEPLOY_CONFIG" && ${#BATCH_FILES[@]} -eq 0 ]]; then
+if [[ -z "$DEPLOY_CONFIG" && -z "$DEPLOYMENT_OUTPUT" && ${#BATCH_FILES[@]} -eq 0 ]]; then
   usage
   exit 64
 fi
@@ -84,13 +92,28 @@ for batch in "${BATCH_FILES[@]}"; do
   validate_args+=(--batch "$batch")
 done
 
-echo "== Strict config validation =="
-bash tools/validate-configs.sh "${validate_args[@]}"
+if [[ ${#validate_args[@]} -gt 0 ]]; then
+  echo "== Strict config validation =="
+  bash tools/validate-configs.sh "${validate_args[@]}"
+fi
 
 if [[ ${#BATCH_FILES[@]} -gt 0 ]]; then
   echo "== Batch generation =="
   FLM_BATCH_TEMPLATE_CHECK_OUT="${FLM_BATCH_TEMPLATE_CHECK_OUT:-out/preflight-limited-deploy}" \
     bash tools/check-batch-templates.sh "${BATCH_FILES[@]}"
+fi
+
+if [[ -n "$DEPLOYMENT_OUTPUT" ]]; then
+  artifact_args=(--deployment-output "$DEPLOYMENT_OUTPUT")
+  if [[ -n "$DEPLOY_CONFIG" ]]; then
+    artifact_args+=(--deploy "$DEPLOY_CONFIG")
+  fi
+  for batch in "${BATCH_FILES[@]}"; do
+    artifact_args+=(--batch "$batch")
+  done
+
+  echo "== Deployment artifact links =="
+  bash tools/check-deployment-artifacts.sh "${artifact_args[@]}"
 fi
 
 if [[ "$RUN_FORK_TESTS" == true ]]; then

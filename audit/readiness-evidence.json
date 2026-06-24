@@ -207,6 +207,10 @@
         {
           "description": "Strict batch validation rejects placeholder targets, zero liquidity amounts, missing deadlines, and zero slippage minimums.",
           "path": "tools/validate-configs.sh"
+        },
+        {
+          "description": "Deployment artifact checker rejects operation batches wired to the wrong deployed stack.",
+          "path": "tools/check-deployment-artifacts.sh"
         }
       ],
       "remaining": [
@@ -228,6 +232,10 @@
           "ciStep": "Limited preflight guard"
         },
         {
+          "description": "Deployment artifact checker links final batch targets back to the deployed manager, proposal source, tokens, owner, bootstrap recipient, and official proposer.",
+          "path": "tools/check-deployment-artifacts.sh"
+        },
+        {
           "description": "Readiness checklist distinguishes audit readiness from real deployment requirements.",
           "path": "docs/readiness.md"
         },
@@ -238,7 +246,7 @@
       ],
       "remaining": [
         "Provide final deployment config, final batch configs, selected proposal/token addresses, Safe owner, bootstrap recipient, signers, and monitoring process.",
-        "Run the limited deploy preflight on those final inputs with --proposal and --run-fork-tests, then retain generated artifacts.",
+        "Run the limited deploy preflight on those final inputs with --deployment-output, --proposal, and --run-fork-tests, then retain generated artifacts.",
         "Execute the first transaction set with limited funds and verify positions and balances before scaling."
       ]
     }

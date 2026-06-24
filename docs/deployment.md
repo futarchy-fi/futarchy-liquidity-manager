@@ -35,12 +35,21 @@ zero, the deployment script uses the newly deployed `DeadlineBoundedRealityProxy
 
 ## Production Preflight
 
-Example configs intentionally contain zero placeholders. Before broadcasting a real deployment,
-run the limited-funds preflight on the reviewed deploy config and every batch intended for signing:
+Example configs intentionally contain zero placeholders. Before broadcasting a real deployment, run
+the limited-funds preflight on the reviewed deploy config:
+
+```sh
+tools/preflight-limited-deploy.sh \
+  --deploy config/gnosis.fao.json
+```
+
+After the deployment output exists and before signing any operation batch, run preflight on the
+reviewed deploy config, deployment output, and every batch intended for signing:
 
 ```sh
 tools/preflight-limited-deploy.sh \
   --deploy config/gnosis.fao.json \
+  --deployment-output deployments/flm.gnosis.json \
   --batch config/batches/bootstrap.production.json \
   --batch config/batches/set-proposal-validation.production.json \
   --proposal <final-futarchy-proposal> \
@@ -48,13 +57,14 @@ tools/preflight-limited-deploy.sh \
 ```
 
 The preflight runs strict config validation, renders every batch to Safe transaction-builder JSON
-plus a Markdown summary, and optionally runs the Gnosis fork tests against the selected proposal,
-company token, and collateral token. When `--run-fork-tests` is supplied, the proposal must be
-provided with `--proposal` or by a `setOfficialProposal` batch; the company and collateral token
-addresses come from the deploy config unless `TEST_COMPANY_TOKEN` or `TEST_COLLATERAL_TOKEN` are
-set explicitly. Strict validation rejects zero deployment addresses and requires proposal
-validation to be enabled with real Reality/CTF/arbitrator bounds. CI validates placeholder examples
-separately in `--allow-placeholders` mode.
+plus a Markdown summary, checks that batch targets match the deployment output when
+`--deployment-output` is supplied, and optionally runs the Gnosis fork tests against the selected
+proposal, company token, and collateral token. When `--run-fork-tests` is supplied, the proposal
+must be provided with `--proposal` or by a `setOfficialProposal` batch; the company and collateral
+token addresses come from the deploy config unless `TEST_COMPANY_TOKEN` or
+`TEST_COLLATERAL_TOKEN` are set explicitly. Strict validation rejects zero deployment addresses and
+requires proposal validation to be enabled with real Reality/CTF/arbitrator bounds. CI validates
+placeholder examples separately in `--allow-placeholders` mode.
 
 ## Broadcast
 
@@ -71,11 +81,25 @@ forge script script/DeployFutarchyLiquidityManager.s.sol \
 The script writes deployed addresses to `FLM_DEPLOY_OUTPUT`. Review that output before generating
 liquidity or proposal batches.
 
+Before signing any operation batch, link it back to the reviewed deploy config and deployment
+output:
+
+```sh
+tools/check-deployment-artifacts.sh \
+  --deploy config/gnosis.fao.json \
+  --deployment-output deployments/flm.gnosis.json \
+  --batch config/batches/bootstrap.production.json
+```
+
+This catches copied-address mistakes such as a batch targeting the wrong manager, proposal source,
+company token, owner Safe, bootstrap recipient, or official proposer.
+
 ## Limited-Funds Deployment Order
 
 1. Deploy the FLM stack from a reviewed JSON config.
-2. Run `tools/preflight-limited-deploy.sh --deploy <reviewed-config> --batch <batch-config> ...
-   --proposal <final-proposal> --run-fork-tests` and keep the output with the audit materials.
+2. Run `tools/preflight-limited-deploy.sh --deploy <reviewed-config> --deployment-output
+   <deploy-output> --batch <batch-config> ... --proposal <final-proposal> --run-fork-tests` and
+   keep the output with the audit materials.
 3. Verify deployed bytecode and constructor arguments.
 4. Configure proposal validation if it was not configured during deployment.
 5. Generate and audit the bootstrap liquidity Safe batch.

@@ -21,13 +21,16 @@ signing:
 
 ```sh
 tools/preflight-limited-deploy.sh \
+  --deployment-output deployments/flm.gnosis.json \
   --batch config/batches/bootstrap.production.json
 ```
 
 Strict mode rejects placeholder Safe/owner/target addresses, zero liquidity amounts for bootstrap
 and deposit batches, missing deadlines, and zero slippage minimums on liquidity add/remove paths.
-The example config is validated in CI with `--allow-placeholders` because it is only a schema
-template.
+When `--deployment-output` is supplied, preflight also checks that the batch references the deployed
+manager, proposal source, tokens, owner Safe, bootstrap recipient, and official proposer expected
+for the selected operation. The example config is validated in CI with `--allow-placeholders`
+because it is only a schema template.
 
 CI also runs:
 
@@ -102,7 +105,7 @@ quote. The examples use zeros only as placeholders.
 ## Audit Procedure
 
 1. Review the JSON config.
-2. Run `tools/preflight-limited-deploy.sh --batch <final-config>`.
+2. Run `tools/preflight-limited-deploy.sh --deployment-output <deploy-output> --batch <final-config>`.
 3. Review the generated Markdown summary and Safe transaction-builder JSON.
 4. Decode each `data` field with `cast calldata-decode` or a Safe UI preview.
 5. Confirm `to`, `value`, deadlines, slippage, and token approvals.
