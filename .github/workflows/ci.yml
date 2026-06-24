@@ -24,6 +24,12 @@ jobs:
       - name: Format
         run: forge fmt --check
 
+      - name: Scope guard
+        run: bash tools/check-scope.sh
+
+      - name: API freeze guard
+        run: bash tools/check-api-freeze.sh
+
       - name: Test
         run: forge test
 

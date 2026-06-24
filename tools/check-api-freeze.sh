@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+check_contract() {
+  local name="$1"
+  local contract="$2"
+  local baseline="audit/api-freeze/${name}.method-identifiers.json"
+  local generated="${TMP_DIR}/${name}.method-identifiers.json"
+
+  forge inspect --json "$contract" methodIdentifiers > "$generated"
+  if ! diff -u "$baseline" "$generated"; then
+    echo "API freeze guard failed for ${name}" >&2
+    echo "If this API change is intentional, review it and update ${baseline}." >&2
+    exit 1
+  fi
+}
+
+check_contract \
+  "FutarchyLiquidityManager" \
+  "src/core/FutarchyLiquidityManager.sol:FutarchyLiquidityManager"
+check_contract \
+  "FutarchyOfficialProposalSource" \
+  "src/sources/FutarchyOfficialProposalSource.sol:FutarchyOfficialProposalSource"
+check_contract \
+  "DeadlineBoundedRealityProxy" \
+  "src/oracles/DeadlineBoundedRealityProxy.sol:DeadlineBoundedRealityProxy"
+check_contract \
+  "SwaprAlgebraLiquidityAdapter" \
+  "src/adapters/SwaprAlgebraLiquidityAdapter.sol:SwaprAlgebraLiquidityAdapter"
+
+echo "API freeze guard passed"

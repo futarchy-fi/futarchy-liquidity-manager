@@ -1,0 +1,10 @@
+{
+  "DEFAULT_TICK_LOWER()": "820c161e",
+  "DEFAULT_TICK_UPPER()": "94e49769",
+  "POSITION_MANAGER()": "1bea83fe",
+  "addFullRangeLiquidity(address,address,uint256,uint256,bytes)": "de2e6c74",
+  "compoundPosition(address,address,bytes)": "9e308266",
+  "getPositionTokenId(address,address)": "af07ae85",
+  "positionTokenId(bytes32)": "607f1402",
+  "removeLiquidity(address,address,uint128,bytes)": "e51af905"
+}

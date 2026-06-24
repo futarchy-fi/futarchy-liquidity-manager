@@ -9,8 +9,12 @@ batch so reviewers can audit calldata and values independently.
 ```sh
 FLM_BATCH_CONFIG=config/batches/bootstrap.json \
 FLM_BATCH_OUTPUT=out/bootstrap.safe.json \
+FLM_BATCH_SUMMARY=out/bootstrap.summary.md \
 forge script script/BuildLiquidityOperationBatch.s.sol
 ```
+
+The script writes both the Safe transaction-builder JSON and a Markdown sidecar summary. Review the
+summary first, then decode the calldata in the JSON before signing.
 
 ## Supported Operations
 

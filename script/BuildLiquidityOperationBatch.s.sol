@@ -35,15 +35,19 @@ contract BuildLiquidityOperationBatch is Script {
         string memory configPath =
             vm.envOr("FLM_BATCH_CONFIG", string("config/safe-batch.example.json"));
         string memory outputPath = vm.envOr("FLM_BATCH_OUTPUT", string("out/flm-safe-batch.json"));
+        string memory summaryPath =
+            vm.envOr("FLM_BATCH_SUMMARY", string("out/flm-safe-batch.summary.md"));
         string memory json = vm.readFile(configPath);
         BatchConfig memory cfg = _readBatchConfig(json);
 
         string memory txs = _buildTransactions(json, cfg);
         string memory batch = _safeBatchJson(cfg, txs);
         vm.writeFile(outputPath, batch);
+        vm.writeFile(summaryPath, _summaryMarkdown(json, cfg, outputPath));
 
         console2.log("Config:", configPath);
         console2.log("Output:", outputPath);
+        console2.log("Summary:", summaryPath);
         console2.log("Operation:", cfg.operation);
         console2.log("Manager:", cfg.manager);
     }
@@ -311,6 +315,220 @@ contract BuildLiquidityOperationBatch is Script {
             '"contractMethod":null,',
             '"contractInputsValues":null',
             "}"
+        );
+    }
+
+    function _summaryMarkdown(string memory json, BatchConfig memory cfg, string memory outputPath)
+        internal
+        view
+        returns (string memory)
+    {
+        return string.concat(
+            "# FLM Safe Batch Summary\n\n",
+            _summaryHeader(cfg, outputPath),
+            _summaryAdapterParams(json),
+            _summaryValidation(json),
+            "## Review Checklist\n\n",
+            "- Confirm every `to` address in the Safe JSON matches this summary.\n",
+            "- Confirm `value` is nonzero only for native-collateral calls.\n",
+            "- Confirm slippage minimums and deadlines came from a fresh quote.\n",
+            "- Decode every `data` field before signing.\n"
+        );
+    }
+
+    function _summaryHeader(BatchConfig memory cfg, string memory outputPath)
+        internal
+        view
+        returns (string memory)
+    {
+        return string.concat(
+            _summaryBatchInfo(cfg, outputPath),
+            _summaryTargets(cfg),
+            _summaryAmounts(cfg),
+            _summaryProposal(cfg)
+        );
+    }
+
+    function _summaryBatchInfo(BatchConfig memory cfg, string memory outputPath)
+        internal
+        view
+        returns (string memory)
+    {
+        return string.concat(
+            "- Output: `",
+            outputPath,
+            "`\n",
+            "- Chain ID: `",
+            vm.toString(cfg.chainId),
+            "`\n",
+            "- Operation: `",
+            cfg.operation,
+            "`\n",
+            "- Safe: `",
+            vm.toString(cfg.safe),
+            "`\n",
+            "- Owner: `",
+            vm.toString(cfg.owner),
+            "`\n"
+        );
+    }
+
+    function _summaryTargets(BatchConfig memory cfg) internal view returns (string memory) {
+        return string.concat(
+            "- Manager: `",
+            vm.toString(cfg.manager),
+            "`\n",
+            "- Proposal source: `",
+            vm.toString(cfg.proposalSource),
+            "`\n",
+            "- Company token: `",
+            vm.toString(cfg.companyToken),
+            "`\n"
+        );
+    }
+
+    function _summaryAmounts(BatchConfig memory cfg) internal view returns (string memory) {
+        return string.concat(
+            "- Company amount: `",
+            vm.toString(cfg.companyAmount),
+            "`\n",
+            "- Native value: `",
+            vm.toString(cfg.nativeValue),
+            "`\n",
+            "- Shares: `",
+            vm.toString(cfg.shares),
+            "`\n",
+            "- Recipient: `",
+            vm.toString(cfg.recipient),
+            "`\n",
+            "- Unwrap native: `",
+            vm.toString(cfg.unwrapNative),
+            "`\n"
+        );
+    }
+
+    function _summaryProposal(BatchConfig memory cfg) internal view returns (string memory) {
+        return string.concat(
+            "- Proposal ID: `",
+            vm.toString(cfg.proposalId),
+            "`\n",
+            "- Proposal: `",
+            vm.toString(cfg.proposal),
+            "`\n",
+            "- Creator: `",
+            vm.toString(cfg.creator),
+            "`\n\n"
+        );
+    }
+
+    function _summaryAdapterParams(string memory json) internal view returns (string memory) {
+        return string.concat(
+            "## Adapter Parameters\n\n",
+            _addParamSummary(json, "spotAdd", ".spotAdd"),
+            _exitParamSummary(json, "spotExit", ".spotExit"),
+            _addParamSummary(json, "yesAdd", ".yesAdd"),
+            _addParamSummary(json, "noAdd", ".noAdd"),
+            _exitParamSummary(json, "yesExit", ".yesExit"),
+            _exitParamSummary(json, "noExit", ".noExit"),
+            "\n"
+        );
+    }
+
+    function _addParamSummary(string memory json, string memory label, string memory base)
+        internal
+        view
+        returns (string memory)
+    {
+        return string.concat(
+            "- `",
+            label,
+            "` tickLower `",
+            vm.toString(json.readInt(string.concat(base, ".tickLower"))),
+            "`, tickUpper `",
+            vm.toString(json.readInt(string.concat(base, ".tickUpper"))),
+            "`, amount0Min `",
+            vm.toString(json.readUint(string.concat(base, ".amount0Min"))),
+            "`, amount1Min `",
+            vm.toString(json.readUint(string.concat(base, ".amount1Min"))),
+            "`, deadline `",
+            vm.toString(json.readUint(string.concat(base, ".deadline"))),
+            "`, sqrtPriceX96 `",
+            vm.toString(json.readUint(string.concat(base, ".sqrtPriceX96"))),
+            "`\n"
+        );
+    }
+
+    function _exitParamSummary(string memory json, string memory label, string memory base)
+        internal
+        view
+        returns (string memory)
+    {
+        return string.concat(
+            "- `",
+            label,
+            "` amount0Min `",
+            vm.toString(json.readUint(string.concat(base, ".amount0Min"))),
+            "`, amount1Min `",
+            vm.toString(json.readUint(string.concat(base, ".amount1Min"))),
+            "`, deadline `",
+            vm.toString(json.readUint(string.concat(base, ".deadline"))),
+            "`\n"
+        );
+    }
+
+    function _summaryValidation(string memory json) internal view returns (string memory) {
+        return string.concat(
+            "## Proposal Validation\n\n",
+            _summaryValidationAddresses(json),
+            _summaryValidationBounds(json)
+        );
+    }
+
+    function _summaryValidationAddresses(string memory json) internal view returns (string memory) {
+        string memory base = ".validation";
+        return string.concat(
+            "- Enabled: `",
+            vm.toString(json.readBool(string.concat(base, ".enabled"))),
+            "`\n",
+            "- Expected proposal token: `",
+            vm.toString(json.readAddress(string.concat(base, ".expectedProposalToken"))),
+            "`\n",
+            "- Expected collateral token: `",
+            vm.toString(json.readAddress(string.concat(base, ".expectedCollateralToken"))),
+            "`\n",
+            "- Conditional tokens: `",
+            vm.toString(json.readAddress(string.concat(base, ".conditionalTokens"))),
+            "`\n",
+            "- Trusted oracle: `",
+            vm.toString(json.readAddress(string.concat(base, ".trustedOracle"))),
+            "`\n",
+            "- Realitio: `",
+            vm.toString(json.readAddress(string.concat(base, ".realitio"))),
+            "`\n",
+            "- Trusted arbitrator: `",
+            vm.toString(json.readAddress(string.concat(base, ".trustedArbitrator"))),
+            "`\n"
+        );
+    }
+
+    function _summaryValidationBounds(string memory json) internal view returns (string memory) {
+        string memory base = ".validation";
+        return string.concat(
+            "- Max opening delay: `",
+            vm.toString(json.readUint(string.concat(base, ".maxOpeningDelay"))),
+            "`\n",
+            "- Min timeout: `",
+            vm.toString(json.readUint(string.concat(base, ".minTimeout"))),
+            "`\n",
+            "- Max timeout: `",
+            vm.toString(json.readUint(string.concat(base, ".maxTimeout"))),
+            "`\n",
+            "- Max min bond: `",
+            vm.toString(json.readUint(string.concat(base, ".maxMinBond"))),
+            "`\n",
+            "- Require pools: `",
+            vm.toString(json.readBool(string.concat(base, ".requirePools"))),
+            "`\n\n"
         );
     }
 

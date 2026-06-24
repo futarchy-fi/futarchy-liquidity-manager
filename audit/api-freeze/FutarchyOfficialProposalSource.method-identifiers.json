@@ -1,0 +1,21 @@
+{
+  "ALGEBRA_FACTORY()": "9949da1f",
+  "acceptOwnership()": "79ba5097",
+  "clearOfficialProposal()": "08756a92",
+  "currentOfficialProposal()": "2db05dcd",
+  "officialProposal()": "4913a19c",
+  "officialProposalExtended()": "0e0e6911",
+  "officialProposer()": "38056b22",
+  "owner()": "8da5cb5b",
+  "pendingOwner()": "e30c3978",
+  "proposalValidationConfig()": "23c4b44e",
+  "renounceOwnership()": "715018a6",
+  "setManualSettled(bool)": "45b75854",
+  "setOfficialProposal(uint256,address,address)": "d876036e",
+  "setOfficialProposer(address)": "60786b82",
+  "setProposalValidationConfig((bool,address,address,address,address,address,address,uint32,uint32,uint32,uint256,bool))": "f930c771",
+  "setSettlementOracle(address)": "7f9c7c25",
+  "settlementOracle()": "26e18e59",
+  "transferOwnership(address)": "f2fde38b",
+  "validateProposal(address)": "a5e4fec2"
+}

@@ -6,8 +6,17 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 
 import {
     IConditionalTokensCore,
-    IFutarchyProposalCore
+    IFutarchyProposalCore,
+    IRealityETHCore
 } from "../../src/interfaces/IFutarchyTradingCore.sol";
+
+interface IFutarchyProposalRealityView {
+    function realityProxy() external view returns (address);
+}
+
+interface IFutarchyRealityProxyView {
+    function realitio() external view returns (address);
+}
 
 contract FutarchyProposalWiringForkTest is Test {
     address internal constant GNOSIS_WXDAI = 0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d;
@@ -32,6 +41,8 @@ contract FutarchyProposalWiringForkTest is Test {
         bytes32 conditionId = proposal.conditionId();
         assertTrue(questionId != bytes32(0), "missing Reality question id");
         assertTrue(conditionId != bytes32(0), "missing CTF condition id");
+        _assertRealityWiring(proposalAddress, questionId, conditionId);
+
         assertEq(IConditionalTokensCore(GNOSIS_CTF).getOutcomeSlotCount(conditionId), 2);
         IConditionalTokensCore(GNOSIS_CTF).payoutDenominator(conditionId);
 
@@ -59,6 +70,35 @@ contract FutarchyProposalWiringForkTest is Test {
         assertTrue(_startsWith(IERC20Metadata(noCurrency).symbol(), "NO_"));
         assertTrue(_contains(IERC20Metadata(yesCurrency).symbol(), collateralSymbol));
         assertTrue(_contains(IERC20Metadata(noCurrency).symbol(), collateralSymbol));
+    }
+
+    function _assertRealityWiring(address proposalAddress, bytes32 questionId, bytes32 conditionId)
+        internal
+        view
+    {
+        address realityProxy = IFutarchyProposalRealityView(proposalAddress).realityProxy();
+        assertTrue(realityProxy != address(0), "missing Reality proxy");
+        address realitio = IFutarchyRealityProxyView(realityProxy).realitio();
+        assertTrue(realitio != address(0), "missing Realitio");
+        assertEq(
+            IConditionalTokensCore(GNOSIS_CTF).getConditionId(realityProxy, questionId, 2),
+            conditionId,
+            "condition oracle mismatch"
+        );
+
+        (
+            bytes32 contentHash,
+            address arbitrator,
+            uint32 openingTs,
+            uint32 timeout,,,,,,,
+            uint256 minBond
+        ) = IRealityETHCore(realitio).questions(questionId);
+
+        assertTrue(contentHash != bytes32(0), "missing Reality content");
+        assertTrue(arbitrator != address(0), "missing Reality arbitrator");
+        assertGt(openingTs, 0, "missing Reality opening time");
+        assertGt(timeout, 0, "missing Reality timeout");
+        assertGt(minBond, 0, "missing Reality min bond");
     }
 
     function _startsWith(string memory value, string memory prefix) internal pure returns (bool) {

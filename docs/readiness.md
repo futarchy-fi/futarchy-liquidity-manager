@@ -5,13 +5,15 @@ This file tracks the remaining gap between this repository and a limited-funds r
 ## Ready To Audit
 
 - API and scope freeze: no FAO-specific imports, sale contracts, SnapshotX contracts, or
-  deployment-specific custody paths in `src/`.
+  deployment-specific custody paths in `src/`. CI enforces this with `tools/check-scope.sh`.
+- API selector freeze: audited contract method identifiers are snapshotted in `audit/api-freeze`
+  and checked by `tools/check-api-freeze.sh`.
 - Unit tests: core manager, proposal source validation, deadline proxy, and adapter safety checks.
 - Invariant tests: LP supply is backed by managed liquidity, conditional accounting is internally
   consistent, and adapter liquidity accounting matches manager state across deposit, redeem,
   migrate, and settle cycles.
 - Fork tests: env-gated Gnosis checks for Swapr Algebra NFPM, deployed proposal shape, CTF
-  condition wiring, and futarchy router splitting.
+  condition wiring, Reality question wiring, and futarchy router splitting.
 - CI: `forge build`, `forge fmt --check`, `forge test`, and coverage summary.
 - Docs: audit scope, dependency surface, deployment flow, FAO integration boundary, and operation
   batch flow.
