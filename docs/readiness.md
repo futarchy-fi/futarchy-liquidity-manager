@@ -20,6 +20,8 @@ This file tracks the remaining gap between this repository and a limited-funds r
 - Config validation: CI checks deployment and batch example schemas, and strict mode rejects real
   configs with placeholder addresses, missing validation, missing deadlines, or zero slippage
   minimums.
+- Operation templates: bootstrap, add-liquidity, redeem, sync migrate/settle, proposal setup, and
+  emergency-control Safe batch configs are separated for independent calldata review.
 - Docs: audit scope, dependency surface, deployment flow, FAO integration boundary, and operation
   batch flow.
 - NatSpec: integration interfaces, proposal-source views, and adapter slippage/deadline parameters

@@ -1,0 +1,71 @@
+{
+  "chainId": 100,
+  "name": "FLM set proposal validation",
+  "createdFromSafeAddress": "0x0000000000000000000000000000000000000000",
+  "createdFromOwnerAddress": "0x0000000000000000000000000000000000000000",
+  "operation": "setProposalValidationConfig",
+  "manager": "0x0000000000000000000000000000000000000000",
+  "proposalSource": "0x0000000000000000000000000000000000000000",
+  "companyToken": "0x0000000000000000000000000000000000000000",
+  "companyAmount": 0,
+  "nativeValue": 0,
+  "shares": 0,
+  "recipient": "0x0000000000000000000000000000000000000000",
+  "unwrapNative": false,
+  "proposalId": 0,
+  "proposal": "0x0000000000000000000000000000000000000000",
+  "creator": "0x0000000000000000000000000000000000000000",
+  "spotAdd": {
+    "tickLower": -887220,
+    "tickUpper": 887220,
+    "amount0Min": 0,
+    "amount1Min": 0,
+    "deadline": 0,
+    "sqrtPriceX96": 0
+  },
+  "spotExit": {
+    "amount0Min": 0,
+    "amount1Min": 0,
+    "deadline": 0
+  },
+  "yesAdd": {
+    "tickLower": -887220,
+    "tickUpper": 887220,
+    "amount0Min": 0,
+    "amount1Min": 0,
+    "deadline": 0,
+    "sqrtPriceX96": 0
+  },
+  "noAdd": {
+    "tickLower": -887220,
+    "tickUpper": 887220,
+    "amount0Min": 0,
+    "amount1Min": 0,
+    "deadline": 0,
+    "sqrtPriceX96": 0
+  },
+  "yesExit": {
+    "amount0Min": 0,
+    "amount1Min": 0,
+    "deadline": 0
+  },
+  "noExit": {
+    "amount0Min": 0,
+    "amount1Min": 0,
+    "deadline": 0
+  },
+  "validation": {
+    "enabled": false,
+    "expectedProposalToken": "0x0000000000000000000000000000000000000000",
+    "expectedCollateralToken": "0x0000000000000000000000000000000000000000",
+    "conditionalTokens": "0xCeAfDD6bc0bEF976fdCd1112955828E00543c0Ce",
+    "trustedOracle": "0x0000000000000000000000000000000000000000",
+    "realitio": "0x0000000000000000000000000000000000000000",
+    "trustedArbitrator": "0x0000000000000000000000000000000000000000",
+    "maxOpeningDelay": 604800,
+    "minTimeout": 3600,
+    "maxTimeout": 604800,
+    "maxMinBond": 0,
+    "requirePools": true
+  }
+}

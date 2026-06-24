@@ -20,13 +20,33 @@ For real operation batches, run strict validation on the finalized config before
 signing:
 
 ```sh
-tools/validate-configs.sh --batch config/batches/bootstrap.json
+tools/validate-configs.sh --batch config/batches/bootstrap.production.json
 ```
 
 Strict mode rejects placeholder Safe/owner/target addresses, zero liquidity amounts for bootstrap
 and deposit batches, missing deadlines, and zero slippage minimums on liquidity add/remove paths.
 The example config is validated in CI with `--allow-placeholders` because it is only a schema
 template.
+
+## Operation Templates
+
+Start from the closest operation-specific template instead of editing the generic example:
+
+- `config/batches/bootstrap.example.json` for `initializeFromBootstrap`.
+- `config/batches/deposit-to-spot.example.json` for later spot liquidity additions.
+- `config/batches/sync.example.json` for both spot-to-conditional migration and settlement
+  return-to-spot.
+- `config/batches/redeem.example.json` for LP share redemption.
+- `config/batches/set-proposal-validation.example.json` before admitting a real proposal.
+- `config/batches/set-official-proposal.example.json` after proposal validation is configured.
+- `config/batches/arm-emergency-exit.example.json` to start the emergency delay.
+- `config/batches/disarm-emergency-exit.example.json` to cancel an armed emergency exit.
+- `config/batches/emergency-exit.example.json` for the delayed full emergency exit.
+- `config/batches/sweep-idle.example.json` for idle asset recovery to the bootstrap recipient.
+
+All templates keep every slippage/deadline field visible even when the selected operation does not
+use that leg. This makes reviews mechanical: fill the operation fields, run strict validation,
+generate the batch, then audit the summary and calldata.
 
 ## Supported Operations
 

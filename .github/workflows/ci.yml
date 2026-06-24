@@ -32,9 +32,13 @@ jobs:
 
       - name: Config schema guard
         run: |
+          batch_args=()
+          for file in config/safe-batch.example.json config/batches/*.example.json; do
+            batch_args+=(--batch "$file")
+          done
           bash tools/validate-configs.sh --allow-placeholders \
             --deploy config/gnosis.example.json \
-            --batch config/safe-batch.example.json
+            "${batch_args[@]}"
 
       - name: Test
         run: forge test
