@@ -41,7 +41,7 @@ contract FutarchyOfficialProposalSourceTest is Test {
         vm.warp(1_000_000);
         factory = new MockAlgebraFactoryLike();
         source = new FutarchyOfficialProposalSource(
-            owner, officialProposer, IAlgebraFactoryLike(address(factory))
+            owner, officialProposer, IAlgebraFactoryLike(address(factory)), ""
         );
         oracle = new MockProposalSettlementOracle();
         conditionalTokens = new MockConditionalTokens();
@@ -150,6 +150,23 @@ contract FutarchyOfficialProposalSourceTest is Test {
         (uint256 proposalId,, bool exists,,,,,) = source.officialProposal();
         assertEq(proposalId, 11);
         assertTrue(exists);
+    }
+
+    function test_constructor_can_set_validation_before_safe_owner_takes_over() public {
+        FutarchyOfficialProposalSource configured = new FutarchyOfficialProposalSource(
+            nonOwner,
+            officialProposer,
+            IAlgebraFactoryLike(address(factory)),
+            abi.encode(_validationConfig(true, true))
+        );
+
+        assertEq(configured.owner(), nonOwner);
+
+        (bool enabled, address expectedProposalToken, address expectedCollateralToken,,,,,,,,,) =
+            configured.proposalValidationConfig();
+        assertTrue(enabled);
+        assertEq(expectedProposalToken, company);
+        assertEq(expectedCollateralToken, wxdai);
     }
 
     function test_validation_rejects_wrong_collateral_pair() public {
@@ -290,22 +307,28 @@ contract FutarchyOfficialProposalSourceTest is Test {
     }
 
     function _enableValidation(bool requirePools) internal {
-        source.setProposalValidationConfig(
-            FutarchyOfficialProposalSource.ProposalValidationConfig({
-                enabled: true,
-                expectedProposalToken: company,
-                expectedCollateralToken: wxdai,
-                conditionalTokens: address(conditionalTokens),
-                trustedOracle: trustedOracle,
-                realitio: address(realitio),
-                trustedArbitrator: trustedArbitrator,
-                maxOpeningDelay: uint32(7 days),
-                minTimeout: uint32(1 hours),
-                maxTimeout: uint32(7 days),
-                maxMinBond: 100 ether,
-                requirePools: requirePools
-            })
-        );
+        source.setProposalValidationConfig(_validationConfig(true, requirePools));
+    }
+
+    function _validationConfig(bool enabled, bool requirePools)
+        internal
+        view
+        returns (FutarchyOfficialProposalSource.ProposalValidationConfig memory)
+    {
+        return FutarchyOfficialProposalSource.ProposalValidationConfig({
+            enabled: enabled,
+            expectedProposalToken: enabled ? company : address(0),
+            expectedCollateralToken: enabled ? wxdai : address(0),
+            conditionalTokens: enabled ? address(conditionalTokens) : address(0),
+            trustedOracle: enabled ? trustedOracle : address(0),
+            realitio: enabled ? address(realitio) : address(0),
+            trustedArbitrator: enabled ? trustedArbitrator : address(0),
+            maxOpeningDelay: enabled ? uint32(7 days) : 0,
+            minTimeout: enabled ? uint32(1 hours) : 0,
+            maxTimeout: enabled ? uint32(7 days) : 0,
+            maxMinBond: enabled ? 100 ether : 0,
+            requirePools: requirePools
+        });
     }
 
     function _validProposal(bool setPools, bool setReality)

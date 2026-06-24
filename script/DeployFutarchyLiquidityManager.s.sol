@@ -38,69 +38,81 @@ contract DeployFutarchyLiquidityManager is Script {
         FutarchyOfficialProposalSource.ProposalValidationConfig validation;
     }
 
+    struct DeployedContracts {
+        address proposalSource;
+        address deadlineProxy;
+        address spotAdapter;
+        address conditionalAdapter;
+        address manager;
+    }
+
     function run() external {
         string memory configPath =
             vm.envOr("FLM_DEPLOY_CONFIG", string("config/gnosis.example.json"));
         string memory outputPath =
             vm.envOr("FLM_DEPLOY_OUTPUT", string("deployments/flm.latest.json"));
         uint256 privateKey = vm.envUint("PRIVATE_KEY");
+        bytes32 configHash = keccak256(bytes(vm.readFile(configPath)));
         DeployConfig memory cfg = _readConfig(configPath);
         _assertDeployConfig(cfg);
 
         vm.startBroadcast(privateKey);
 
-        FutarchyOfficialProposalSource proposalSource = new FutarchyOfficialProposalSource(
-            cfg.owner, cfg.officialProposer, IAlgebraFactoryLike(cfg.algebraFactory)
-        );
+        DeployedContracts memory deployed;
 
-        DeadlineBoundedRealityProxy deadlineProxy;
         if (cfg.deployDeadlineProxy) {
-            deadlineProxy = new DeadlineBoundedRealityProxy(
-                IConditionalTokensCore(cfg.deadlineConditionalTokens),
-                IRealityETHCore(cfg.deadlineRealitio),
-                cfg.maxQuestionDuration
+            deployed.deadlineProxy = address(
+                new DeadlineBoundedRealityProxy(
+                    IConditionalTokensCore(cfg.deadlineConditionalTokens),
+                    IRealityETHCore(cfg.deadlineRealitio),
+                    cfg.maxQuestionDuration
+                )
             );
             if (cfg.validation.enabled && cfg.validation.trustedOracle == address(0)) {
-                cfg.validation.trustedOracle = address(deadlineProxy);
+                cfg.validation.trustedOracle = deployed.deadlineProxy;
             }
         }
 
-        if (cfg.validation.enabled) {
-            proposalSource.setProposalValidationConfig(cfg.validation);
-        }
-
-        SwaprAlgebraLiquidityAdapter spotAdapter = new SwaprAlgebraLiquidityAdapter(
-            ISwaprAlgebraPositionManager(cfg.positionManager), cfg.tickLower, cfg.tickUpper
-        );
-        SwaprAlgebraLiquidityAdapter conditionalAdapter = new SwaprAlgebraLiquidityAdapter(
-            ISwaprAlgebraPositionManager(cfg.positionManager), cfg.tickLower, cfg.tickUpper
+        deployed.proposalSource = address(
+            new FutarchyOfficialProposalSource(
+                cfg.owner,
+                cfg.officialProposer,
+                IAlgebraFactoryLike(cfg.algebraFactory),
+                _encodeInitialValidationConfig(cfg.validation)
+            )
         );
 
-        FutarchyLiquidityManager manager = new FutarchyLiquidityManager(
-            cfg.bootstrapRecipient,
-            IERC20(cfg.companyToken),
-            IWrappedNative(cfg.wrappedNative),
-            cfg.officialProposer,
-            proposalSource,
-            spotAdapter,
-            conditionalAdapter,
-            IFutarchyConditionalRouter(cfg.futarchyRouter),
-            cfg.owner,
-            cfg.lpTokenName,
-            cfg.lpTokenSymbol
+        deployed.spotAdapter = address(
+            new SwaprAlgebraLiquidityAdapter(
+                ISwaprAlgebraPositionManager(cfg.positionManager), cfg.tickLower, cfg.tickUpper
+            )
+        );
+
+        deployed.conditionalAdapter = address(
+            new SwaprAlgebraLiquidityAdapter(
+                ISwaprAlgebraPositionManager(cfg.positionManager), cfg.tickLower, cfg.tickUpper
+            )
+        );
+
+        deployed.manager = address(
+            new FutarchyLiquidityManager(
+                cfg.bootstrapRecipient,
+                IERC20(cfg.companyToken),
+                IWrappedNative(cfg.wrappedNative),
+                cfg.officialProposer,
+                FutarchyOfficialProposalSource(deployed.proposalSource),
+                SwaprAlgebraLiquidityAdapter(deployed.spotAdapter),
+                SwaprAlgebraLiquidityAdapter(deployed.conditionalAdapter),
+                IFutarchyConditionalRouter(cfg.futarchyRouter),
+                cfg.owner,
+                cfg.lpTokenName,
+                cfg.lpTokenSymbol
+            )
         );
 
         vm.stopBroadcast();
 
-        _writeDeploymentOutput(
-            outputPath,
-            cfg,
-            address(proposalSource),
-            address(deadlineProxy),
-            address(spotAdapter),
-            address(conditionalAdapter),
-            address(manager)
-        );
+        _writeDeploymentOutput(outputPath, cfg, configHash, deployed);
 
         console2.log("Config:", configPath);
         console2.log("Output:", outputPath);
@@ -109,11 +121,11 @@ contract DeployFutarchyLiquidityManager is Script {
         console2.log("Company token:", cfg.companyToken);
         console2.log("Wrapped native:", cfg.wrappedNative);
         console2.log("Official proposer:", cfg.officialProposer);
-        console2.log("Proposal source:", address(proposalSource));
-        console2.log("Deadline proxy:", address(deadlineProxy));
-        console2.log("Spot adapter:", address(spotAdapter));
-        console2.log("Conditional adapter:", address(conditionalAdapter));
-        console2.log("Liquidity manager:", address(manager));
+        console2.log("Proposal source:", deployed.proposalSource);
+        console2.log("Deadline proxy:", deployed.deadlineProxy);
+        console2.log("Spot adapter:", deployed.spotAdapter);
+        console2.log("Conditional adapter:", deployed.conditionalAdapter);
+        console2.log("Liquidity manager:", deployed.manager);
     }
 
     function _readConfig(string memory path) internal view returns (DeployConfig memory cfg) {
@@ -182,27 +194,58 @@ contract DeployFutarchyLiquidityManager is Script {
         require(value != address(0), label);
     }
 
+    function _encodeInitialValidationConfig(
+        FutarchyOfficialProposalSource.ProposalValidationConfig memory config
+    ) internal pure returns (bytes memory) {
+        if (!config.enabled) return "";
+        return abi.encode(config);
+    }
+
     function _writeDeploymentOutput(
         string memory path,
         DeployConfig memory cfg,
-        address proposalSource,
-        address deadlineProxy,
-        address spotAdapter,
-        address conditionalAdapter,
-        address manager
+        bytes32 configHash,
+        DeployedContracts memory deployed
     ) internal {
         string memory key = "deployment";
+        _serializeDeploymentConfig(key, cfg, configHash);
+        _serializeDeploymentAddresses(key, deployed);
+        string memory output = _serializeDeploymentCodeHashes(key, deployed);
+        vm.writeJson(output, path);
+    }
+
+    function _serializeDeploymentConfig(
+        string memory key,
+        DeployConfig memory cfg,
+        bytes32 configHash
+    ) internal {
         vm.serializeUint(key, "chainId", cfg.chainId);
+        vm.serializeBytes32(key, "configHash", configHash);
         vm.serializeAddress(key, "owner", cfg.owner);
         vm.serializeAddress(key, "bootstrapRecipient", cfg.bootstrapRecipient);
         vm.serializeAddress(key, "companyToken", cfg.companyToken);
         vm.serializeAddress(key, "wrappedNative", cfg.wrappedNative);
         vm.serializeAddress(key, "officialProposer", cfg.officialProposer);
-        vm.serializeAddress(key, "proposalSource", proposalSource);
-        vm.serializeAddress(key, "deadlineProxy", deadlineProxy);
-        vm.serializeAddress(key, "spotAdapter", spotAdapter);
-        vm.serializeAddress(key, "conditionalAdapter", conditionalAdapter);
-        string memory output = vm.serializeAddress(key, "manager", manager);
-        vm.writeJson(output, path);
+    }
+
+    function _serializeDeploymentAddresses(string memory key, DeployedContracts memory deployed)
+        internal
+    {
+        vm.serializeAddress(key, "proposalSource", deployed.proposalSource);
+        vm.serializeAddress(key, "deadlineProxy", deployed.deadlineProxy);
+        vm.serializeAddress(key, "spotAdapter", deployed.spotAdapter);
+        vm.serializeAddress(key, "conditionalAdapter", deployed.conditionalAdapter);
+        vm.serializeAddress(key, "manager", deployed.manager);
+    }
+
+    function _serializeDeploymentCodeHashes(string memory key, DeployedContracts memory deployed)
+        internal
+        returns (string memory)
+    {
+        vm.serializeBytes32(key, "proposalSourceCodeHash", deployed.proposalSource.codehash);
+        vm.serializeBytes32(key, "deadlineProxyCodeHash", deployed.deadlineProxy.codehash);
+        vm.serializeBytes32(key, "spotAdapterCodeHash", deployed.spotAdapter.codehash);
+        vm.serializeBytes32(key, "conditionalAdapterCodeHash", deployed.conditionalAdapter.codehash);
+        return vm.serializeBytes32(key, "managerCodeHash", deployed.manager.codehash);
     }
 }

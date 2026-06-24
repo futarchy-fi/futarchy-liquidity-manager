@@ -31,7 +31,9 @@ Gnosis defaults included in the example:
 
 Validation fields are explicit even when disabled. For production, prefer enabling validation before
 setting an official proposal. If `deployDeadlineProxy` is true and `validation.trustedOracle` is
-zero, the deployment script uses the newly deployed `DeadlineBoundedRealityProxy`.
+zero, the deployment script uses the newly deployed `DeadlineBoundedRealityProxy`. Enabled
+validation is constructor-initialized on the proposal source, so the owner can be a Safe from the
+first deployed state.
 
 ## Production Preflight
 
@@ -78,8 +80,8 @@ forge script script/DeployFutarchyLiquidityManager.s.sol \
   --verify
 ```
 
-The script writes deployed addresses to `FLM_DEPLOY_OUTPUT`. Review that output before generating
-liquidity or proposal batches.
+The script writes deployed addresses, the reviewed config hash, and deployed code hashes to
+`FLM_DEPLOY_OUTPUT`. Review that output before generating liquidity or proposal batches.
 
 Before signing any operation batch, link it back to the reviewed deploy config and deployment
 output:
@@ -91,8 +93,9 @@ tools/check-deployment-artifacts.sh \
   --batch config/batches/bootstrap.production.json
 ```
 
-This catches copied-address mistakes such as a batch targeting the wrong manager, proposal source,
-company token, owner Safe, bootstrap recipient, or official proposer.
+This recomputes the deploy config hash and catches copied-address mistakes such as a batch
+targeting the wrong manager, proposal source, company token, owner Safe, bootstrap recipient, or
+official proposer.
 
 ## Limited-Funds Deployment Order
 

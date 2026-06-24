@@ -27,10 +27,11 @@ tools/preflight-limited-deploy.sh \
 
 Strict mode rejects placeholder Safe/owner/target addresses, zero liquidity amounts for bootstrap
 and deposit batches, missing deadlines, and zero slippage minimums on liquidity add/remove paths.
-When `--deployment-output` is supplied, preflight also checks that the batch references the deployed
-manager, proposal source, tokens, owner Safe, bootstrap recipient, and official proposer expected
-for the selected operation. The example config is validated in CI with `--allow-placeholders`
-because it is only a schema template.
+When `--deployment-output` is supplied, preflight also verifies the deployment output hash schema,
+recomputes the reviewed deploy config hash when `--deploy` is supplied, and checks that the batch
+references the deployed manager, proposal source, tokens, owner Safe, bootstrap recipient, and
+official proposer expected for the selected operation. The example config is validated in CI with
+`--allow-placeholders` because it is only a schema template.
 
 CI also runs:
 

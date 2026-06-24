@@ -56,4 +56,4 @@ jobs:
         run: forge test
 
       - name: Coverage summary
-        run: forge coverage --report summary
+        run: forge coverage --ir-minimum --report summary

@@ -123,7 +123,8 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
     constructor(
         address initialOwner,
         address initialOfficialProposer,
-        IAlgebraFactoryLike algebraFactory
+        IAlgebraFactoryLike algebraFactory,
+        bytes memory initialValidationConfigData
     ) Ownable() {
         if (
             initialOwner == address(0) || initialOfficialProposer == address(0)
@@ -132,10 +133,15 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
             revert ZeroAddress();
         }
 
-        _transferOwnership(initialOwner);
-
         officialProposer = initialOfficialProposer;
         ALGEBRA_FACTORY = algebraFactory;
+        if (initialValidationConfigData.length != 0) {
+            _setProposalValidationConfig(
+                abi.decode(initialValidationConfigData, (ProposalValidationConfig))
+            );
+        }
+
+        _transferOwnership(initialOwner);
     }
 
     /// @notice Updates the only proposal creator whose proposals should be considered official.
@@ -163,21 +169,7 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         external
         onlyOwner
     {
-        if (config.enabled) {
-            if (
-                config.expectedProposalToken == address(0)
-                    || config.expectedCollateralToken == address(0)
-                    || config.conditionalTokens == address(0) || config.trustedOracle == address(0)
-                    || config.realitio == address(0) || config.trustedArbitrator == address(0)
-                    || config.maxOpeningDelay == 0 || config.maxTimeout == 0
-                    || config.minTimeout > config.maxTimeout
-            ) {
-                revert InvalidProposalValidationConfig();
-            }
-        }
-
-        proposalValidationConfig = config;
-        emit ProposalValidationConfigUpdated(config);
+        _setProposalValidationConfig(config);
     }
 
     /// @notice Sets the current official proposal.
@@ -467,6 +459,24 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         }
 
         return p.manualSettled;
+    }
+
+    function _setProposalValidationConfig(ProposalValidationConfig memory config) internal {
+        if (config.enabled) {
+            if (
+                config.expectedProposalToken == address(0)
+                    || config.expectedCollateralToken == address(0)
+                    || config.conditionalTokens == address(0) || config.trustedOracle == address(0)
+                    || config.realitio == address(0) || config.trustedArbitrator == address(0)
+                    || config.maxOpeningDelay == 0 || config.maxTimeout == 0
+                    || config.minTimeout > config.maxTimeout
+            ) {
+                revert InvalidProposalValidationConfig();
+            }
+        }
+
+        proposalValidationConfig = config;
+        emit ProposalValidationConfigUpdated(config);
     }
 
     function _resolveOfficialProposalView() internal view returns (ProposalView memory p) {

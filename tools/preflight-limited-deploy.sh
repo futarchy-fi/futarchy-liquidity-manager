@@ -88,9 +88,11 @@ validate_args=()
 if [[ -n "$DEPLOY_CONFIG" ]]; then
   validate_args+=(--deploy "$DEPLOY_CONFIG")
 fi
-for batch in "${BATCH_FILES[@]}"; do
-  validate_args+=(--batch "$batch")
-done
+if [[ ${#BATCH_FILES[@]} -gt 0 ]]; then
+  for batch in "${BATCH_FILES[@]}"; do
+    validate_args+=(--batch "$batch")
+  done
+fi
 
 if [[ ${#validate_args[@]} -gt 0 ]]; then
   echo "== Strict config validation =="
@@ -108,9 +110,11 @@ if [[ -n "$DEPLOYMENT_OUTPUT" ]]; then
   if [[ -n "$DEPLOY_CONFIG" ]]; then
     artifact_args+=(--deploy "$DEPLOY_CONFIG")
   fi
-  for batch in "${BATCH_FILES[@]}"; do
-    artifact_args+=(--batch "$batch")
-  done
+  if [[ ${#BATCH_FILES[@]} -gt 0 ]]; then
+    for batch in "${BATCH_FILES[@]}"; do
+      artifact_args+=(--batch "$batch")
+    done
+  fi
 
   echo "== Deployment artifact links =="
   bash tools/check-deployment-artifacts.sh "${artifact_args[@]}"
@@ -123,17 +127,19 @@ if [[ "$RUN_FORK_TESTS" == true ]]; then
   fi
 
   if [[ -z "$PROPOSAL_ADDRESS" ]]; then
-    for batch in "${BATCH_FILES[@]}"; do
-      candidate="$(jq -r '
-        select(.operation == "setOfficialProposal")
-        | .proposal
-        | select(type == "string" and test("^0x[0-9a-fA-F]{40}$"))
-      ' "$batch")"
-      if [[ -n "$candidate" && ! "$candidate" =~ ^[[:space:]]*$ ]]; then
-        PROPOSAL_ADDRESS="$candidate"
-        break
-      fi
-    done
+    if [[ ${#BATCH_FILES[@]} -gt 0 ]]; then
+      for batch in "${BATCH_FILES[@]}"; do
+        candidate="$(jq -r '
+          select(.operation == "setOfficialProposal")
+          | .proposal
+          | select(type == "string" and test("^0x[0-9a-fA-F]{40}$"))
+        ' "$batch")"
+        if [[ -n "$candidate" && ! "$candidate" =~ ^[[:space:]]*$ ]]; then
+          PROPOSAL_ADDRESS="$candidate"
+          break
+        fi
+      done
+    fi
   fi
 
   if [[ -z "$PROPOSAL_ADDRESS" && -n "${TEST_FUTARCHY_PROPOSAL:-}" ]]; then

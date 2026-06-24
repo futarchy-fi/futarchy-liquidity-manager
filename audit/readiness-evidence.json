@@ -139,7 +139,7 @@
       "status": "ready-to-audit",
       "evidence": [
         {
-          "description": "Deployment script reads JSON config instead of hard-coded production addresses.",
+          "description": "Deployment script reads JSON config instead of hard-coded production addresses and records config/deployed-code hashes in the deployment output.",
           "path": "script/DeployFutarchyLiquidityManager.s.sol"
         },
         {
@@ -232,7 +232,7 @@
           "ciStep": "Limited preflight guard"
         },
         {
-          "description": "Deployment artifact checker links final batch targets back to the deployed manager, proposal source, tokens, owner, bootstrap recipient, and official proposer.",
+          "description": "Deployment artifact checker verifies config hash evidence and links final batch targets back to the deployed manager, proposal source, tokens, owner, bootstrap recipient, and official proposer.",
           "path": "tools/check-deployment-artifacts.sh"
         },
         {
