@@ -40,6 +40,9 @@ jobs:
             --deploy config/gnosis.example.json \
             "${batch_args[@]}"
 
+      - name: Batch template generation
+        run: bash tools/check-batch-templates.sh
+
       - name: Test
         run: forge test
 

@@ -28,6 +28,15 @@ and deposit batches, missing deadlines, and zero slippage minimums on liquidity 
 The example config is validated in CI with `--allow-placeholders` because it is only a schema
 template.
 
+CI also runs:
+
+```sh
+tools/check-batch-templates.sh
+```
+
+That command renders every example template into Safe transaction-builder JSON and a Markdown
+summary, then checks both outputs are parseable.
+
 ## Operation Templates
 
 Start from the closest operation-specific template instead of editing the generic example:
