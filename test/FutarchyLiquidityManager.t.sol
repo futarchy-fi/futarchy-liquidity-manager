@@ -189,6 +189,54 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(company.balanceOf(bootstrapRecipient), companyBefore + 10 ether);
     }
 
+    function test_emergency_controls_are_owner_only() public {
+        _bootstrap();
+
+        vm.startPrank(depositor);
+        vm.expectRevert("Ownable: caller is not the owner");
+        manager.armEmergencyExit();
+        vm.expectRevert("Ownable: caller is not the owner");
+        manager.sweepIdleToBootstrapRecipient(true);
+        vm.expectRevert("Ownable: caller is not the owner");
+        manager.emergencyExitAllToBootstrapRecipient(true, "", "");
+        vm.stopPrank();
+
+        manager.armEmergencyExit();
+        vm.prank(depositor);
+        vm.expectRevert("Ownable: caller is not the owner");
+        manager.disarmEmergencyExit();
+    }
+
+    function test_emergency_exit_after_delay_returns_assets_to_bootstrap_recipient() public {
+        _bootstrap();
+        _createOfficialProposal(true);
+        manager.sync(_emptySyncParams());
+        assertTrue(manager.inConditionalMode());
+
+        uint256 companyBefore = company.balanceOf(bootstrapRecipient);
+        uint256 nativeBefore = bootstrapRecipient.balance;
+
+        manager.armEmergencyExit();
+        vm.expectRevert(FutarchyLiquidityManager.EmergencyExitDelayActive.selector);
+        manager.emergencyExitAllToBootstrapRecipient(true, "", "");
+
+        vm.warp(block.timestamp + manager.EMERGENCY_EXIT_DELAY());
+        (uint256 companySentToBootstrap,, uint256 nativeSentToBootstrap) =
+            manager.emergencyExitAllToBootstrapRecipient(true, "", "");
+
+        assertEq(companySentToBootstrap, 100 ether);
+        assertEq(nativeSentToBootstrap, 100 ether);
+        assertEq(company.balanceOf(bootstrapRecipient), companyBefore + 100 ether);
+        assertEq(bootstrapRecipient.balance, nativeBefore + 100 ether);
+        assertEq(manager.spotLiquidity(), 0);
+        assertEq(manager.conditionalLiquidity(), 0);
+        assertFalse(manager.inConditionalMode());
+        assertTrue(manager.emergencyExitExecuted());
+
+        vm.expectRevert(FutarchyLiquidityManager.EmergencyExitAlreadyExecuted.selector);
+        manager.emergencyExitAllToBootstrapRecipient(true, "", "");
+    }
+
     function test_sweep_idle_to_bootstrap_recipient() public {
         _bootstrap();
         company.mint(address(manager), 3 ether);
