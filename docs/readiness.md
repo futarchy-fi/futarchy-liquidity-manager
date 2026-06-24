@@ -1,6 +1,8 @@
 # Readiness Checklist
 
 This file tracks the remaining gap between this repository and a limited-funds real deployment.
+The machine-checkable evidence index is `audit/readiness-evidence.json`; CI validates it with
+`tools/check-readiness-evidence.sh`.
 
 ## Ready To Audit
 

@@ -1,0 +1,236 @@
+{
+  "version": 1,
+  "status": "ready-to-audit; limited-funds-deploy-awaits-final-inputs",
+  "requirements": [
+    {
+      "id": "api-and-scope-freeze",
+      "title": "Freeze contract API and repository scope",
+      "status": "ready-to-audit",
+      "evidence": [
+        {
+          "description": "Scope guard rejects FAO-specific imports, sale-specific contracts, SnapshotX contracts, and deployment-specific custody paths in src.",
+          "path": "tools/check-scope.sh",
+          "ciStep": "Scope guard"
+        },
+        {
+          "description": "Public contract selectors are snapshotted and enforced.",
+          "path": "tools/check-api-freeze.sh",
+          "ciStep": "API freeze guard"
+        },
+        {
+          "description": "Frozen selector manifest for the liquidity manager.",
+          "path": "audit/api-freeze/FutarchyLiquidityManager.method-identifiers.json"
+        },
+        {
+          "description": "Audit scope documents core boundaries and out-of-scope FAO/SnapshotX behavior.",
+          "path": "docs/audit-scope.md"
+        }
+      ],
+      "remaining": []
+    },
+    {
+      "id": "fork-tests-real-dependencies",
+      "title": "Fork tests against real deployed dependencies",
+      "status": "ready-to-audit",
+      "evidence": [
+        {
+          "description": "Swapr Algebra NFPM fork smoke test.",
+          "path": "test/fork/SwaprAlgebraLiquidityAdapterFork.t.sol"
+        },
+        {
+          "description": "Real futarchy proposal, Reality question, and CTF condition wiring fork test.",
+          "path": "test/fork/FutarchyProposalWiringFork.t.sol"
+        },
+        {
+          "description": "Futarchy conditional router split behavior fork test.",
+          "path": "test/fork/FutarchyRouterSplitFork.t.sol"
+        },
+        {
+          "description": "Fork tests are documented as a required final target-address check.",
+          "path": "docs/readiness.md"
+        }
+      ],
+      "remaining": [
+        "Run the fork test suite against the selected final target proposal and token addresses before limited-funds execution."
+      ]
+    },
+    {
+      "id": "invariant-and-fuzz-tests",
+      "title": "Invariant and fuzz coverage for accounting and safety properties",
+      "status": "ready-to-audit",
+      "evidence": [
+        {
+          "description": "Core manager tests cover proportional mint/redeem behavior, bad proposal safety, emergency exit behavior, and fuzz cases.",
+          "path": "test/FutarchyLiquidityManager.t.sol"
+        },
+        {
+          "description": "Adapter over-pull safety test.",
+          "path": "test/FutarchyLiquidityManagerAdapterSafety.t.sol"
+        },
+        {
+          "description": "Invariant suite covers LP backing, conditional accounting, and adapter liquidity consistency.",
+          "path": "test/invariant/FutarchyLiquidityManagerInvariant.t.sol"
+        },
+        {
+          "description": "Deeper invariant pass command is documented for pre-deploy review.",
+          "path": "docs/readiness.md"
+        }
+      ],
+      "remaining": [
+        "Run the deeper invariant pass documented in docs/readiness.md before mainnet-value deployment."
+      ]
+    },
+    {
+      "id": "natspec-and-audit-docs",
+      "title": "NatSpec and audit documentation",
+      "status": "ready-to-audit",
+      "evidence": [
+        {
+          "description": "Audit scope, permissions, trust assumptions, and FAO compatibility.",
+          "path": "docs/audit-scope.md"
+        },
+        {
+          "description": "Dependency surface and repository ownership boundaries.",
+          "path": "docs/dependencies.md"
+        },
+        {
+          "description": "Design notes for manager, proposal source, deadline proxy, and adapter boundaries.",
+          "path": "docs/design.md"
+        },
+        {
+          "description": "FAO runbook keeps sale, arbitration, and SnapshotX behavior outside this repository.",
+          "path": "docs/fao-integration.md"
+        },
+        {
+          "description": "Integration-facing manager interface with NatSpec.",
+          "path": "src/interfaces/IFutarchyLiquidityManager.sol"
+        },
+        {
+          "description": "Integration-facing proposal source interface with NatSpec.",
+          "path": "src/interfaces/IFutarchyOfficialProposalSource.sol"
+        },
+        {
+          "description": "Adapter interface with slippage and deadline parameters visible at the boundary.",
+          "path": "src/interfaces/IFutarchyLiquidityAdapter.sol"
+        }
+      ],
+      "remaining": []
+    },
+    {
+      "id": "ci",
+      "title": "Continuous integration gates",
+      "status": "ready-to-audit",
+      "evidence": [
+        {
+          "description": "CI runs build, format, shell syntax, scope freeze, API freeze, config schema, batch generation, tests, and coverage summary.",
+          "path": ".github/workflows/ci.yml"
+        }
+      ],
+      "remaining": []
+    },
+    {
+      "id": "explicit-chain-config-deployment",
+      "title": "Deployment scripts with explicit per-chain config",
+      "status": "ready-to-audit",
+      "evidence": [
+        {
+          "description": "Deployment script reads JSON config instead of hard-coded production addresses.",
+          "path": "script/DeployFutarchyLiquidityManager.s.sol"
+        },
+        {
+          "description": "Gnosis example config keeps every deployment address and validation bound reviewable.",
+          "path": "config/gnosis.example.json"
+        },
+        {
+          "description": "Strict deploy config validation rejects placeholder addresses and disabled validation for production inputs.",
+          "path": "tools/validate-configs.sh"
+        },
+        {
+          "description": "Deployment runbook documents reviewed config usage and broadcast flow.",
+          "path": "docs/deployment.md"
+        }
+      ],
+      "remaining": [
+        "Fill and independently review the final organization-specific config before broadcasting."
+      ]
+    },
+    {
+      "id": "fao-integration-boundary",
+      "title": "FAO integration wrapper or runbook",
+      "status": "ready-to-audit",
+      "evidence": [
+        {
+          "description": "FAO integration runbook describes initializeFromBootstrap, proposal validation, and external sale/arbitration/SnapshotX ownership.",
+          "path": "docs/fao-integration.md"
+        },
+        {
+          "description": "Scope guard keeps FAO-specific behavior outside src.",
+          "path": "tools/check-scope.sh",
+          "ciStep": "Scope guard"
+        },
+        {
+          "description": "Generic integration interface exposed for FAO or other downstream users.",
+          "path": "src/interfaces/IFutarchyLiquidityManager.sol"
+        }
+      ],
+      "remaining": [
+        "FAO must fill its own wrapper or operational Safe flow around the generic FLM calls."
+      ]
+    },
+    {
+      "id": "liquidity-operation-batches",
+      "title": "Auditable real liquidity operation scripts and batches",
+      "status": "ready-to-audit",
+      "evidence": [
+        {
+          "description": "Safe batch builder emits one logical operation per batch.",
+          "path": "script/BuildLiquidityOperationBatch.s.sol"
+        },
+        {
+          "description": "Operation runbook documents calldata audit procedure, slippage, and deadlines.",
+          "path": "docs/operations.md"
+        },
+        {
+          "description": "Operation-specific batch templates exist for bootstrap, add, redeem, sync, proposal setup, emergency controls, and sweeps.",
+          "path": "config/batches/bootstrap.example.json"
+        },
+        {
+          "description": "Batch generation guard renders example templates to Safe JSON and Markdown summaries.",
+          "path": "tools/check-batch-templates.sh",
+          "ciStep": "Batch template generation"
+        },
+        {
+          "description": "Strict batch validation rejects placeholder targets, zero liquidity amounts, missing deadlines, and zero slippage minimums.",
+          "path": "tools/validate-configs.sh"
+        }
+      ],
+      "remaining": [
+        "Fill real operation configs with fresh quotes, deadlines, and nonzero slippage minimums before signing."
+      ]
+    },
+    {
+      "id": "limited-funds-deploy",
+      "title": "Limited-funds deployment readiness",
+      "status": "awaits-final-inputs",
+      "evidence": [
+        {
+          "description": "Limited deploy preflight runs strict config validation, renders Safe JSON plus Markdown summaries, and optionally runs fork tests.",
+          "path": "tools/preflight-limited-deploy.sh"
+        },
+        {
+          "description": "Readiness checklist distinguishes audit readiness from real deployment requirements.",
+          "path": "docs/readiness.md"
+        },
+        {
+          "description": "Deployment runbook documents limited-funds deployment order.",
+          "path": "docs/deployment.md"
+        }
+      ],
+      "remaining": [
+        "Provide final deployment config, final batch configs, selected proposal/token addresses, Safe owner, bootstrap recipient, signers, and monitoring process.",
+        "Run the limited deploy preflight on those final inputs and retain generated artifacts.",
+        "Execute the first transaction set with limited funds and verify positions and balances before scaling."
+      ]
+    }
+  ]
+}

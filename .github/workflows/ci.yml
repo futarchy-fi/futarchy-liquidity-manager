@@ -46,6 +46,9 @@ jobs:
       - name: Batch template generation
         run: bash tools/check-batch-templates.sh
 
+      - name: Readiness evidence guard
+        run: bash tools/check-readiness-evidence.sh
+
       - name: Test
         run: forge test
 
