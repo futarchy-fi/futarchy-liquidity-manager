@@ -43,14 +43,18 @@ tools/preflight-limited-deploy.sh \
   --deploy config/gnosis.fao.json \
   --batch config/batches/bootstrap.production.json \
   --batch config/batches/set-proposal-validation.production.json \
+  --proposal <final-futarchy-proposal> \
   --run-fork-tests
 ```
 
 The preflight runs strict config validation, renders every batch to Safe transaction-builder JSON
-plus a Markdown summary, and optionally runs the Gnosis fork tests. Strict validation rejects zero
-deployment addresses and requires proposal validation to be enabled with real
-Reality/CTF/arbitrator bounds. CI validates placeholder examples separately in
-`--allow-placeholders` mode.
+plus a Markdown summary, and optionally runs the Gnosis fork tests against the selected proposal,
+company token, and collateral token. When `--run-fork-tests` is supplied, the proposal must be
+provided with `--proposal` or by a `setOfficialProposal` batch; the company and collateral token
+addresses come from the deploy config unless `TEST_COMPANY_TOKEN` or `TEST_COLLATERAL_TOKEN` are
+set explicitly. Strict validation rejects zero deployment addresses and requires proposal
+validation to be enabled with real Reality/CTF/arbitrator bounds. CI validates placeholder examples
+separately in `--allow-placeholders` mode.
 
 ## Broadcast
 
@@ -70,8 +74,8 @@ liquidity or proposal batches.
 ## Limited-Funds Deployment Order
 
 1. Deploy the FLM stack from a reviewed JSON config.
-2. Run `tools/preflight-limited-deploy.sh --deploy <reviewed-config> --batch <batch-config> ...`
-   and keep the output with the audit materials.
+2. Run `tools/preflight-limited-deploy.sh --deploy <reviewed-config> --batch <batch-config> ...
+   --proposal <final-proposal> --run-fork-tests` and keep the output with the audit materials.
 3. Verify deployed bytecode and constructor arguments.
 4. Configure proposal validation if it was not configured during deployment.
 5. Generate and audit the bootstrap liquidity Safe batch.

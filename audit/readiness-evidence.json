@@ -124,6 +124,11 @@
         {
           "description": "CI runs build, format, shell syntax, scope freeze, API freeze, config schema, batch generation, tests, and coverage summary.",
           "path": ".github/workflows/ci.yml"
+        },
+        {
+          "description": "CI exercises the limited deploy preflight wrapper and checks that fork preflight cannot run without a selected final proposal.",
+          "path": "tools/check-preflight-limited-deploy.sh",
+          "ciStep": "Limited preflight guard"
         }
       ],
       "remaining": []
@@ -214,8 +219,13 @@
       "status": "awaits-final-inputs",
       "evidence": [
         {
-          "description": "Limited deploy preflight runs strict config validation, renders Safe JSON plus Markdown summaries, and optionally runs fork tests.",
+          "description": "Limited deploy preflight runs strict config validation, renders Safe JSON plus Markdown summaries, and binds fork tests to final proposal/company/collateral addresses.",
           "path": "tools/preflight-limited-deploy.sh"
+        },
+        {
+          "description": "Preflight guard checks strict validation, artifact rendering, and final-proposal enforcement for fork preflight.",
+          "path": "tools/check-preflight-limited-deploy.sh",
+          "ciStep": "Limited preflight guard"
         },
         {
           "description": "Readiness checklist distinguishes audit readiness from real deployment requirements.",
@@ -228,7 +238,7 @@
       ],
       "remaining": [
         "Provide final deployment config, final batch configs, selected proposal/token addresses, Safe owner, bootstrap recipient, signers, and monitoring process.",
-        "Run the limited deploy preflight on those final inputs and retain generated artifacts.",
+        "Run the limited deploy preflight on those final inputs with --proposal and --run-fork-tests, then retain generated artifacts.",
         "Execute the first transaction set with limited funds and verify positions and balances before scaling."
       ]
     }

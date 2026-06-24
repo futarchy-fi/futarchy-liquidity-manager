@@ -33,8 +33,9 @@ The machine-checkable evidence index is `audit/readiness-evidence.json`; CI vali
 ## Still Required Before Mainnet-Value Deployment
 
 - Fill and independently review a concrete deployment config for the target organization.
-- Run `tools/preflight-limited-deploy.sh --deploy <final-config> --batch <final-batch-config> ...`
-  for every real batch, then retain the generated summaries with the audit materials.
+- Run `tools/preflight-limited-deploy.sh --deploy <final-config> --batch <final-batch-config> ...
+  --proposal <final-proposal> --run-fork-tests` for every real batch, then retain the generated
+  summaries with the audit materials.
 - Run `RUN_GNOSIS_FORK_TESTS=true forge test --match-path 'test/fork/*'` against the selected
   target proposal/token addresses.
 - Generate Safe batches from final operation configs and audit the calldata before signing.

@@ -49,6 +49,9 @@ jobs:
       - name: Readiness evidence guard
         run: bash tools/check-readiness-evidence.sh
 
+      - name: Limited preflight guard
+        run: bash tools/check-preflight-limited-deploy.sh
+
       - name: Test
         run: forge test
 
