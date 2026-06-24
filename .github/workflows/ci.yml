@@ -24,6 +24,9 @@ jobs:
       - name: Format
         run: forge fmt --check
 
+      - name: Shell syntax guard
+        run: bash -n tools/*.sh
+
       - name: Scope guard
         run: bash tools/check-scope.sh
 

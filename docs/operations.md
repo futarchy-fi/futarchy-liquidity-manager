@@ -20,7 +20,8 @@ For real operation batches, run strict validation on the finalized config before
 signing:
 
 ```sh
-tools/validate-configs.sh --batch config/batches/bootstrap.production.json
+tools/preflight-limited-deploy.sh \
+  --batch config/batches/bootstrap.production.json
 ```
 
 Strict mode rejects placeholder Safe/owner/target addresses, zero liquidity amounts for bootstrap
@@ -101,8 +102,8 @@ quote. The examples use zeros only as placeholders.
 ## Audit Procedure
 
 1. Review the JSON config.
-2. Run `tools/validate-configs.sh --batch <final-config>`.
-3. Generate the batch.
+2. Run `tools/preflight-limited-deploy.sh --batch <final-config>`.
+3. Review the generated Markdown summary and Safe transaction-builder JSON.
 4. Decode each `data` field with `cast calldata-decode` or a Safe UI preview.
 5. Confirm `to`, `value`, deadlines, slippage, and token approvals.
 6. Sign only after calldata matches the reviewed config.

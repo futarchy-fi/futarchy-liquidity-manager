@@ -36,15 +36,21 @@ zero, the deployment script uses the newly deployed `DeadlineBoundedRealityProxy
 ## Production Preflight
 
 Example configs intentionally contain zero placeholders. Before broadcasting a real deployment,
-run strict validation on the reviewed config:
+run the limited-funds preflight on the reviewed deploy config and every batch intended for signing:
 
 ```sh
-tools/validate-configs.sh --deploy config/gnosis.fao.json
+tools/preflight-limited-deploy.sh \
+  --deploy config/gnosis.fao.json \
+  --batch config/batches/bootstrap.production.json \
+  --batch config/batches/set-proposal-validation.production.json \
+  --run-fork-tests
 ```
 
-Strict mode rejects zero deployment addresses and requires proposal validation to be enabled with
-real Reality/CTF/arbitrator bounds. CI runs the same validator in `--allow-placeholders` mode only
-to keep the example JSON schema checked.
+The preflight runs strict config validation, renders every batch to Safe transaction-builder JSON
+plus a Markdown summary, and optionally runs the Gnosis fork tests. Strict validation rejects zero
+deployment addresses and requires proposal validation to be enabled with real
+Reality/CTF/arbitrator bounds. CI validates placeholder examples separately in
+`--allow-placeholders` mode.
 
 ## Broadcast
 
@@ -64,8 +70,8 @@ liquidity or proposal batches.
 ## Limited-Funds Deployment Order
 
 1. Deploy the FLM stack from a reviewed JSON config.
-2. Run `tools/validate-configs.sh --deploy <reviewed-config>` and keep the output with the audit
-   materials.
+2. Run `tools/preflight-limited-deploy.sh --deploy <reviewed-config> --batch <batch-config> ...`
+   and keep the output with the audit materials.
 3. Verify deployed bytecode and constructor arguments.
 4. Configure proposal validation if it was not configured during deployment.
 5. Generate and audit the bootstrap liquidity Safe batch.

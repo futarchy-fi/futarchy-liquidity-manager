@@ -31,8 +31,8 @@ This file tracks the remaining gap between this repository and a limited-funds r
 ## Still Required Before Mainnet-Value Deployment
 
 - Fill and independently review a concrete deployment config for the target organization.
-- Run `tools/validate-configs.sh --deploy <final-config>` and
-  `tools/validate-configs.sh --batch <final-batch-config>` for every real batch.
+- Run `tools/preflight-limited-deploy.sh --deploy <final-config> --batch <final-batch-config> ...`
+  for every real batch, then retain the generated summaries with the audit materials.
 - Run `RUN_GNOSIS_FORK_TESTS=true forge test --match-path 'test/fork/*'` against the selected
   target proposal/token addresses.
 - Generate Safe batches from final operation configs and audit the calldata before signing.
