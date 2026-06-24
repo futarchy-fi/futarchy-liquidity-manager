@@ -16,8 +16,12 @@ interface IProposalSettlementOracle {
     function isSettled(address proposal) external view returns (bool);
 }
 
+/// @title FutarchyOfficialProposalSource
 /// @notice Owner-managed source of a single official proposal with optional oracle-based
-/// settlement. @dev This enforces "one live official proposal" at a time.
+/// settlement.
+/// @dev This enforces "one live official proposal" at a time. When validation is enabled, the
+/// owner can only set proposals whose on-chain shape matches the configured token, CTF, Reality,
+/// arbitrator, timing, bond, and pool policy.
 contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Ownable2Step {
     enum ProposalValidationFailure {
         None,
@@ -128,6 +132,9 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         ALGEBRA_FACTORY = algebraFactory;
     }
 
+    /// @notice Updates the only proposal creator whose proposals should be considered official.
+    /// @dev Owner-only. The manager still checks that the current official proposal creator equals
+    /// its immutable `OFFICIAL_PROPOSER`.
     function setOfficialProposer(address newOfficialProposer) external onlyOwner {
         if (newOfficialProposer == address(0)) revert ZeroAddress();
         address old = officialProposer;
@@ -135,12 +142,17 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         emit OfficialProposerUpdated(old, newOfficialProposer);
     }
 
+    /// @notice Sets an optional settlement oracle used instead of manual settlement.
+    /// @dev Owner-only. A zero oracle reverts settlement reads back to the manual flag.
     function setSettlementOracle(address newOracle) external onlyOwner {
         address old = settlementOracle;
         settlementOracle = newOracle;
         emit SettlementOracleUpdated(old, newOracle);
     }
 
+    /// @notice Configures on-chain validation for future official proposals.
+    /// @dev Owner-only. Validation does not inspect free-form Reality question text; it checks
+    /// explicit on-chain fields exposed by the proposal, CTF, Reality, and Algebra factory.
     function setProposalValidationConfig(ProposalValidationConfig calldata config)
         external
         onlyOwner
@@ -162,6 +174,12 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         emit ProposalValidationConfigUpdated(config);
     }
 
+    /// @notice Sets the current official proposal.
+    /// @dev Owner-only. Reverts while a previous official proposal exists and is not settled.
+    /// If validation is enabled, the proposal must pass `validateProposal`.
+    /// @param proposalId External proposal identifier used by the integration.
+    /// @param proposal Futarchy proposal contract address.
+    /// @param creator Creator address reported by the integration/proposal system.
     function setOfficialProposal(uint256 proposalId, address proposal, address creator)
         external
         onlyOwner
@@ -180,11 +198,16 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         emit OfficialProposalSet(proposalId, proposal, creator);
     }
 
+    /// @notice Clears the official proposal slot.
+    /// @dev Owner-only emergency/admin action. Clearing while the manager is in conditional mode
+    /// can make `sync` back to spot revert until the active proposal is restored and settled.
     function clearOfficialProposal() external onlyOwner {
         delete _official;
         emit OfficialProposalCleared();
     }
 
+    /// @notice Manually marks the official proposal settled or unsettled.
+    /// @dev Owner-only. Ignored when `settlementOracle` is configured.
     function setManualSettled(bool settled) external onlyOwner {
         _official.manualSettled = settled;
         emit OfficialProposalManualSettlementUpdated(settled);
@@ -240,6 +263,9 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         return _official;
     }
 
+    /// @notice Checks whether a proposal satisfies the active validation config.
+    /// @dev Returns true when validation is disabled. This is intended for pre-flight review and
+    /// mirrors the check performed by `setOfficialProposal`.
     function validateProposal(address proposal)
         public
         view

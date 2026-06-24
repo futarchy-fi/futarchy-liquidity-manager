@@ -13,6 +13,7 @@ proposal, and return to spot after settlement.
 - `src/oracles/` - deadline-bounded Reality/CTF settlement helpers.
 - `src/adapters/` - protocol-specific liquidity adapters.
 - `src/interfaces/` - minimal external dependency interfaces.
+- `script/` - JSON-configured deployment and Safe batch helpers.
 - `test/` - focused unit tests and protocol mocks.
 - `docs/` - design notes, threat model, and audit-scope material.
 
@@ -44,4 +45,28 @@ package should not import FAO-specific contracts.
 ```sh
 git submodule update --init --recursive
 forge test
+```
+
+Run Gnosis fork checks explicitly:
+
+```sh
+RUN_GNOSIS_FORK_TESTS=true forge test --match-path 'test/fork/*'
+```
+
+Generate a deployment from explicit JSON config:
+
+```sh
+FLM_DEPLOY_CONFIG=config/gnosis.example.json \
+FLM_DEPLOY_OUTPUT=deployments/flm.gnosis.json \
+forge script script/DeployFutarchyLiquidityManager.s.sol \
+  --rpc-url gnosis \
+  --broadcast
+```
+
+Generate a Safe transaction-builder batch:
+
+```sh
+FLM_BATCH_CONFIG=config/safe-batch.example.json \
+FLM_BATCH_OUTPUT=out/flm-safe-batch.json \
+forge script script/BuildLiquidityOperationBatch.s.sol
 ```

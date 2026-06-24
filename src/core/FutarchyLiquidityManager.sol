@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
@@ -159,6 +158,18 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         uint256 nativeSentToBootstrap
     );
 
+    /// @notice Deploys the manager with immutable token, proposal, router, and adapter wiring.
+    /// @param bootstrapRecipient Account allowed to initialize and receive emergency/idle sweeps.
+    /// @param companyToken Organization token paired against wrapped native collateral.
+    /// @param wrappedNative Wrapped native collateral token used by spot and conditional pools.
+    /// @param officialProposer Proposal creator whose official proposals trigger migration.
+    /// @param proposalSource Source that exposes the current official proposal and settlement flag.
+    /// @param spotAdapter Adapter managing the spot company/wrapped-native position.
+    /// @param conditionalAdapter Adapter managing YES and NO conditional positions.
+    /// @param conditionalRouter Router used to split, merge, and redeem conditional positions.
+    /// @param initialOwner Owner of emergency controls.
+    /// @param lpTokenName ERC20 name for manager shares.
+    /// @param lpTokenSymbol ERC20 symbol for manager shares.
     constructor(
         address bootstrapRecipient,
         IERC20 companyToken,
@@ -211,6 +222,13 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         token.safeApprove(spender, value);
     }
 
+    /// @notice Initializes first spot liquidity and mints all initial FLM shares to
+    /// `BOOTSTRAP_RECIPIENT`.
+    /// @dev Only `BOOTSTRAP_RECIPIENT` can call this once. `spotAddData` is forwarded to the spot
+    /// adapter and should contain reviewed slippage/deadline parameters.
+    /// @param companyAmount Amount of company token to pull from the bootstrap recipient.
+    /// @param spotAddData Adapter-specific add-liquidity calldata.
+    /// @return liquidityMinted Spot liquidity units minted by the adapter.
     function initializeFromBootstrap(uint256 companyAmount, bytes calldata spotAddData)
         external
         payable
@@ -241,6 +259,10 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
 
     /// @notice Lets anyone add company + native assets into the manager and route to spot
     /// liquidity.
+    /// @param companyAmount Amount of company token to pull from the caller.
+    /// @param spotAddData Adapter-specific add-liquidity calldata.
+    /// @return liquidityMinted Spot liquidity units minted by the adapter.
+    /// @return sharesMinted FLM shares minted to the caller.
     function depositToSpot(uint256 companyAmount, bytes calldata spotAddData)
         external
         payable
@@ -266,6 +288,13 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     }
 
     /// @notice Burns share tokens and redeems underlying assets from all active pools pro-rata.
+    /// @param shares FLM shares to burn from the caller.
+    /// @param recipient Recipient of company/collateral assets and any unmerged outcome residue.
+    /// @param unwrapNative Whether wrapped collateral should be unwrapped before payout.
+    /// @param spotRemoveData Adapter-specific spot remove-liquidity calldata.
+    /// @param conditionalRemoveData ABI-encoded `(bytes yesRemoveData, bytes noRemoveData)`.
+    /// @return companyOut Amount of company token recovered and paid out.
+    /// @return collateralOut Amount of wrapped/native collateral recovered and paid out.
     function redeem(
         uint256 shares,
         address recipient,
@@ -308,6 +337,9 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
 
     /// @notice Permissionless, idempotent transition function.
     /// @dev While in a given mode, sync also compounds liquidity on that active venue.
+    /// `SyncParams` carries adapter-specific slippage/deadline calldata for each possible leg.
+    /// @param params Adapter calldata for compounding, migration, and return-to-spot paths.
+    /// @return action The transition performed by this call.
     function sync(SyncParams calldata params) external nonReentrant returns (SyncAction action) {
         _assertNotEmergencyMode();
         _compoundActive(params);
@@ -350,6 +382,9 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
                 && block.timestamp >= emergencyExitArmedAt + EMERGENCY_EXIT_DELAY;
     }
 
+    /// @notice Arms emergency mode. Deposits and sync are blocked until disarmed.
+    /// @dev Owner-only. `emergencyExitAllToBootstrapRecipient` remains unavailable until the delay
+    /// has elapsed.
     function armEmergencyExit() external {
         _checkOwner();
         if (emergencyExitExecuted) revert EmergencyExitAlreadyExecuted();
@@ -358,6 +393,8 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         emit EmergencyExitArmed(block.timestamp, block.timestamp + EMERGENCY_EXIT_DELAY);
     }
 
+    /// @notice Disarms an armed emergency exit before execution.
+    /// @dev Owner-only.
     function disarmEmergencyExit() external {
         _checkOwner();
         if (emergencyExitExecuted) revert EmergencyExitAlreadyExecuted();
@@ -366,6 +403,9 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         emit EmergencyExitDisarmed();
     }
 
+    /// @notice Sends idle base and active outcome-token balances to `BOOTSTRAP_RECIPIENT`.
+    /// @dev Owner-only. This does not remove active liquidity positions.
+    /// @param unwrapNative Whether wrapped collateral should be unwrapped before transfer.
     function sweepIdleToBootstrapRecipient(bool unwrapNative)
         external
         nonReentrant
@@ -383,6 +423,11 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         );
     }
 
+    /// @notice Removes all active liquidity and sends recovered assets to `BOOTSTRAP_RECIPIENT`.
+    /// @dev Owner-only, delayed by `EMERGENCY_EXIT_DELAY`, and executable once.
+    /// @param unwrapNative Whether wrapped collateral should be unwrapped before transfer.
+    /// @param spotRemoveData Adapter-specific spot remove-liquidity calldata.
+    /// @param conditionalRemoveData ABI-encoded `(bytes yesRemoveData, bytes noRemoveData)`.
     function emergencyExitAllToBootstrapRecipient(
         bool unwrapNative,
         bytes calldata spotRemoveData,

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {FutarchyOfficialProposalSource} from "../src/sources/FutarchyOfficialProposalSource.sol";
 import {IAlgebraFactoryLike} from "../src/interfaces/IAlgebraFactoryLike.sol";

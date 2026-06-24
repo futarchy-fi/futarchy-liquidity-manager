@@ -7,9 +7,10 @@ import {
     IRealityETHCore
 } from "../interfaces/IFutarchyTradingCore.sol";
 
+/// @title DeadlineBoundedRealityProxy
 /// @notice CTF oracle proxy that mirrors FutarchyRealityProxy and adds a forced NO deadline.
 /// @dev New FLM-grade factories can use this contract as their CTF oracle. It cannot retrofit
-///      deadlines onto conditions created with a different oracle address.
+/// deadlines onto conditions created with a different oracle address.
 contract DeadlineBoundedRealityProxy {
     IConditionalTokensCore public immutable conditionalTokens;
     IRealityETHCore public immutable realitio;
@@ -22,6 +23,9 @@ contract DeadlineBoundedRealityProxy {
     error DeadlineNotReached(uint256 deadline);
     error ConditionAlreadyResolved();
 
+    /// @param _conditionalTokens Conditional Tokens Framework contract that receives payouts.
+    /// @param _realitio Reality.eth contract that stores questions and final answers.
+    /// @param _maxQuestionDuration Max seconds after Reality opening before forced NO is allowed.
     constructor(
         IConditionalTokensCore _conditionalTokens,
         IRealityETHCore _realitio,
@@ -37,12 +41,19 @@ contract DeadlineBoundedRealityProxy {
         maxQuestionDuration = _maxQuestionDuration;
     }
 
+    /// @notice Reports the settled Reality result for a futarchy proposal to CTF.
+    /// @dev Reality answer `0` maps to YES payout `[1, 0]`; any other answer maps to NO `[0, 1]`.
+    /// @param proposal Futarchy proposal exposing the Reality question id.
     function resolve(address proposal) external {
         bytes32 questionId = IFutarchyProposalCore(proposal).questionId();
         uint256 answer = uint256(realitio.resultForOnceSettled(questionId));
         _reportPayouts(questionId, answer == 0);
     }
 
+    /// @notice Reports deterministic NO for a proposal if Reality has not resolved by deadline.
+    /// @dev Reverts before `openingTs + maxQuestionDuration` and if the condition already has a
+    /// payout denominator.
+    /// @param proposal Futarchy proposal exposing the Reality question id.
     function forceFailByDeadline(address proposal) external {
         bytes32 questionId = IFutarchyProposalCore(proposal).questionId();
         bytes32 conditionId = conditionalTokens.getConditionId(address(this), questionId, 2);

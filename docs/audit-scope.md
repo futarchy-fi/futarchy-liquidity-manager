@@ -36,6 +36,38 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
 - Emergency exit does not create a hidden curator theft path.
 - Adapters cannot over-pull tokens from the manager.
 
+## Permissions
+
+- `FutarchyLiquidityManager.owner`
+  - can arm/disarm emergency exit;
+  - can execute emergency exit only after `EMERGENCY_EXIT_DELAY`;
+  - can sweep idle assets to `BOOTSTRAP_RECIPIENT`.
+- `BOOTSTRAP_RECIPIENT`
+  - is the only account allowed to call `initializeFromBootstrap`;
+  - receives idle sweeps and emergency-exit assets.
+- `FutarchyOfficialProposalSource.owner`
+  - can set the official proposer;
+  - can configure validation;
+  - can set/clear the official proposal;
+  - can mark manual settlement if no settlement oracle is configured.
+- Any account
+  - can deposit to spot;
+  - can redeem its own FLM shares;
+  - can call `sync` when conditions are met.
+
+## Trust Assumptions
+
+- The selected liquidity adapter is in audit scope. The manager checks that add-liquidity calls do
+  not report more input used than provided, but adapter custody and protocol interactions still
+  require adapter review.
+- The conditional router is trusted to split, merge, and redeem the expected proposal positions.
+- The official proposal source owner is trusted to configure validation correctly before setting a
+  production official proposal.
+- If manual settlement is used, the proposal source owner is trusted for settlement timing. For
+  bounded liveness, prefer a settlement oracle or `DeadlineBoundedRealityProxy` path.
+- `BOOTSTRAP_RECIPIENT` should be controlled by the organization integration, normally a Safe or
+  reviewed bootstrap contract.
+
 ## FAO Compatibility
 
 FAO should consume this package as an integration. If FAO needs sale bootstrap or SnapshotX

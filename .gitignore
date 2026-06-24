@@ -1,5 +1,6 @@
 out/
 cache/
 broadcast/
+deployments/*.json
 .env
 .DS_Store

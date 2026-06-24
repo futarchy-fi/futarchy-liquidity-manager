@@ -1,0 +1,35 @@
+{
+  "chainId": 100,
+  "owner": "0x0000000000000000000000000000000000000000",
+  "bootstrapRecipient": "0x0000000000000000000000000000000000000000",
+  "companyToken": "0x0000000000000000000000000000000000000000",
+  "officialProposer": "0x0000000000000000000000000000000000000000",
+  "wrappedNative": "0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d",
+  "positionManager": "0x91fD594c46D8B01E62dBDeBed2401dde01817834",
+  "algebraFactory": "0xA0864cCA6E114013AB0e27cbd5B6f4c8947da766",
+  "futarchyRouter": "0x7495a583ba85875d59407781b4958ED6e0E1228f",
+  "tickLower": -887220,
+  "tickUpper": 887220,
+  "lpTokenName": "Futarchy Liquidity Manager LP",
+  "lpTokenSymbol": "FLM",
+  "deployDeadlineProxy": false,
+  "deadlineProxy": {
+    "conditionalTokens": "0xCeAfDD6bc0bEF976fdCd1112955828E00543c0Ce",
+    "realitio": "0x0000000000000000000000000000000000000000",
+    "maxQuestionDuration": 0
+  },
+  "validation": {
+    "enabled": false,
+    "expectedProposalToken": "0x0000000000000000000000000000000000000000",
+    "expectedCollateralToken": "0x0000000000000000000000000000000000000000",
+    "conditionalTokens": "0xCeAfDD6bc0bEF976fdCd1112955828E00543c0Ce",
+    "trustedOracle": "0x0000000000000000000000000000000000000000",
+    "realitio": "0x0000000000000000000000000000000000000000",
+    "trustedArbitrator": "0x0000000000000000000000000000000000000000",
+    "maxOpeningDelay": 604800,
+    "minTimeout": 3600,
+    "maxTimeout": 604800,
+    "maxMinBond": 0,
+    "requirePools": true
+  }
+}
