@@ -257,6 +257,43 @@ contract FutarchyLiquidityManagerTest is Test {
         manager.emergencyExitAllToBootstrapRecipient(true, "", "");
     }
 
+    function test_emergency_exit_cannot_redirect_third_party_liquidity_to_owner() public {
+        _bootstrap();
+
+        vm.prank(depositor);
+        manager.depositToSpot{value: 50 ether}(50 ether, "");
+
+        _createOfficialProposal(true);
+        manager.sync(_emptySyncParams());
+        assertTrue(manager.inConditionalMode());
+        assertEq(manager.totalSupply(), 150 ether);
+        assertEq(manager.balanceOf(depositor), 50 ether);
+
+        uint256 bootstrapCompanyBefore = company.balanceOf(bootstrapRecipient);
+        uint256 bootstrapNativeBefore = bootstrapRecipient.balance;
+        uint256 ownerCompanyBefore = company.balanceOf(owner);
+        uint256 ownerNativeBefore = owner.balance;
+        uint256 depositorCompanyBefore = company.balanceOf(depositor);
+        uint256 depositorNativeBefore = depositor.balance;
+
+        manager.armEmergencyExit();
+        vm.warp(block.timestamp + manager.EMERGENCY_EXIT_DELAY());
+        (uint256 companySentToBootstrap,, uint256 nativeSentToBootstrap) =
+            manager.emergencyExitAllToBootstrapRecipient(true, "", "");
+
+        assertEq(companySentToBootstrap, 150 ether);
+        assertEq(nativeSentToBootstrap, 150 ether);
+        assertEq(company.balanceOf(bootstrapRecipient), bootstrapCompanyBefore + 150 ether);
+        assertEq(bootstrapRecipient.balance, bootstrapNativeBefore + 150 ether);
+        assertEq(company.balanceOf(owner), ownerCompanyBefore);
+        assertEq(owner.balance, ownerNativeBefore);
+        assertEq(company.balanceOf(depositor), depositorCompanyBefore);
+        assertEq(depositor.balance, depositorNativeBefore);
+        assertEq(manager.spotLiquidity(), 0);
+        assertEq(manager.conditionalLiquidity(), 0);
+        assertTrue(manager.emergencyExitExecuted());
+    }
+
     function test_sweep_idle_to_bootstrap_recipient() public {
         _bootstrap();
         company.mint(address(manager), 3 ether);
