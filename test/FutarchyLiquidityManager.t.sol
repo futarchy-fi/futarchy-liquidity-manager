@@ -145,30 +145,50 @@ contract FutarchyLiquidityManagerTest is Test {
     function test_sync_reverts_on_official_proposal_with_wrong_tokens() public {
         _bootstrap();
 
-        MockMintableERC20 wrongCompany = new MockMintableERC20("Wrong", "WRONG");
-        MockFutarchyProposalLike badProposal = new MockFutarchyProposalLike(
-            address(wrongCompany),
-            address(wrappedNative),
-            address(yesCompany),
-            address(noCompany),
-            address(yesCurrency),
-            address(noCurrency)
-        );
-        proposalSource.createProposalExtended(
-            address(badProposal),
-            officialProposer,
-            address(wrongCompany),
-            address(wrappedNative),
-            address(yesCompany),
-            address(noCompany),
-            address(yesCurrency),
-            address(noCurrency),
-            address(0xCAFE),
-            address(0xBEEF)
-        );
+        _createOfficialProposalWithWrongCompany();
 
         vm.expectRevert(FutarchyLiquidityManager.InvalidProposalConfig.selector);
         manager.sync(_emptySyncParams());
+    }
+
+    function test_bad_official_proposal_does_not_trap_redeem_or_poison_state() public {
+        _bootstrap();
+
+        vm.prank(depositor);
+        manager.depositToSpot{value: 50 ether}(50 ether, "");
+
+        _createOfficialProposalWithWrongCompany();
+
+        vm.expectRevert(FutarchyLiquidityManager.InvalidProposalConfig.selector);
+        manager.sync(_emptySyncParams());
+
+        assertFalse(manager.inConditionalMode());
+        assertEq(manager.activeProposal(), address(0));
+        assertEq(manager.spotLiquidity(), 150 ether);
+        assertEq(manager.balanceOf(depositor), 50 ether);
+
+        uint256 companyBefore = company.balanceOf(depositor);
+        uint256 nativeBefore = depositor.balance;
+
+        vm.prank(depositor);
+        (uint256 companyOut, uint256 collateralOut) =
+            manager.redeem(50 ether, depositor, true, "", "");
+
+        assertEq(companyOut, 50 ether);
+        assertEq(collateralOut, 50 ether);
+        assertEq(company.balanceOf(depositor), companyBefore + 50 ether);
+        assertEq(depositor.balance, nativeBefore + 50 ether);
+        assertEq(manager.balanceOf(depositor), 0);
+        assertEq(manager.spotLiquidity(), 100 ether);
+
+        proposalSource.clearProposal();
+        _createOfficialProposal(true);
+        FutarchyLiquidityManager.SyncAction action = manager.sync(_emptySyncParams());
+        assertEq(
+            uint256(action), uint256(FutarchyLiquidityManager.SyncAction.MigratedToConditional)
+        );
+        assertTrue(manager.inConditionalMode());
+        assertEq(manager.activeProposal(), address(proposal));
     }
 
     function test_emergency_arm_blocks_deposit_and_sync_but_redeem_works() public {
@@ -289,6 +309,30 @@ contract FutarchyLiquidityManagerTest is Test {
             address(yesCurrency),
             address(noCurrency),
             winnerIsYes
+        );
+    }
+
+    function _createOfficialProposalWithWrongCompany() internal {
+        MockMintableERC20 wrongCompany = new MockMintableERC20("Wrong", "WRONG");
+        MockFutarchyProposalLike badProposal = new MockFutarchyProposalLike(
+            address(wrongCompany),
+            address(wrappedNative),
+            address(yesCompany),
+            address(noCompany),
+            address(yesCurrency),
+            address(noCurrency)
+        );
+        proposalSource.createProposalExtended(
+            address(badProposal),
+            officialProposer,
+            address(wrongCompany),
+            address(wrappedNative),
+            address(yesCompany),
+            address(noCompany),
+            address(yesCurrency),
+            address(noCurrency),
+            address(0xCAFE),
+            address(0xBEEF)
         );
     }
 
