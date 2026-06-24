@@ -8,8 +8,9 @@ This file tracks the remaining gap between this repository and a limited-funds r
   deployment-specific custody paths in `src/`. CI enforces this with `tools/check-scope.sh`.
 - API selector freeze: audited contract method identifiers are snapshotted in `audit/api-freeze`
   and checked by `tools/check-api-freeze.sh`.
-- Unit tests: core manager, proposal source validation, deadline proxy, bad-proposal exit safety,
-  emergency exit destination safety, and adapter safety checks.
+- Unit and fuzz tests: core manager, proportional LP share mint/redeem behavior, proposal source
+  validation, deadline proxy, bad-proposal exit safety, emergency exit destination safety, and
+  adapter safety checks.
 - Invariant tests: LP supply is backed by managed liquidity, conditional accounting is internally
   consistent, and adapter liquidity accounting matches manager state across deposit, redeem,
   migrate, and settle cycles.

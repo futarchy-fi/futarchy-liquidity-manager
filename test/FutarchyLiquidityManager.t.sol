@@ -30,6 +30,7 @@ contract FutarchyLiquidityManagerTest is Test {
     address internal bootstrapRecipient = address(0xB007);
     address internal officialProposer = address(0x0FF1C1A1);
     address internal depositor = address(0xD0E);
+    address internal secondDepositor = address(0xD0E2);
 
     uint256 internal constant SEED_COMPANY = 100 ether;
     uint256 internal constant SEED_NATIVE = 100 ether;
@@ -80,6 +81,12 @@ contract FutarchyLiquidityManagerTest is Test {
         company.mint(depositor, 1000 ether);
         vm.deal(depositor, 1000 ether);
         vm.startPrank(depositor);
+        company.approve(address(manager), type(uint256).max);
+        vm.stopPrank();
+
+        company.mint(secondDepositor, 1000 ether);
+        vm.deal(secondDepositor, 1000 ether);
+        vm.startPrank(secondDepositor);
         company.approve(address(manager), type(uint256).max);
         vm.stopPrank();
     }
@@ -140,6 +147,103 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(depositor.balance, nativeBefore + 25 ether);
         assertEq(manager.balanceOf(depositor), 25 ether);
         assertEq(manager.spotLiquidity(), 125 ether);
+    }
+
+    function testFuzz_balanced_deposits_mint_lp_shares_proportionally(
+        uint96 firstSeed,
+        uint96 secondSeed
+    ) public {
+        _bootstrap();
+
+        uint256 firstDeposit = bound(uint256(firstSeed), 1e9, 250 ether);
+        uint256 secondDeposit = bound(uint256(secondSeed), 1e9, 250 ether);
+
+        vm.prank(depositor);
+        (uint128 firstLiquidity, uint256 firstShares) =
+            manager.depositToSpot{value: firstDeposit}(firstDeposit, "");
+
+        vm.prank(secondDepositor);
+        (uint128 secondLiquidity, uint256 secondShares) =
+            manager.depositToSpot{value: secondDeposit}(secondDeposit, "");
+
+        assertEq(firstLiquidity, firstDeposit);
+        assertEq(firstShares, firstDeposit);
+        assertEq(secondLiquidity, secondDeposit);
+        assertEq(secondShares, secondDeposit);
+        assertEq(manager.balanceOf(bootstrapRecipient), SEED_COMPANY);
+        assertEq(manager.balanceOf(depositor), firstDeposit);
+        assertEq(manager.balanceOf(secondDepositor), secondDeposit);
+        assertEq(manager.totalSupply(), SEED_COMPANY + firstDeposit + secondDeposit);
+        assertEq(manager.totalManagedLiquidity(), manager.totalSupply());
+    }
+
+    function testFuzz_spot_redeem_returns_exact_pro_rata_assets_for_multi_depositor(
+        uint96 firstSeed,
+        uint96 secondSeed,
+        uint96 redeemSeed
+    ) public {
+        _bootstrap();
+
+        uint256 firstDeposit = bound(uint256(firstSeed), 1e9, 250 ether);
+        uint256 secondDeposit = bound(uint256(secondSeed), 1e9, 250 ether);
+        vm.prank(depositor);
+        manager.depositToSpot{value: firstDeposit}(firstDeposit, "");
+        vm.prank(secondDepositor);
+        manager.depositToSpot{value: secondDeposit}(secondDeposit, "");
+
+        uint256 sharesToRedeem = bound(uint256(redeemSeed), 1, firstDeposit);
+        uint256 supplyBefore = manager.totalSupply();
+        uint256 liquidityBefore = manager.totalManagedLiquidity();
+        uint256 companyBefore = company.balanceOf(depositor);
+        uint256 nativeBefore = depositor.balance;
+
+        vm.prank(depositor);
+        (uint256 companyOut, uint256 collateralOut) =
+            manager.redeem(sharesToRedeem, depositor, true, "", "");
+
+        assertEq(companyOut, sharesToRedeem);
+        assertEq(collateralOut, sharesToRedeem);
+        assertEq(company.balanceOf(depositor), companyBefore + sharesToRedeem);
+        assertEq(depositor.balance, nativeBefore + sharesToRedeem);
+        assertEq(manager.balanceOf(depositor), firstDeposit - sharesToRedeem);
+        assertEq(manager.balanceOf(secondDepositor), secondDeposit);
+        assertEq(manager.totalSupply(), supplyBefore - sharesToRedeem);
+        assertEq(manager.totalManagedLiquidity(), liquidityBefore - sharesToRedeem);
+    }
+
+    function testFuzz_conditional_redeem_returns_exact_pro_rata_assets_after_migration(
+        uint8 depositUnitsSeed,
+        uint8 redeemUnitsSeed
+    ) public {
+        _bootstrap();
+
+        uint256 depositUnits = bound(uint256(depositUnitsSeed), 1, 50);
+        uint256 firstDeposit = depositUnits * 5 ether;
+        vm.prank(depositor);
+        manager.depositToSpot{value: firstDeposit}(firstDeposit, "");
+
+        _createOfficialProposal(true);
+        manager.sync(_emptySyncParams());
+        assertTrue(manager.inConditionalMode());
+
+        uint256 redeemUnits = bound(uint256(redeemUnitsSeed), 1, depositUnits);
+        uint256 sharesToRedeem = redeemUnits * 5 ether;
+        uint256 supplyBefore = manager.totalSupply();
+        uint256 liquidityBefore = manager.totalManagedLiquidity();
+        uint256 companyBefore = company.balanceOf(depositor);
+        uint256 nativeBefore = depositor.balance;
+
+        vm.prank(depositor);
+        (uint256 companyOut, uint256 collateralOut) =
+            manager.redeem(sharesToRedeem, depositor, true, "", "");
+
+        assertEq(companyOut, sharesToRedeem);
+        assertEq(collateralOut, sharesToRedeem);
+        assertEq(company.balanceOf(depositor), companyBefore + sharesToRedeem);
+        assertEq(depositor.balance, nativeBefore + sharesToRedeem);
+        assertEq(manager.balanceOf(depositor), firstDeposit - sharesToRedeem);
+        assertEq(manager.totalSupply(), supplyBefore - sharesToRedeem);
+        assertEq(manager.totalManagedLiquidity(), liquidityBefore - sharesToRedeem);
     }
 
     function test_sync_reverts_on_official_proposal_with_wrong_tokens() public {
