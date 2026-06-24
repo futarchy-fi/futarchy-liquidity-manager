@@ -118,12 +118,12 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     error ZeroRedeemLiquidity();
 
     event InitializedFromBootstrap(
-        uint256 companyAmount, uint256 nativeAmount, uint128 spotLiquidityMinted
+        uint256 companyAmount, uint256 collateralAmount, uint128 spotLiquidityMinted
     );
     event SpotDeposited(
         address indexed sender,
         uint256 companyAmount,
-        uint256 nativeAmount,
+        uint256 collateralAmount,
         uint128 liquidityMinted,
         uint256 sharesMinted
     );
@@ -160,8 +160,9 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
 
     /// @notice Deploys the manager with immutable token, proposal, router, and adapter wiring.
     /// @param bootstrapRecipient Account allowed to initialize and receive emergency/idle sweeps.
-    /// @param companyToken Organization token paired against wrapped native collateral.
-    /// @param wrappedNative Wrapped native collateral token used by spot and conditional pools.
+    /// @param companyToken Organization token paired against collateral.
+    /// @param wrappedNative Collateral token used by spot and conditional pools. Native-collateral
+    /// flows require this to implement `deposit()`/`withdraw(uint256)`.
     /// @param officialProposer Proposal creator whose official proposals trigger migration.
     /// @param proposalSource Source that exposes the current official proposal and settlement flag.
     /// @param spotAdapter Adapter managing the spot company/wrapped-native position.
@@ -235,26 +236,25 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         nonReentrant
         returns (uint128 liquidityMinted)
     {
-        _assertOnlyBootstrap();
-        _assertNotEmergencyMode();
-        if (initializedFromBootstrap) revert AlreadyInitialized();
-        initializedFromBootstrap = true;
+        liquidityMinted = _initializeFromBootstrap(companyAmount, msg.value, spotAddData, true);
+    }
 
-        if (companyAmount > 0) {
-            COMPANY_TOKEN.safeTransferFrom(msg.sender, address(this), companyAmount);
-        }
-        if (msg.value > 0) {
-            WRAPPED_NATIVE.deposit{value: msg.value}();
-        }
-
-        uint256 companyUnused;
-        uint256 collateralUnused;
-        (liquidityMinted, companyUnused, collateralUnused) =
-            _addToSpot(companyAmount, msg.value, spotAddData);
-        _payout(BOOTSTRAP_RECIPIENT, companyUnused, collateralUnused, true);
-        uint256 sharesMinted = _mintShares(BOOTSTRAP_RECIPIENT, liquidityMinted);
-        if (sharesMinted == 0) revert ZeroSharesMinted();
-        emit InitializedFromBootstrap(companyAmount, msg.value, liquidityMinted);
+    /// @notice Initializes first spot liquidity with ERC20 collateral and mints all initial FLM
+    /// shares to `BOOTSTRAP_RECIPIENT`.
+    /// @dev Only `BOOTSTRAP_RECIPIENT` can call this once. The caller must approve both the
+    /// company token and collateral token before calling.
+    /// @param companyAmount Amount of company token to pull from the bootstrap recipient.
+    /// @param collateralAmount ERC20 collateral amount to pull from the bootstrap recipient.
+    /// @param spotAddData Adapter-specific add-liquidity calldata.
+    /// @return liquidityMinted Spot liquidity units minted by the adapter.
+    function initializeFromBootstrap(
+        uint256 companyAmount,
+        uint256 collateralAmount,
+        bytes calldata spotAddData
+    ) external nonReentrant returns (uint128 liquidityMinted) {
+        liquidityMinted = _initializeFromBootstrap(
+            companyAmount, collateralAmount, spotAddData, false
+        );
     }
 
     /// @notice Lets anyone add company + native assets into the manager and route to spot
@@ -269,22 +269,88 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         nonReentrant
         returns (uint128 liquidityMinted, uint256 sharesMinted)
     {
+        (liquidityMinted, sharesMinted) =
+            _depositToSpot(companyAmount, msg.value, spotAddData, true);
+    }
+
+    /// @notice Lets anyone add company + ERC20 collateral assets into the manager and route to
+    /// spot liquidity.
+    /// @dev The caller must approve both the company token and collateral token before calling.
+    /// @param companyAmount Amount of company token to pull from the caller.
+    /// @param collateralAmount Amount of ERC20 collateral token to pull from the caller.
+    /// @param spotAddData Adapter-specific add-liquidity calldata.
+    /// @return liquidityMinted Spot liquidity units minted by the adapter.
+    /// @return sharesMinted FLM shares minted to the caller.
+    function depositToSpot(
+        uint256 companyAmount,
+        uint256 collateralAmount,
+        bytes calldata spotAddData
+    ) external nonReentrant returns (uint128 liquidityMinted, uint256 sharesMinted) {
+        (liquidityMinted, sharesMinted) =
+            _depositToSpot(companyAmount, collateralAmount, spotAddData, false);
+    }
+
+    function _initializeFromBootstrap(
+        uint256 companyAmount,
+        uint256 collateralAmount,
+        bytes calldata spotAddData,
+        bool wrapNativeCollateral
+    ) internal returns (uint128 liquidityMinted) {
+        _assertOnlyBootstrap();
         _assertNotEmergencyMode();
-        if (companyAmount > 0) {
-            COMPANY_TOKEN.safeTransferFrom(msg.sender, address(this), companyAmount);
-        }
-        if (msg.value > 0) {
-            WRAPPED_NATIVE.deposit{value: msg.value}();
-        }
+        if (initializedFromBootstrap) revert AlreadyInitialized();
+        initializedFromBootstrap = true;
+
+        _pullBaseAssets(companyAmount, collateralAmount, wrapNativeCollateral);
 
         uint256 companyUnused;
         uint256 collateralUnused;
         (liquidityMinted, companyUnused, collateralUnused) =
-            _addToSpot(companyAmount, msg.value, spotAddData);
-        _payout(msg.sender, companyUnused, collateralUnused, true);
+            _addToSpot(companyAmount, collateralAmount, spotAddData);
+        _payout(BOOTSTRAP_RECIPIENT, companyUnused, collateralUnused, wrapNativeCollateral);
+        uint256 sharesMinted = _mintShares(BOOTSTRAP_RECIPIENT, liquidityMinted);
+        if (sharesMinted == 0) revert ZeroSharesMinted();
+        emit InitializedFromBootstrap(companyAmount, collateralAmount, liquidityMinted);
+    }
+
+    function _depositToSpot(
+        uint256 companyAmount,
+        uint256 collateralAmount,
+        bytes calldata spotAddData,
+        bool wrapNativeCollateral
+    ) internal returns (uint128 liquidityMinted, uint256 sharesMinted) {
+        _assertNotEmergencyMode();
+        _pullBaseAssets(companyAmount, collateralAmount, wrapNativeCollateral);
+
+        uint256 companyUnused;
+        uint256 collateralUnused;
+        (liquidityMinted, companyUnused, collateralUnused) =
+            _addToSpot(companyAmount, collateralAmount, spotAddData);
+        _payout(msg.sender, companyUnused, collateralUnused, wrapNativeCollateral);
         sharesMinted = _mintShares(msg.sender, liquidityMinted);
         if (sharesMinted == 0) revert ZeroSharesMinted();
-        emit SpotDeposited(msg.sender, companyAmount, msg.value, liquidityMinted, sharesMinted);
+        emit SpotDeposited(
+            msg.sender, companyAmount, collateralAmount, liquidityMinted, sharesMinted
+        );
+    }
+
+    function _pullBaseAssets(
+        uint256 companyAmount,
+        uint256 collateralAmount,
+        bool wrapNativeCollateral
+    ) internal {
+        if (companyAmount > 0) {
+            COMPANY_TOKEN.safeTransferFrom(msg.sender, address(this), companyAmount);
+        }
+
+        if (collateralAmount == 0) return;
+
+        if (wrapNativeCollateral) {
+            WRAPPED_NATIVE.deposit{value: collateralAmount}();
+        } else {
+            IERC20(address(WRAPPED_NATIVE))
+                .safeTransferFrom(msg.sender, address(this), collateralAmount);
+        }
     }
 
     /// @notice Burns share tokens and redeems underlying assets from all active pools pro-rata.

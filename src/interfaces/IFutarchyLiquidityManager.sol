@@ -10,4 +10,13 @@ interface IFutarchyLiquidityManager {
         external
         payable
         returns (uint128 liquidityMinted);
+
+    /// @notice Initializes first spot liquidity with ERC20 collateral from the configured
+    /// bootstrap recipient.
+    /// @dev The caller must approve both the company token and collateral token.
+    function initializeFromBootstrap(
+        uint256 companyAmount,
+        uint256 collateralAmount,
+        bytes calldata spotAddData
+    ) external returns (uint128 liquidityMinted);
 }

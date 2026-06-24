@@ -32,7 +32,8 @@ interfaces are the compatibility boundary for FAO or any other organization.
 ## External Protocol Interfaces
 
 - ERC20 company token.
-- Wrapped native collateral token.
+- Configured collateral token. Native-collateral flows require wrapped-native `deposit()` and
+  `withdraw(uint256)` support; ERC20-collateral flows use approval and transfer.
 - Conditional Tokens Framework.
 - Reality.eth.
 - Algebra/Swapr pool factory.

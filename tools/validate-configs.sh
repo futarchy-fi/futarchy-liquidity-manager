@@ -191,7 +191,9 @@ batch_schema_filter='
   and (.manager | address)
   and (.proposalSource | address)
   and (.companyToken | address)
+  and (.collateralToken | address)
   and (.companyAmount | nonnegative)
+  and (.collateralAmount | nonnegative)
   and (.nativeValue | nonnegative)
   and (.shares | nonnegative)
   and (.recipient | address)
@@ -247,6 +249,16 @@ batch_strict_filter='
     and (.validation.minTimeout > 0)
     and (.validation.maxTimeout >= .validation.minTimeout)
     and (.validation.requirePools == true);
+  def fundingstrict:
+    (
+      (.nativeValue | positive)
+      and (.collateralAmount == 0)
+    )
+    or (
+      (.nativeValue == 0)
+      and (.collateralAmount | positive)
+      and (.collateralToken | nzaddress)
+    );
   .operation as $op
   | (.createdFromSafeAddress | nzaddress)
   and (.createdFromOwnerAddress | nzaddress)
@@ -276,7 +288,7 @@ batch_strict_filter='
     then
       (.companyToken | nzaddress)
       and (.companyAmount | positive)
-      and (.nativeValue | positive)
+      and fundingstrict
       and addstrict(.spotAdd)
     else true
     end

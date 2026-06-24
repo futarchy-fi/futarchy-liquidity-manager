@@ -17,7 +17,8 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
 ## External Dependencies
 
 - ERC20 company token.
-- Wrapped native collateral token.
+- Configured collateral token, either wrapped native through the payable overloads or ERC20
+  collateral through explicit approval overloads.
 - Futarchy proposal contract exposing collateral, wrapped outcomes, question id, and condition id.
 - Conditional Tokens Framework.
 - Reality.eth.

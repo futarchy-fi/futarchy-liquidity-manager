@@ -22,7 +22,9 @@ FAO-side code or operations should:
 3. Deploy one `SwaprAlgebraLiquidityAdapter` for spot and one for conditional pools.
 4. Deploy `FutarchyLiquidityManager`.
 5. Approve company tokens from `bootstrapRecipient` to the manager.
-6. Call `initializeFromBootstrap(companyAmount, spotAddData)` with native collateral value.
+6. For native collateral, call `initializeFromBootstrap(companyAmount, spotAddData)` with native
+   value. For ERC20 collateral, approve the collateral token and call
+   `initializeFromBootstrap(companyAmount, collateralAmount, spotAddData)`.
 
 ## Proposal Flow
 

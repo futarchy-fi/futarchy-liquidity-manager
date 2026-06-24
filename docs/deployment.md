@@ -17,13 +17,14 @@ Required organization-specific fields:
 - `owner`: owner of the proposal source and liquidity manager emergency controls, ideally a Safe.
 - `bootstrapRecipient`: account allowed to call `initializeFromBootstrap`; for FAO this should be
   the integration contract or Safe that initially funds liquidity.
-- `companyToken`: the token paired against wrapped native collateral.
+- `companyToken`: the token paired against the configured collateral token.
 - `officialProposer`: the only proposal creator whose official proposal can trigger migration.
 - `lpTokenName` and `lpTokenSymbol`: ERC20 metadata for FLM shares.
 
 Gnosis defaults included in the example:
 
-- `wrappedNative`: WXDAI.
+- `wrappedNative`: collateral token used by the manager. Use WXDAI for native-collateral flows, or
+  the ERC20 collateral itself, such as sDAI, for ERC20-collateral markets.
 - `positionManager`: Swapr Algebra non-fungible position manager.
 - `algebraFactory`: Swapr Algebra factory.
 - `futarchyRouter`: futarchy conditional split/merge/redeem router.
@@ -34,6 +35,10 @@ setting an official proposal. If `deployDeadlineProxy` is true and `validation.t
 zero, the deployment script uses the newly deployed `DeadlineBoundedRealityProxy`. Enabled
 validation is constructor-initialized on the proposal source, so the owner can be a Safe from the
 first deployed state.
+
+For ERC20-collateral deployments, bootstrap and deposit batches must use `collateralToken` and
+`collateralAmount` with `nativeValue` set to zero. Native-collateral deployments use `nativeValue`
+and leave `collateralAmount` at zero.
 
 ## Production Preflight
 

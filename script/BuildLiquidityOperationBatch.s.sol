@@ -21,7 +21,9 @@ contract BuildLiquidityOperationBatch is Script {
         address manager;
         address proposalSource;
         address companyToken;
+        address collateralToken;
         uint256 companyAmount;
+        uint256 collateralAmount;
         uint256 nativeValue;
         uint256 shares;
         address recipient;
@@ -61,7 +63,9 @@ contract BuildLiquidityOperationBatch is Script {
         cfg.manager = json.readAddress(".manager");
         cfg.proposalSource = json.readAddress(".proposalSource");
         cfg.companyToken = json.readAddress(".companyToken");
+        cfg.collateralToken = json.readAddress(".collateralToken");
         cfg.companyAmount = json.readUint(".companyAmount");
+        cfg.collateralAmount = json.readUint(".collateralAmount");
         cfg.nativeValue = json.readUint(".nativeValue");
         cfg.shares = json.readUintOr(".shares", 0);
         cfg.recipient = json.readAddressOr(".recipient", address(0));
@@ -77,25 +81,13 @@ contract BuildLiquidityOperationBatch is Script {
         returns (string memory txs)
     {
         if (_eq(cfg.operation, "initializeFromBootstrap")) {
-            bytes memory approve = abi.encodeCall(IERC20.approve, (cfg.manager, cfg.companyAmount));
-            bytes memory init = abi.encodeCall(
-                FutarchyLiquidityManager.initializeFromBootstrap,
-                (cfg.companyAmount, _addParams(json, ".spotAdd"))
-            );
-            return _maybeApprovalAndCall(
-                cfg.companyToken, cfg.companyAmount, approve, cfg.manager, cfg.nativeValue, init
-            );
+            bytes memory init = _encodeBootstrapCall(json, cfg);
+            return _approvalsAndCall(cfg, cfg.manager, cfg.nativeValue, init);
         }
 
         if (_eq(cfg.operation, "depositToSpot")) {
-            bytes memory approve = abi.encodeCall(IERC20.approve, (cfg.manager, cfg.companyAmount));
-            bytes memory deposit = abi.encodeCall(
-                FutarchyLiquidityManager.depositToSpot,
-                (cfg.companyAmount, _addParams(json, ".spotAdd"))
-            );
-            return _maybeApprovalAndCall(
-                cfg.companyToken, cfg.companyAmount, approve, cfg.manager, cfg.nativeValue, deposit
-            );
+            bytes memory deposit = _encodeDepositCall(json, cfg);
+            return _approvalsAndCall(cfg, cfg.manager, cfg.nativeValue, deposit);
         }
 
         if (_eq(cfg.operation, "sync")) {
@@ -180,6 +172,50 @@ contract BuildLiquidityOperationBatch is Script {
         revert("unsupported operation");
     }
 
+    function _encodeBootstrapCall(string memory json, BatchConfig memory cfg)
+        internal
+        view
+        returns (bytes memory)
+    {
+        if (cfg.collateralAmount > 0) {
+            require(cfg.nativeValue == 0, "mixed collateral value");
+            require(cfg.collateralToken != address(0), "collateral token");
+            return abi.encodeWithSignature(
+                "initializeFromBootstrap(uint256,uint256,bytes)",
+                cfg.companyAmount,
+                cfg.collateralAmount,
+                _addParams(json, ".spotAdd")
+            );
+        }
+
+        return abi.encodeWithSignature(
+            "initializeFromBootstrap(uint256,bytes)",
+            cfg.companyAmount,
+            _addParams(json, ".spotAdd")
+        );
+    }
+
+    function _encodeDepositCall(string memory json, BatchConfig memory cfg)
+        internal
+        view
+        returns (bytes memory)
+    {
+        if (cfg.collateralAmount > 0) {
+            require(cfg.nativeValue == 0, "mixed collateral value");
+            require(cfg.collateralToken != address(0), "collateral token");
+            return abi.encodeWithSignature(
+                "depositToSpot(uint256,uint256,bytes)",
+                cfg.companyAmount,
+                cfg.collateralAmount,
+                _addParams(json, ".spotAdd")
+            );
+        }
+
+        return abi.encodeWithSignature(
+            "depositToSpot(uint256,bytes)", cfg.companyAmount, _addParams(json, ".spotAdd")
+        );
+    }
+
     function _syncParams(string memory json)
         internal
         view
@@ -250,17 +286,43 @@ contract BuildLiquidityOperationBatch is Script {
         config.requirePools = json.readBool(string.concat(base, ".requirePools"));
     }
 
-    function _maybeApprovalAndCall(
-        address token,
-        uint256 amount,
-        bytes memory approveData,
+    function _approvalsAndCall(
+        BatchConfig memory cfg,
         address target,
         uint256 value,
         bytes memory callData
     ) internal view returns (string memory) {
-        string memory callTx = _txJson(target, value, callData);
-        if (amount == 0) return callTx;
-        return string.concat(_txJson(token, 0, approveData), ",", callTx);
+        string memory txs = "";
+        if (cfg.companyAmount > 0) {
+            txs = _appendTx(
+                txs,
+                _txJson(
+                    cfg.companyToken,
+                    0,
+                    abi.encodeCall(IERC20.approve, (cfg.manager, cfg.companyAmount))
+                )
+            );
+        }
+        if (cfg.collateralAmount > 0) {
+            txs = _appendTx(
+                txs,
+                _txJson(
+                    cfg.collateralToken,
+                    0,
+                    abi.encodeCall(IERC20.approve, (cfg.manager, cfg.collateralAmount))
+                )
+            );
+        }
+        return _appendTx(txs, _txJson(target, value, callData));
+    }
+
+    function _appendTx(string memory txs, string memory txJson)
+        internal
+        pure
+        returns (string memory)
+    {
+        if (bytes(txs).length == 0) return txJson;
+        return string.concat(txs, ",", txJson);
     }
 
     function _safeBatchJson(BatchConfig memory cfg, string memory txs)
@@ -383,6 +445,9 @@ contract BuildLiquidityOperationBatch is Script {
             "`\n",
             "- Company token: `",
             vm.toString(cfg.companyToken),
+            "`\n",
+            "- Collateral token: `",
+            vm.toString(cfg.collateralToken),
             "`\n"
         );
     }
@@ -391,6 +456,9 @@ contract BuildLiquidityOperationBatch is Script {
         return string.concat(
             "- Company amount: `",
             vm.toString(cfg.companyAmount),
+            "`\n",
+            "- Collateral amount: `",
+            vm.toString(cfg.collateralAmount),
             "`\n",
             "- Native value: `",
             vm.toString(cfg.nativeValue),

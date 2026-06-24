@@ -128,6 +128,48 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(manager.spotLiquidity(), 150 ether);
     }
 
+    function test_bootstrap_deposit_and_redeem_with_erc20_collateral() public {
+        MockMintableERC20 collateral = new MockMintableERC20("Savings DAI", "sDAI");
+        FutarchyLiquidityManager erc20Manager = _newManagerWithCollateral(collateral);
+
+        collateral.mint(bootstrapRecipient, 1000 ether);
+        vm.startPrank(bootstrapRecipient);
+        company.approve(address(erc20Manager), type(uint256).max);
+        collateral.approve(address(erc20Manager), type(uint256).max);
+        uint128 bootstrapLiquidity =
+            erc20Manager.initializeFromBootstrap(SEED_COMPANY, SEED_NATIVE, "");
+        vm.stopPrank();
+
+        assertEq(bootstrapLiquidity, 100 ether);
+        assertEq(erc20Manager.balanceOf(bootstrapRecipient), 100 ether);
+        assertEq(erc20Manager.spotLiquidity(), 100 ether);
+
+        collateral.mint(depositor, 1000 ether);
+        vm.startPrank(depositor);
+        company.approve(address(erc20Manager), type(uint256).max);
+        collateral.approve(address(erc20Manager), type(uint256).max);
+        (uint128 liquidityMinted, uint256 sharesMinted) =
+            erc20Manager.depositToSpot(50 ether, 50 ether, "");
+        vm.stopPrank();
+
+        assertEq(liquidityMinted, 50 ether);
+        assertEq(sharesMinted, 50 ether);
+        assertEq(erc20Manager.balanceOf(depositor), 50 ether);
+
+        uint256 companyBefore = company.balanceOf(depositor);
+        uint256 collateralBefore = collateral.balanceOf(depositor);
+
+        vm.prank(depositor);
+        (uint256 companyOut, uint256 collateralOut) =
+            erc20Manager.redeem(25 ether, depositor, false, "", "");
+
+        assertEq(companyOut, 25 ether);
+        assertEq(collateralOut, 25 ether);
+        assertEq(company.balanceOf(depositor), companyBefore + 25 ether);
+        assertEq(collateral.balanceOf(depositor), collateralBefore + 25 ether);
+        assertEq(depositor.balance, 1000 ether);
+    }
+
     function test_redeem_burns_shares_and_returns_pro_rata_assets() public {
         _bootstrap();
 
@@ -422,6 +464,25 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(manager.spotLiquidity(), 100 ether);
         assertEq(manager.name(), "Futarchy LP");
         assertEq(manager.symbol(), "fLP");
+    }
+
+    function _newManagerWithCollateral(MockMintableERC20 collateral)
+        internal
+        returns (FutarchyLiquidityManager)
+    {
+        return new FutarchyLiquidityManager(
+            bootstrapRecipient,
+            company,
+            IWrappedNative(address(collateral)),
+            officialProposer,
+            proposalSource,
+            spotAdapter,
+            conditionalAdapter,
+            router,
+            owner,
+            "Futarchy LP",
+            "fLP"
+        );
     }
 
     function _createOfficialProposal(bool winnerIsYes) internal {

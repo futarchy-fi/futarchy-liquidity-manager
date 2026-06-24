@@ -1,0 +1,35 @@
+{
+  "chainId": 100,
+  "owner": "0x693E3FB46Bb36eE43C702FE94f9463df0691b43d",
+  "bootstrapRecipient": "0x693E3FB46Bb36eE43C702FE94f9463df0691b43d",
+  "companyToken": "0x9C58BAcC331c9aa871AFD802DB6379a98e80CEdb",
+  "officialProposer": "0x693E3FB46Bb36eE43C702FE94f9463df0691b43d",
+  "wrappedNative": "0xaf204776c7245bF4147c2612BF6e5972Ee483701",
+  "positionManager": "0x91fD594c46D8B01E62dBDeBed2401dde01817834",
+  "algebraFactory": "0xA0864cCA6E114013AB0e27cbd5B6f4c8947da766",
+  "futarchyRouter": "0x7495a583ba85875d59407781b4958ED6e0E1228f",
+  "tickLower": -887220,
+  "tickUpper": 887220,
+  "lpTokenName": "GIP-151 Futarchy Liquidity Manager LP",
+  "lpTokenSymbol": "GIP151-FLM",
+  "deployDeadlineProxy": false,
+  "deadlineProxy": {
+    "conditionalTokens": "0xCeAfDD6bc0bEF976fdCd1112955828E00543c0Ce",
+    "realitio": "0xE78996A233895bE74a66F451f1019cA9734205cc",
+    "maxQuestionDuration": 604800
+  },
+  "validation": {
+    "enabled": true,
+    "expectedProposalToken": "0x9C58BAcC331c9aa871AFD802DB6379a98e80CEdb",
+    "expectedCollateralToken": "0xaf204776c7245bF4147c2612BF6e5972Ee483701",
+    "conditionalTokens": "0xCeAfDD6bc0bEF976fdCd1112955828E00543c0Ce",
+    "trustedOracle": "0xb5786fa17CC3E262d855240a074978C133438e7B",
+    "realitio": "0xE78996A233895bE74a66F451f1019cA9734205cc",
+    "trustedArbitrator": "0x68154EA682f95BF582b80Dd6453FA401737491Dc",
+    "maxOpeningDelay": 604800,
+    "minTimeout": 3600,
+    "maxTimeout": 604800,
+    "maxMinBond": 1000000000000000000,
+    "requirePools": true
+  }
+}

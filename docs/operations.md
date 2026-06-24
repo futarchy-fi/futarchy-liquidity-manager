@@ -26,12 +26,13 @@ tools/preflight-limited-deploy.sh \
 ```
 
 Strict mode rejects placeholder Safe/owner/target addresses, zero liquidity amounts for bootstrap
-and deposit batches, missing deadlines, and zero slippage minimums on liquidity add/remove paths.
-When `--deployment-output` is supplied, preflight also verifies the deployment output hash schema,
-recomputes the reviewed deploy config hash when `--deploy` is supplied, and checks that the batch
-references the deployed manager, proposal source, tokens, owner Safe, bootstrap recipient, and
-official proposer expected for the selected operation. The example config is validated in CI with
-`--allow-placeholders` because it is only a schema template.
+and deposit batches, mixed native/ERC20 collateral funding, missing deadlines, and zero slippage
+minimums on liquidity add/remove paths. When `--deployment-output` is supplied, preflight also
+verifies the deployment output hash schema, recomputes the reviewed deploy config hash when
+`--deploy` is supplied, and checks that the batch references the deployed manager, proposal source,
+tokens, owner Safe, bootstrap recipient, and official proposer expected for the selected operation.
+The example config is validated in CI with `--allow-placeholders` because it is only a schema
+template.
 
 CI also runs:
 
@@ -65,11 +66,13 @@ generate the batch, then audit the summary and calldata.
 ## Supported Operations
 
 - `initializeFromBootstrap`
-  - Transactions: company-token approval, then `manager.initializeFromBootstrap`.
-  - Uses `companyAmount`, `nativeValue`, and `spotAdd`.
+  - Transactions: company-token approval, optional collateral-token approval, then
+    `manager.initializeFromBootstrap`.
+  - Uses `companyAmount`, either `nativeValue` or `collateralAmount`, and `spotAdd`.
 - `depositToSpot`
-  - Transactions: company-token approval, then `manager.depositToSpot`.
-  - Uses `companyAmount`, `nativeValue`, and `spotAdd`.
+  - Transactions: company-token approval, optional collateral-token approval, then
+    `manager.depositToSpot`.
+  - Uses `companyAmount`, either `nativeValue` or `collateralAmount`, and `spotAdd`.
 - `sync`
   - Transaction: `manager.sync`.
   - Uses `spotExit`, `spotAdd`, `yesAdd`, `noAdd`, `yesExit`, and `noExit`.
@@ -102,6 +105,9 @@ All adapter calldata is generated from explicit JSON fields:
 
 For real execution, set nonzero `amount0Min`, `amount1Min`, and `deadline` values based on a fresh
 quote. The examples use zeros only as placeholders.
+
+For ERC20 collateral such as sDAI, set `collateralToken` to the deployed collateral token,
+`collateralAmount` to the amount being supplied, `nativeValue` to zero, and `unwrapNative` to false.
 
 ## Audit Procedure
 

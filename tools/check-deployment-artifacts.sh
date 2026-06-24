@@ -169,6 +169,8 @@ batch_filter='
   and (.manager | address)
   and (.proposalSource | address)
   and (.companyToken | address)
+  and (.collateralToken | address)
+  and (.collateralAmount | type == "number" and . >= 0)
 '
 
 require_jq "$DEPLOYMENT_OUTPUT" "$deployment_output_filter" "deployment output schema is invalid"
@@ -234,6 +236,11 @@ if [[ ${#BATCH_FILES[@]} -gt 0 ]]; then
         require_same_address "${batch} companyToken" \
           "$(json_address "$batch" '.companyToken')" \
           "$deployment_company"
+        if [[ "$(json_string "$batch" '.collateralAmount')" != "0" ]]; then
+          require_same_address "${batch} collateralToken" \
+            "$(json_address "$batch" '.collateralToken')" \
+            "$deployment_collateral"
+        fi
         ;;
     esac
 
