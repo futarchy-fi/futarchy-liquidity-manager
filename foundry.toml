@@ -19,6 +19,11 @@ remappings = [
 
 [rpc_endpoints]
 gnosis = "https://rpc.gnosischain.com"
+chiado = "https://rpc.chiadochain.net"
+
+[etherscan]
+gnosis = { key = "${ETHERSCAN_KEY}", url = "https://api.gnosisscan.io/api" }
+chiado = { key = "${ETHERSCAN_KEY}", url = "https://api-chiado.gnosisscan.io/api" }
 
 [fmt]
 line_length = 100
