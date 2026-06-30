@@ -2,7 +2,7 @@
 
 ## Objective
 
-Make futarchy liquidity provision operationally simple without giving a proposal curator the
+Make futarchy liquidity provision operationally simple without giving a proposal manager the
 power to freeze or redirect LP funds through arbitrary or never-settling conditional markets.
 
 ## Core Contracts
@@ -29,12 +29,12 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
 ## Security Properties To Review
 
 - LP shares remain proportional through deposits, withdrawals, migration, and settlement.
-- Curator cannot select arbitrary unsafe proposals once validation is enabled.
+- Proposal manager cannot select arbitrary unsafe proposals once validation is enabled.
 - Validation rejects far-future opening times, excessive min bonds, bad timeout bounds, wrong
   arbitrators, wrong CTF oracle, non-binary conditions, wrong collateral, missing outcomes, and
   missing pools.
 - Deadline proxy gives new FLM-grade proposals a bounded liveness path.
-- Emergency exit does not create a hidden curator theft path.
+- Emergency exit does not create a hidden proposal-manager theft path.
 - Adapters cannot over-pull tokens from the manager.
 
 ## Permissions
@@ -47,6 +47,9 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   - is the only account allowed to call `initializeFromBootstrap`;
   - receives idle sweeps and emergency-exit assets.
 - `FutarchyOfficialProposalSource.owner`
+  - can set the proposal manager;
+  - can perform every proposal-source operation available to the proposal manager.
+- `FutarchyOfficialProposalSource.proposalManager`
   - can set the official proposer;
   - can configure validation;
   - can set/clear the official proposal;
@@ -62,9 +65,9 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   not report more input used than provided, but adapter custody and protocol interactions still
   require adapter review.
 - The conditional router is trusted to split, merge, and redeem the expected proposal positions.
-- The official proposal source owner is trusted to configure validation correctly before setting a
-  production official proposal.
-- If manual settlement is used, the proposal source owner is trusted for settlement timing. For
+- The official proposal source owner or proposal manager is trusted to configure validation
+  correctly before setting a production official proposal.
+- If manual settlement is used, the owner or proposal manager is trusted for settlement timing. For
   bounded liveness, prefer a settlement oracle or `DeadlineBoundedRealityProxy` path.
 - `BOOTSTRAP_RECIPIENT` should be controlled by the organization integration, normally a Safe or
   reviewed bootstrap contract.

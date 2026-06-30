@@ -14,9 +14,9 @@ company token and collateral once, receive FLM shares, and let the manager handl
 
 Proposal curation must not imply custody over LP funds.
 
-The curator can mark an official proposal only through `FutarchyOfficialProposalSource`. When
-validation is enabled, `setOfficialProposal` accepts only proposals whose on-chain properties
-match the configured safety policy.
+The owner or proposal manager can mark an official proposal only through
+`FutarchyOfficialProposalSource`. When validation is enabled, `setOfficialProposal` accepts only
+proposals whose on-chain properties match the configured safety policy.
 
 ## Bad Proposal Checks
 
@@ -33,8 +33,8 @@ The proposal source can reject:
 - timeout below or above configured bounds;
 - minimum bond above the configured maximum.
 
-These checks are intended to prevent a weak curator from freezing LP funds by selecting an
-arbitrary or never-settling conditional market.
+These checks are intended to prevent a weak proposal manager from freezing LP funds by selecting
+an arbitrary or never-settling conditional market.
 
 ## Settlement Liveness
 

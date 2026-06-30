@@ -47,4 +47,5 @@ The machine-checkable evidence index is `audit/readiness-evidence.json`; CI vali
 
 - Complete an external review of `src/core`, `src/sources`, `src/oracles`, `src/interfaces`, and
   the selected adapter.
-- Document the deployed owner Safe, bootstrap recipient, emergency signers, and monitoring process.
+- Document the deployed owner Safe, proposal manager, bootstrap recipient, emergency signers, and
+  monitoring process.

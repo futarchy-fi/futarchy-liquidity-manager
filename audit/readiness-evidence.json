@@ -232,7 +232,7 @@
           "ciStep": "Limited preflight guard"
         },
         {
-          "description": "Deployment artifact checker verifies config hash evidence and links final batch targets back to the deployed manager, proposal source, tokens, owner, bootstrap recipient, and official proposer.",
+          "description": "Deployment artifact checker verifies config hash evidence and links final batch targets back to the deployed manager, proposal source, tokens, owner, proposal manager, bootstrap recipient, and official proposer.",
           "path": "tools/check-deployment-artifacts.sh"
         },
         {
@@ -245,7 +245,7 @@
         }
       ],
       "remaining": [
-        "Provide final deployment config, final batch configs, selected proposal/token addresses, Safe owner, bootstrap recipient, signers, and monitoring process.",
+        "Provide final deployment config, final batch configs, selected proposal/token addresses, Safe owner, proposal manager, bootstrap recipient, signers, and monitoring process.",
         "Run the limited deploy preflight on those final inputs with --deployment-output, --proposal, and --run-fork-tests, then retain generated artifacts.",
         "Execute the first transaction set with limited funds and verify positions and balances before scaling."
       ]

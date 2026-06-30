@@ -20,6 +20,7 @@ contract DeployFutarchyLiquidityManager is Script {
     struct DeployConfig {
         uint256 chainId;
         address owner;
+        address proposalManager;
         address bootstrapRecipient;
         address companyToken;
         address officialProposer;
@@ -76,6 +77,7 @@ contract DeployFutarchyLiquidityManager is Script {
         deployed.proposalSource = address(
             new FutarchyOfficialProposalSource(
                 cfg.owner,
+                cfg.proposalManager,
                 cfg.officialProposer,
                 IAlgebraFactoryLike(cfg.algebraFactory),
                 _encodeInitialValidationConfig(cfg.validation)
@@ -117,6 +119,7 @@ contract DeployFutarchyLiquidityManager is Script {
         console2.log("Config:", configPath);
         console2.log("Output:", outputPath);
         console2.log("Owner:", cfg.owner);
+        console2.log("Proposal manager:", cfg.proposalManager);
         console2.log("Bootstrap recipient:", cfg.bootstrapRecipient);
         console2.log("Company token:", cfg.companyToken);
         console2.log("Wrapped native:", cfg.wrappedNative);
@@ -132,6 +135,7 @@ contract DeployFutarchyLiquidityManager is Script {
         string memory json = vm.readFile(path);
         cfg.chainId = json.readUint(".chainId");
         cfg.owner = json.readAddress(".owner");
+        cfg.proposalManager = json.readAddress(".proposalManager");
         cfg.bootstrapRecipient = json.readAddress(".bootstrapRecipient");
         cfg.companyToken = json.readAddress(".companyToken");
         cfg.officialProposer = json.readAddress(".officialProposer");
@@ -174,6 +178,7 @@ contract DeployFutarchyLiquidityManager is Script {
     function _assertDeployConfig(DeployConfig memory cfg) internal view {
         require(block.chainid == cfg.chainId, "wrong chain");
         _requireNonzero(cfg.owner, "owner");
+        _requireNonzero(cfg.proposalManager, "proposalManager");
         _requireNonzero(cfg.bootstrapRecipient, "bootstrapRecipient");
         _requireNonzero(cfg.companyToken, "companyToken");
         _requireNonzero(cfg.officialProposer, "officialProposer");
@@ -222,6 +227,7 @@ contract DeployFutarchyLiquidityManager is Script {
         vm.serializeUint(key, "chainId", cfg.chainId);
         vm.serializeBytes32(key, "configHash", configHash);
         vm.serializeAddress(key, "owner", cfg.owner);
+        vm.serializeAddress(key, "proposalManager", cfg.proposalManager);
         vm.serializeAddress(key, "bootstrapRecipient", cfg.bootstrapRecipient);
         vm.serializeAddress(key, "companyToken", cfg.companyToken);
         vm.serializeAddress(key, "wrappedNative", cfg.wrappedNative);

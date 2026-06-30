@@ -12,6 +12,8 @@ FAO-side code or operations should:
   repository;
 - call `initializeFromBootstrap` from the configured `bootstrapRecipient`;
 - configure `FutarchyOfficialProposalSource` validation before setting a real official proposal;
+- assign a proposal manager for proposal-source operations when ownership should remain separate
+  from day-to-day metadata updates;
 - set only proposals whose creator equals the configured `officialProposer`;
 - generate operation batches from explicit JSON and audit calldata before execution.
 
