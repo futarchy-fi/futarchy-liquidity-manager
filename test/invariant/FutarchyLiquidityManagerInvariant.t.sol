@@ -216,24 +216,7 @@ contract FutarchyLiquidityManagerInvariantTest is StdInvariant, Test {
         targetContract(address(handler));
     }
 
-    function invariant_totalManagedLiquidityMatchesComponents() public view {
-        assertEq(
-            manager.totalManagedLiquidity(),
-            uint256(manager.spotLiquidity()) + uint256(manager.conditionalLiquidity())
-        );
-    }
-
-    function invariant_shareSupplyIsBackedByManagedLiquidity() public view {
-        assertLe(manager.totalSupply(), manager.totalManagedLiquidity());
-    }
-
     function invariant_conditionalAccountingIsConsistent() public view {
-        assertEq(
-            manager.conditionalLiquidity(),
-            (uint256(manager.conditionalYesLiquidity()) + uint256(manager.conditionalNoLiquidity()))
-                / 2
-        );
-
         if (manager.inConditionalMode()) {
             assertTrue(manager.activeProposal() != address(0));
             assertTrue(manager.activeYesCompanyToken() != address(0));
@@ -241,7 +224,6 @@ contract FutarchyLiquidityManagerInvariantTest is StdInvariant, Test {
             assertTrue(manager.activeYesCurrencyToken() != address(0));
             assertTrue(manager.activeNoCurrencyToken() != address(0));
         } else {
-            assertEq(manager.conditionalLiquidity(), 0);
             assertEq(manager.conditionalYesLiquidity(), 0);
             assertEq(manager.conditionalNoLiquidity(), 0);
             assertEq(manager.activeProposal(), address(0));

@@ -48,7 +48,6 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     uint256 public activeProposalId;
     uint256 public emergencyExitArmedAt;
     uint128 public spotLiquidity;
-    uint128 public conditionalLiquidity;
     uint128 public conditionalYesLiquidity;
     uint128 public conditionalNoLiquidity;
     address public activeProposal;
@@ -90,7 +89,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
 
     struct RedeemPlan {
         uint128 spotToRemove;
-        uint128 conditionalToRemove;
+        uint256 conditionalToRemove;
         uint128 yesToRemove;
         uint128 noToRemove;
     }
@@ -105,6 +104,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     error EmergencyExitNotArmed();
     error EmergencyExitDelayActive();
     error EmergencyExitAlreadyExecuted();
+    error DepositsDisabledInConditionalMode();
     error AdapterOverusedInput();
     error ExcessiveSyncLeftover(
         uint256 companyRecovered,
@@ -132,22 +132,22 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         address indexed recipient,
         uint256 sharesBurned,
         uint128 spotLiquidityRemoved,
-        uint128 conditionalLiquidityRemoved,
+        uint256 conditionalLiquidityRemoved,
         uint256 companyOut,
         uint256 collateralOut
     );
     event LiquidityMigratedToConditional(
-        uint256 indexed proposalId, uint128 spotRemoved, uint128 conditionalAdded
+        uint256 indexed proposalId, uint128 spotRemoved, uint256 conditionalAdded
     );
     event LiquidityMigratedBackToSpot(
-        uint256 indexed proposalId, uint128 conditionalRemoved, uint128 spotAdded
+        uint256 indexed proposalId, uint256 conditionalRemoved, uint128 spotAdded
     );
-    event Compounded(bool conditionalMode, uint128 liquidityAdded);
+    event Compounded(bool conditionalMode, uint256 liquidityAdded);
     event EmergencyExitArmed(uint256 armedAt, uint256 executableAt);
     event EmergencyExitDisarmed();
     event EmergencyExitExecuted(
         uint128 spotRemoved,
-        uint128 conditionalRemoved,
+        uint256 conditionalRemoved,
         uint256 companySentToBootstrap,
         uint256 collateralSentToBootstrap,
         uint256 nativeSentToBootstrap
@@ -320,6 +320,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         bool wrapNativeCollateral
     ) internal returns (uint128 liquidityMinted, uint256 sharesMinted) {
         _assertNotEmergencyMode();
+        if (inConditionalMode) revert DepositsDisabledInConditionalMode();
         _pullBaseAssets(companyAmount, collateralAmount, wrapNativeCollateral);
 
         uint256 companyUnused;
@@ -370,9 +371,8 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     ) external nonReentrant returns (uint256 companyOut, uint256 collateralOut) {
         if (recipient == address(0)) revert ZeroRecipient();
         uint256 supply = totalSupply();
-        uint256 totalLiquidity = totalManagedLiquidity();
         require(shares > 0 && shares <= balanceOf(msg.sender), "invalid shares");
-        RedeemPlan memory plan = _buildRedeemPlan(shares, supply, totalLiquidity);
+        RedeemPlan memory plan = _buildRedeemPlan(shares, supply);
 
         _burn(msg.sender, shares);
 
@@ -436,10 +436,6 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
 
     function previewLiquidityMigration() external view returns (uint128 liquidityToMove) {
         liquidityToMove = uint128((uint256(spotLiquidity) * MIGRATION_BPS) / BPS_DENOMINATOR);
-    }
-
-    function totalManagedLiquidity() public view returns (uint256) {
-        return uint256(spotLiquidity) + uint256(conditionalLiquidity);
     }
 
     function emergencyExitReady() public view returns (bool) {
@@ -513,7 +509,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         if (!emergencyExitReady()) revert EmergencyExitDelayActive();
 
         uint128 spotRemoved = spotLiquidity;
-        uint128 conditionalRemoved = conditionalLiquidity;
+        uint256 conditionalRemoved = _conditionalLiquidityTotal();
 
         if (spotRemoved > 0) {
             _removeFromSpot(spotRemoved, spotRemoveData);
@@ -539,7 +535,6 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
                 );
                 conditionalNoLiquidity = 0;
             }
-            _recomputeConditionalLiquidity();
             _recoverCollateralFromOutcomeTokens(false);
             _sweepActiveOutcomeTokensTo(BOOTSTRAP_RECIPIENT);
         }
@@ -611,7 +606,6 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         uint128 liquidityToMove =
             uint128((uint256(spotLiquidity) * MIGRATION_BPS) / BPS_DENOMINATOR);
         if (liquidityToMove > 0) {
-            uint128 conditionalBefore = conditionalLiquidity;
             (uint256 companyOut, uint256 collateralOut) =
                 _removeFromSpot(liquidityToMove, params.spotToConditionalRemoveData);
 
@@ -636,8 +630,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
             );
             conditionalYesLiquidity += yesAdded;
             conditionalNoLiquidity += noAdded;
-            _recomputeConditionalLiquidity();
-            uint128 condAdded = conditionalLiquidity - conditionalBefore;
+            uint256 condAdded = uint256(yesAdded) + uint256(noAdded);
             emit LiquidityMigratedToConditional(proposal.proposalId, liquidityToMove, condAdded);
         } else {
             emit LiquidityMigratedToConditional(proposal.proposalId, 0, 0);
@@ -665,7 +658,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         }
         if (!proposal.settled) return SyncAction.None;
 
-        uint128 condLiq = conditionalLiquidity;
+        uint256 condLiq = _conditionalLiquidityTotal();
         uint128 spotAddedBack;
         if (condLiq > 0) {
             (bytes memory yesRemoveData, bytes memory noRemoveData) =
@@ -689,8 +682,6 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
                 );
                 conditionalNoLiquidity = 0;
             }
-            _recomputeConditionalLiquidity();
-
             (uint256 companyOut, uint256 collateralOut) = _recoverCollateralFromOutcomeTokens(true);
             if (companyOut > 0 || collateralOut > 0) {
                 uint256 companyUnused;
@@ -711,16 +702,17 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     function _compoundActive(SyncParams calldata params) internal {
         uint128 added;
         if (inConditionalMode) {
-            uint128 conditionalBefore = conditionalLiquidity;
             (bytes memory yesCompoundData, bytes memory noCompoundData) =
                 _decodeDualData(params.conditionalCompoundData);
 
+            uint256 addedTotal;
             if (conditionalYesLiquidity > 0) {
                 added = _compoundConditionalPair(
                     activeYesCompanyToken, activeYesCurrencyToken, yesCompoundData
                 );
                 if (added > 0) {
                     conditionalYesLiquidity += added;
+                    addedTotal += added;
                 }
             }
 
@@ -730,11 +722,10 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
                 );
                 if (added > 0) {
                     conditionalNoLiquidity += added;
+                    addedTotal += added;
                 }
             }
 
-            _recomputeConditionalLiquidity();
-            uint128 addedTotal = conditionalLiquidity - conditionalBefore;
             if (addedTotal > 0) {
                 emit Compounded(true, addedTotal);
             }
@@ -819,7 +810,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         CONDITIONAL_ADAPTER.removeLiquidity(token0, token1, liquidity, data);
     }
 
-    function _buildRedeemPlan(uint256 shares, uint256 supply, uint256 totalLiquidity)
+    function _buildRedeemPlan(uint256 shares, uint256 supply)
         internal
         view
         returns (RedeemPlan memory plan)
@@ -832,20 +823,17 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
             return plan;
         }
 
-        uint256 liquidityToRemove = (totalLiquidity * shares) / supply;
-        if (liquidityToRemove == 0) revert ZeroRedeemLiquidity();
+        plan.spotToRemove = uint128((uint256(spotLiquidity) * shares) / supply);
+        plan.yesToRemove = uint128((uint256(conditionalYesLiquidity) * shares) / supply);
+        plan.noToRemove = uint128((uint256(conditionalNoLiquidity) * shares) / supply);
+        plan.conditionalToRemove = plan.yesToRemove + plan.noToRemove;
 
-        plan.spotToRemove = uint128((uint256(spotLiquidity) * liquidityToRemove) / totalLiquidity);
-        plan.conditionalToRemove = uint128(liquidityToRemove - plan.spotToRemove);
-
-        if (plan.conditionalToRemove == 0 || conditionalLiquidity == 0) return plan;
-
-        plan.yesToRemove = uint128(
-            (uint256(conditionalYesLiquidity) * plan.conditionalToRemove) / conditionalLiquidity
-        );
-        plan.noToRemove = uint128(
-            (uint256(conditionalNoLiquidity) * plan.conditionalToRemove) / conditionalLiquidity
-        );
+        if (
+            plan.spotToRemove == 0 && plan.yesToRemove == 0 && plan.noToRemove == 0
+                && _hasManagedLiquidity()
+        ) {
+            revert ZeroRedeemLiquidity();
+        }
     }
 
     function _redeemConditional(
@@ -873,8 +861,6 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
             );
             conditionalNoLiquidity -= plan.noToRemove;
         }
-        _recomputeConditionalLiquidity();
-
         (companyOut, collateralOut) = _recoverCollateralFromOutcomeTokens(false);
         _transferOutcomeDelta(
             recipient, yesCompanyBefore, noCompanyBefore, yesCurrencyBefore, noCurrencyBefore
@@ -1019,13 +1005,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         }
     }
 
-    function _recomputeConditionalLiquidity() internal {
-        conditionalLiquidity =
-            uint128((uint256(conditionalYesLiquidity) + uint256(conditionalNoLiquidity)) / 2);
-    }
-
     function _clearConditionalModeState() internal {
-        conditionalLiquidity = 0;
         conditionalYesLiquidity = 0;
         conditionalNoLiquidity = 0;
         inConditionalMode = false;
@@ -1101,6 +1081,14 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         return a > b ? a : b;
     }
 
+    function _conditionalLiquidityTotal() internal view returns (uint256) {
+        return uint256(conditionalYesLiquidity) + uint256(conditionalNoLiquidity);
+    }
+
+    function _hasManagedLiquidity() internal view returns (bool) {
+        return spotLiquidity > 0 || conditionalYesLiquidity > 0 || conditionalNoLiquidity > 0;
+    }
+
     function _toTokenOrder(uint256 companyAmount, uint256 collateralAmount)
         internal
         view
@@ -1145,11 +1133,11 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         returns (uint256 sharesMinted)
     {
         uint256 supply = totalSupply();
-        uint256 totalLiquidityBefore = totalManagedLiquidity() - liquidityAdded;
-        if (supply == 0 || totalLiquidityBefore == 0) {
+        uint256 spotLiquidityBefore = spotLiquidity - liquidityAdded;
+        if (supply == 0 || spotLiquidityBefore == 0) {
             sharesMinted = liquidityAdded;
         } else {
-            sharesMinted = (uint256(liquidityAdded) * supply) / totalLiquidityBefore;
+            sharesMinted = (uint256(liquidityAdded) * supply) / spotLiquidityBefore;
         }
 
         if (sharesMinted > 0) {
