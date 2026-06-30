@@ -23,6 +23,8 @@ contract FutarchyOfficialProposalSourceTest is Test {
 
     address internal owner = address(this);
     address internal nonOwner = address(0xBEEF);
+    address internal proposalManager = address(0x69);
+    address internal newProposalManager = address(0x70);
     address internal officialProposer = address(0x1111);
     address internal trustedOracle = address(0xCAFE);
     address internal trustedArbitrator = address(0xA11B);
@@ -41,7 +43,7 @@ contract FutarchyOfficialProposalSourceTest is Test {
         vm.warp(1_000_000);
         factory = new MockAlgebraFactoryLike();
         source = new FutarchyOfficialProposalSource(
-            owner, officialProposer, IAlgebraFactoryLike(address(factory)), ""
+            owner, proposalManager, officialProposer, IAlgebraFactoryLike(address(factory)), ""
         );
         oracle = new MockProposalSettlementOracle();
         conditionalTokens = new MockConditionalTokens();
@@ -155,6 +157,7 @@ contract FutarchyOfficialProposalSourceTest is Test {
     function test_constructor_can_set_validation_before_safe_owner_takes_over() public {
         FutarchyOfficialProposalSource configured = new FutarchyOfficialProposalSource(
             nonOwner,
+            proposalManager,
             officialProposer,
             IAlgebraFactoryLike(address(factory)),
             abi.encode(_validationConfig(true, true))
@@ -302,8 +305,37 @@ contract FutarchyOfficialProposalSourceTest is Test {
 
     function test_only_owner_guards() public {
         vm.prank(nonOwner);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(FutarchyOfficialProposalSource.OnlyOwnerOrProposalManager.selector);
         source.setOfficialProposer(address(0xCAFE));
+
+        vm.prank(proposalManager);
+        vm.expectRevert("Ownable: caller is not the owner");
+        source.setProposalManager(newProposalManager);
+    }
+
+    function test_owner_can_update_proposal_manager() public {
+        source.setProposalManager(newProposalManager);
+        assertEq(source.proposalManager(), newProposalManager);
+    }
+
+    function test_proposal_manager_can_operate_proposal_source() public {
+        factory.setPool(yesComp, yesCurr, yesPool);
+        factory.setPool(noComp, noCurr, noPool);
+        MockFutarchyProposalLike proposal =
+            new MockFutarchyProposalLike(company, wxdai, yesComp, noComp, yesCurr, noCurr);
+
+        vm.startPrank(proposalManager);
+        source.setOfficialProposer(officialProposer);
+        source.setProposalValidationConfig(_validationConfig(false, false));
+        source.setOfficialProposal(23, address(proposal), officialProposer);
+        source.setManualSettled(true);
+        source.setSettlementOracle(address(oracle));
+        source.clearOfficialProposal();
+        vm.stopPrank();
+
+        assertEq(source.settlementOracle(), address(oracle));
+        (,, bool exists,,,,,) = source.officialProposal();
+        assertFalse(exists);
     }
 
     function _enableValidation(bool requirePools) internal {

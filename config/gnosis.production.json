@@ -1,6 +1,6 @@
 {
   "chainId": 100,
-  "owner": "0x693E3FB46Bb36eE43C702FE94f9463df0691b43d",
+  "owner": "0xEB2AEC308e7B3340Dea2E89d40187D2637C6c649",
   "proposalManager": "0x693E3FB46Bb36eE43C702FE94f9463df0691b43d",
   "bootstrapRecipient": "0x693E3FB46Bb36eE43C702FE94f9463df0691b43d",
   "companyToken": "0x9C58BAcC331c9aa871AFD802DB6379a98e80CEdb",
@@ -11,8 +11,8 @@
   "futarchyRouter": "0x7495a583ba85875d59407781b4958ED6e0E1228f",
   "tickLower": -887220,
   "tickUpper": 887220,
-  "lpTokenName": "GIP-151 Futarchy Liquidity Manager LP",
-  "lpTokenSymbol": "GIP151-FLM",
+  "lpTokenName": "Gnosis Futarchy Liquidity Manager LP",
+  "lpTokenSymbol": "GNO-FLM",
   "deployDeadlineProxy": false,
   "deadlineProxy": {
     "conditionalTokens": "0xCeAfDD6bc0bEF976fdCd1112955828E00543c0Ce",

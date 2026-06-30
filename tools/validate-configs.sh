@@ -83,6 +83,7 @@ deploy_schema_filter='
   type == "object"
   and (.chainId | type == "number" and . > 0)
   and (.owner | address)
+  and (.proposalManager | address)
   and (.bootstrapRecipient | address)
   and (.companyToken | address)
   and (.officialProposer | address)
@@ -119,6 +120,7 @@ deploy_strict_filter='
   def zero: "0x0000000000000000000000000000000000000000";
   def nzaddress: address and (ascii_downcase != zero);
   (.owner | nzaddress)
+  and (.proposalManager | nzaddress)
   and (.bootstrapRecipient | nzaddress)
   and (.companyToken | nzaddress)
   and (.officialProposer | nzaddress)

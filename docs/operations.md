@@ -30,7 +30,8 @@ and deposit batches, mixed native/ERC20 collateral funding, missing deadlines, a
 minimums on liquidity add/remove paths. When `--deployment-output` is supplied, preflight also
 verifies the deployment output hash schema, recomputes the reviewed deploy config hash when
 `--deploy` is supplied, and checks that the batch references the deployed manager, proposal source,
-tokens, owner Safe, bootstrap recipient, and official proposer expected for the selected operation.
+tokens, owner Safe or proposal-manager Safe, bootstrap recipient, and official proposer expected
+for the selected operation.
 The example config is validated in CI with `--allow-placeholders` because it is only a schema
 template.
 
@@ -81,9 +82,11 @@ generate the batch, then audit the summary and calldata.
   - Uses `shares`, `recipient`, `unwrapNative`, `spotExit`, `yesExit`, and `noExit`.
 - `setOfficialProposal`
   - Transaction: `proposalSource.setOfficialProposal`.
+  - Must be submitted by the owner or proposal manager.
   - Uses `proposalId`, `proposal`, and `creator`.
 - `setProposalValidationConfig`
   - Transaction: `proposalSource.setProposalValidationConfig`.
+  - Must be submitted by the owner or proposal manager.
   - Uses `validation`.
 - `armEmergencyExit`
 - `disarmEmergencyExit`

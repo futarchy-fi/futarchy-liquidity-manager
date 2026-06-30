@@ -18,11 +18,11 @@ interface IProposalSettlementOracle {
 }
 
 /// @title FutarchyOfficialProposalSource
-/// @notice Owner-managed source of a single official proposal with optional oracle-based
+/// @notice Owner/manager source of a single official proposal with optional oracle-based
 /// settlement.
 /// @dev This enforces "one live official proposal" at a time. When validation is enabled, the
-/// owner can only set proposals whose on-chain shape matches the configured token, CTF, Reality,
-/// arbitrator, timing, bond, and pool policy.
+/// owner or proposal manager can only set proposals whose on-chain shape matches the configured
+/// token, CTF, Reality, arbitrator, timing, bond, and pool policy.
 contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Ownable2Step {
     enum ProposalValidationFailure {
         None,
@@ -100,6 +100,7 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
     }
 
     IAlgebraFactoryLike public immutable ALGEBRA_FACTORY;
+    address public proposalManager;
     address public officialProposer;
     address public settlementOracle;
     ProposalValidationConfig public proposalValidationConfig;
@@ -107,10 +108,12 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
     OfficialProposal private _official;
 
     error ZeroAddress();
+    error OnlyOwnerOrProposalManager();
     error InvalidProposalValidationConfig();
     error ActiveOfficialProposalExists();
     error ProposalValidationFailed(ProposalValidationFailure failure);
 
+    event ProposalManagerUpdated(address indexed oldManager, address indexed newManager);
     event OfficialProposerUpdated(address indexed oldProposer, address indexed newProposer);
     event SettlementOracleUpdated(address indexed oldOracle, address indexed newOracle);
     event ProposalValidationConfigUpdated(ProposalValidationConfig config);
@@ -122,17 +125,19 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
 
     constructor(
         address initialOwner,
+        address initialProposalManager,
         address initialOfficialProposer,
         IAlgebraFactoryLike algebraFactory,
         bytes memory initialValidationConfigData
     ) Ownable() {
         if (
-            initialOwner == address(0) || initialOfficialProposer == address(0)
-                || address(algebraFactory) == address(0)
+            initialOwner == address(0) || initialProposalManager == address(0)
+                || initialOfficialProposer == address(0) || address(algebraFactory) == address(0)
         ) {
             revert ZeroAddress();
         }
 
+        proposalManager = initialProposalManager;
         officialProposer = initialOfficialProposer;
         ALGEBRA_FACTORY = algebraFactory;
         if (initialValidationConfigData.length != 0) {
@@ -144,10 +149,30 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         _transferOwnership(initialOwner);
     }
 
+    modifier onlyOwnerOrProposalManager() {
+        _requireOwnerOrProposalManager();
+        _;
+    }
+
+    function _requireOwnerOrProposalManager() internal view {
+        if (msg.sender != owner() && msg.sender != proposalManager) {
+            revert OnlyOwnerOrProposalManager();
+        }
+    }
+
+    /// @notice Updates the proposal manager that can operate proposal-source state.
+    /// @dev Owner-only. The proposal manager cannot transfer ownership or change this role.
+    function setProposalManager(address newProposalManager) external onlyOwner {
+        if (newProposalManager == address(0)) revert ZeroAddress();
+        address old = proposalManager;
+        proposalManager = newProposalManager;
+        emit ProposalManagerUpdated(old, newProposalManager);
+    }
+
     /// @notice Updates the only proposal creator whose proposals should be considered official.
-    /// @dev Owner-only. The manager still checks that the current official proposal creator equals
-    /// its immutable `OFFICIAL_PROPOSER`.
-    function setOfficialProposer(address newOfficialProposer) external onlyOwner {
+    /// @dev Owner/manager-only. The liquidity manager still checks that the current official
+    /// proposal creator equals its immutable `OFFICIAL_PROPOSER`.
+    function setOfficialProposer(address newOfficialProposer) external onlyOwnerOrProposalManager {
         if (newOfficialProposer == address(0)) revert ZeroAddress();
         address old = officialProposer;
         officialProposer = newOfficialProposer;
@@ -155,32 +180,32 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
     }
 
     /// @notice Sets an optional settlement oracle used instead of manual settlement.
-    /// @dev Owner-only. A zero oracle reverts settlement reads back to the manual flag.
-    function setSettlementOracle(address newOracle) external onlyOwner {
+    /// @dev Owner/manager-only. A zero oracle reverts settlement reads back to the manual flag.
+    function setSettlementOracle(address newOracle) external onlyOwnerOrProposalManager {
         address old = settlementOracle;
         settlementOracle = newOracle;
         emit SettlementOracleUpdated(old, newOracle);
     }
 
     /// @notice Configures on-chain validation for future official proposals.
-    /// @dev Owner-only. Validation does not inspect free-form Reality question text; it checks
-    /// explicit on-chain fields exposed by the proposal, CTF, Reality, and Algebra factory.
+    /// @dev Owner/manager-only. Validation does not inspect free-form Reality question text; it
+    /// checks explicit on-chain fields exposed by the proposal, CTF, Reality, and Algebra factory.
     function setProposalValidationConfig(ProposalValidationConfig calldata config)
         external
-        onlyOwner
+        onlyOwnerOrProposalManager
     {
         _setProposalValidationConfig(config);
     }
 
     /// @notice Sets the current official proposal.
-    /// @dev Owner-only. Reverts while a previous official proposal exists and is not settled.
-    /// If validation is enabled, the proposal must pass `validateProposal`.
+    /// @dev Owner/manager-only. Reverts while a previous official proposal exists and is not
+    /// settled. If validation is enabled, the proposal must pass `validateProposal`.
     /// @param proposalId External proposal identifier used by the integration.
     /// @param proposal Futarchy proposal contract address.
     /// @param creator Creator address reported by the integration/proposal system.
     function setOfficialProposal(uint256 proposalId, address proposal, address creator)
         external
-        onlyOwner
+        onlyOwnerOrProposalManager
     {
         if (proposal == address(0) || creator == address(0)) revert ZeroAddress();
         if (_official.exists && !_isSettled(_official)) revert ActiveOfficialProposalExists();
@@ -197,16 +222,16 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
     }
 
     /// @notice Clears the official proposal slot.
-    /// @dev Owner-only emergency/admin action. Clearing while the manager is in conditional mode
-    /// can make `sync` back to spot revert until the active proposal is restored and settled.
-    function clearOfficialProposal() external onlyOwner {
+    /// @dev Owner/manager-only emergency/admin action. Clearing while the manager is in conditional
+    /// mode can make `sync` back to spot revert until the active proposal is restored and settled.
+    function clearOfficialProposal() external onlyOwnerOrProposalManager {
         delete _official;
         emit OfficialProposalCleared();
     }
 
     /// @notice Manually marks the official proposal settled or unsettled.
-    /// @dev Owner-only. Ignored when `settlementOracle` is configured.
-    function setManualSettled(bool settled) external onlyOwner {
+    /// @dev Owner/manager-only. Ignored when `settlementOracle` is configured.
+    function setManualSettled(bool settled) external onlyOwnerOrProposalManager {
         _official.manualSettled = settled;
         emit OfficialProposalManualSettlementUpdated(settled);
     }

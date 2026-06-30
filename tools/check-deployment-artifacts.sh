@@ -17,9 +17,9 @@ Usage:
 Checks that deployment output and operation batches refer to the same deployed FLM stack:
   - deployment output has the expected schema;
   - deployment output records config and deployed bytecode hashes;
-  - optional deploy config matches output owner/token/bootstrap fields;
+  - optional deploy config matches output owner/proposal-manager/token/bootstrap fields;
   - batches use the deployed manager/proposal source/token addresses;
-  - owner-only and bootstrap-only Safe batches are created from the expected Safe.
+  - owner-only, proposal-source, and bootstrap-only Safe batches are created from an expected Safe.
 USAGE
 }
 
@@ -112,6 +112,25 @@ require_same_address() {
   fi
 }
 
+require_same_address_or() {
+  local label="$1"
+  local actual="$2"
+  local first="$3"
+  local second="$4"
+
+  local actual_lower
+  local first_lower
+  local second_lower
+  actual_lower="$(lower "$actual")"
+  first_lower="$(lower "$first")"
+  second_lower="$(lower "$second")"
+
+  if [[ "$actual_lower" != "$first_lower" && "$actual_lower" != "$second_lower" ]]; then
+    echo "deployment artifact check failed: ${label} mismatch (${actual} != ${first} or ${second})" >&2
+    exit 1
+  fi
+}
+
 file_keccak() {
   if ! command -v cast >/dev/null 2>&1; then
     echo "deployment artifact check failed: cast is required to verify configHash" >&2
@@ -133,6 +152,7 @@ deployment_output_filter='
   and (.chainId | chain)
   and (.configHash | nzbytes32)
   and (.owner | nzaddress)
+  and (.proposalManager | nzaddress)
   and (.bootstrapRecipient | nzaddress)
   and (.companyToken | nzaddress)
   and (.wrappedNative | nzaddress)
@@ -154,6 +174,7 @@ deploy_config_filter='
   type == "object"
   and (.chainId | type == "number" and . > 0)
   and (.owner | address)
+  and (.proposalManager | address)
   and (.bootstrapRecipient | address)
   and (.companyToken | address)
   and (.wrappedNative | address)
@@ -178,6 +199,7 @@ require_jq "$DEPLOYMENT_OUTPUT" "$deployment_output_filter" "deployment output s
 deployment_chain="$(json_string "$DEPLOYMENT_OUTPUT" '.chainId')"
 deployment_config_hash="$(json_address "$DEPLOYMENT_OUTPUT" '.configHash')"
 deployment_owner="$(json_address "$DEPLOYMENT_OUTPUT" '.owner')"
+deployment_proposal_manager="$(json_address "$DEPLOYMENT_OUTPUT" '.proposalManager')"
 deployment_bootstrap="$(json_address "$DEPLOYMENT_OUTPUT" '.bootstrapRecipient')"
 deployment_company="$(json_address "$DEPLOYMENT_OUTPUT" '.companyToken')"
 deployment_collateral="$(json_address "$DEPLOYMENT_OUTPUT" '.wrappedNative')"
@@ -194,6 +216,9 @@ if [[ -n "$DEPLOY_CONFIG" ]]; then
   require_same_address "deploy owner" \
     "$deployment_owner" \
     "$(json_address "$DEPLOY_CONFIG" '.owner')"
+  require_same_address "deploy proposalManager" \
+    "$deployment_proposal_manager" \
+    "$(json_address "$DEPLOY_CONFIG" '.proposalManager')"
   require_same_address "deploy bootstrapRecipient" \
     "$deployment_bootstrap" \
     "$(json_address "$DEPLOY_CONFIG" '.bootstrapRecipient')"
@@ -250,7 +275,13 @@ if [[ ${#BATCH_FILES[@]} -gt 0 ]]; then
           "$(json_address "$batch" '.createdFromSafeAddress')" \
           "$deployment_bootstrap"
         ;;
-      setOfficialProposal|setProposalValidationConfig|armEmergencyExit|disarmEmergencyExit|emergencyExitAllToBootstrapRecipient|sweepIdleToBootstrapRecipient)
+      setOfficialProposal|setProposalValidationConfig)
+        require_same_address_or "${batch} createdFromSafeAddress" \
+          "$(json_address "$batch" '.createdFromSafeAddress')" \
+          "$deployment_owner" \
+          "$deployment_proposal_manager"
+        ;;
+      armEmergencyExit|disarmEmergencyExit|emergencyExitAllToBootstrapRecipient|sweepIdleToBootstrapRecipient)
         require_same_address "${batch} createdFromSafeAddress" \
           "$(json_address "$batch" '.createdFromSafeAddress')" \
           "$deployment_owner"

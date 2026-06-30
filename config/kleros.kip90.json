@@ -1,9 +1,9 @@
 {
   "chainId": 100,
-  "owner": "0x693E3FB46Bb36eE43C702FE94f9463df0691b43d",
+  "owner": "0xEB2AEC308e7B3340Dea2E89d40187D2637C6c649",
   "proposalManager": "0x693E3FB46Bb36eE43C702FE94f9463df0691b43d",
   "bootstrapRecipient": "0x693E3FB46Bb36eE43C702FE94f9463df0691b43d",
-  "companyToken": "0x9C58BAcC331c9aa871AFD802DB6379a98e80CEdb",
+  "companyToken": "0x37b60f4E9A31A64cCc0024dce7D0fD07eAA0F7B3",
   "officialProposer": "0x693E3FB46Bb36eE43C702FE94f9463df0691b43d",
   "wrappedNative": "0xaf204776c7245bF4147c2612BF6e5972Ee483701",
   "positionManager": "0x91fD594c46D8B01E62dBDeBed2401dde01817834",
@@ -11,8 +11,8 @@
   "futarchyRouter": "0x7495a583ba85875d59407781b4958ED6e0E1228f",
   "tickLower": -887220,
   "tickUpper": 887220,
-  "lpTokenName": "GIP-151 Futarchy Liquidity Manager LP",
-  "lpTokenSymbol": "GIP151-FLM",
+  "lpTokenName": "Kleros Futarchy Liquidity Manager LP",
+  "lpTokenSymbol": "KLEROS-FLM",
   "deployDeadlineProxy": false,
   "deadlineProxy": {
     "conditionalTokens": "0xCeAfDD6bc0bEF976fdCd1112955828E00543c0Ce",
@@ -21,7 +21,7 @@
   },
   "validation": {
     "enabled": true,
-    "expectedProposalToken": "0x9C58BAcC331c9aa871AFD802DB6379a98e80CEdb",
+    "expectedProposalToken": "0x37b60f4E9A31A64cCc0024dce7D0fD07eAA0F7B3",
     "expectedCollateralToken": "0xaf204776c7245bF4147c2612BF6e5972Ee483701",
     "conditionalTokens": "0xCeAfDD6bc0bEF976fdCd1112955828E00543c0Ce",
     "trustedOracle": "0xb5786fa17CC3E262d855240a074978C133438e7B",

@@ -15,6 +15,8 @@ cp config/gnosis.example.json config/gnosis.fao.json
 Required organization-specific fields:
 
 - `owner`: owner of the proposal source and liquidity manager emergency controls, ideally a Safe.
+- `proposalManager`: operator allowed to update proposal-source metadata, validation, and manual
+  settlement without owning emergency controls.
 - `bootstrapRecipient`: account allowed to call `initializeFromBootstrap`; for FAO this should be
   the integration contract or Safe that initially funds liquidity.
 - `companyToken`: the token paired against the configured collateral token.
@@ -33,8 +35,8 @@ Gnosis defaults included in the example:
 Validation fields are explicit even when disabled. For production, prefer enabling validation before
 setting an official proposal. If `deployDeadlineProxy` is true and `validation.trustedOracle` is
 zero, the deployment script uses the newly deployed `DeadlineBoundedRealityProxy`. Enabled
-validation is constructor-initialized on the proposal source, so the owner can be a Safe from the
-first deployed state.
+validation is constructor-initialized on the proposal source, so the owner and proposal manager are
+fixed from the first deployed state.
 
 For ERC20-collateral deployments, bootstrap and deposit batches must use `collateralToken` and
 `collateralAmount` with `nativeValue` set to zero. Native-collateral deployments use `nativeValue`
@@ -99,8 +101,8 @@ tools/check-deployment-artifacts.sh \
 ```
 
 This recomputes the deploy config hash and catches copied-address mistakes such as a batch
-targeting the wrong manager, proposal source, company token, owner Safe, bootstrap recipient, or
-official proposer.
+targeting the wrong manager, proposal source, company token, owner Safe, proposal manager,
+bootstrap recipient, or official proposer.
 
 ## Limited-Funds Deployment Order
 
