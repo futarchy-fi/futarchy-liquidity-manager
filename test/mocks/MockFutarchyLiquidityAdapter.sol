@@ -69,12 +69,14 @@ contract MockFutarchyLiquidityAdapter is IFutarchyLiquidityAdapter {
         }
     }
 
-    function compoundPosition(address, address, bytes calldata)
+    function compoundPosition(address token0, address token1, bytes calldata)
         external
         returns (uint128 liquidityAdded)
     {
         liquidityAdded = nextCompoundLiquidity;
         if (liquidityAdded > 0) {
+            bytes32 pairKey = keccak256(abi.encode(token0, token1));
+            liquidityByPair[pairKey] += liquidityAdded;
             totalLiquidity += liquidityAdded;
             nextCompoundLiquidity = 0;
         }
