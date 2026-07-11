@@ -13,4 +13,7 @@ interface IFutarchyConditionalRouter {
 
     /// @notice Redeems winning outcome tokens for base collateral after proposal settlement.
     function redeemPositions(address proposal, address collateralToken, uint256 amount) external;
+
+    /// @notice Returns which binary proposal outcomes have a nonzero payout.
+    function getWinningOutcomes(bytes32 conditionId) external view returns (bool[] memory);
 }

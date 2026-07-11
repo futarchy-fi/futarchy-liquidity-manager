@@ -6,10 +6,13 @@ import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IFutarchyLiquidityAdapter} from "../interfaces/IFutarchyLiquidityAdapter.sol";
 import {IFutarchyOfficialProposalSource} from "../interfaces/IFutarchyOfficialProposalSource.sol";
 import {IFutarchyConditionalRouter} from "../interfaces/IFutarchyConditionalRouter.sol";
+import {IPoolStabilityGuard} from "../interfaces/IPoolStabilityGuard.sol";
+import {IFutarchyProposalCore} from "../interfaces/IFutarchyTradingCore.sol";
 
 interface IWrappedNative is IERC20 {
     function deposit() external payable;
@@ -37,6 +40,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     IFutarchyLiquidityAdapter public immutable SPOT_ADAPTER;
     IFutarchyLiquidityAdapter public immutable CONDITIONAL_ADAPTER;
     IFutarchyConditionalRouter public immutable CONDITIONAL_ROUTER;
+    IPoolStabilityGuard public immutable POOL_STABILITY_GUARD;
 
     address public immutable TOKEN0;
     address public immutable TOKEN1;
@@ -78,24 +82,27 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         address noPool;
     }
 
-    struct SyncParams {
-        bytes spotCompoundData;
-        bytes conditionalCompoundData;
-        bytes spotToConditionalRemoveData;
-        bytes spotToConditionalAddData;
-        bytes conditionalToSpotRemoveData;
-        bytes conditionalToSpotAddData;
+    struct OutcomeAmounts {
+        uint256 yesCompany;
+        uint256 noCompany;
+        uint256 yesCurrency;
+        uint256 noCurrency;
     }
 
-    struct RedeemPlan {
-        uint128 spotToRemove;
-        uint256 conditionalToRemove;
-        uint128 yesToRemove;
-        uint128 noToRemove;
+    struct VaultAmounts {
+        uint256 company;
+        uint256 collateral;
+        OutcomeAmounts outcomes;
+    }
+
+    struct LpTokenMetadata {
+        string name;
+        string symbol;
     }
 
     error OnlyBootstrapRecipient();
     error AlreadyInitialized();
+    error NotInitialized();
     error ZeroAddress();
     error InvalidProposalConfig();
     error ActiveProposalRequired();
@@ -114,8 +121,14 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     );
     error ZeroLiquidityMinted();
     error ZeroSharesMinted();
+    error InvalidShares();
     error ZeroRecipient();
-    error ZeroRedeemLiquidity();
+    error SharesOutstanding();
+    error InvalidDepositRatio();
+    error InvalidAssetTransfer();
+    error InvalidSettlementOutcome();
+    error IncompleteOutcomeRecovery();
+    error OnlySelf();
 
     event InitializedFromBootstrap(
         uint256 companyAmount, uint256 collateralAmount, uint128 spotLiquidityMinted
@@ -124,17 +137,22 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         address indexed sender,
         uint256 companyAmount,
         uint256 collateralAmount,
-        uint128 liquidityMinted,
         uint256 sharesMinted
     );
     event SharesRedeemed(
         address indexed owner,
         address indexed recipient,
         uint256 sharesBurned,
-        uint128 spotLiquidityRemoved,
-        uint256 conditionalLiquidityRemoved,
         uint256 companyOut,
         uint256 collateralOut
+    );
+    event OutcomeTokensRedeemed(
+        address indexed owner,
+        address indexed recipient,
+        uint256 yesCompanyOut,
+        uint256 noCompanyOut,
+        uint256 yesCurrencyOut,
+        uint256 noCurrencyOut
     );
     event LiquidityMigratedToConditional(
         uint256 indexed proposalId, uint128 spotRemoved, uint256 conditionalAdded
@@ -142,16 +160,10 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     event LiquidityMigratedBackToSpot(
         uint256 indexed proposalId, uint256 conditionalRemoved, uint128 spotAdded
     );
-    event Compounded(bool conditionalMode, uint256 liquidityAdded);
+    event LiquidityRestoreDeferred();
     event EmergencyExitArmed(uint256 armedAt, uint256 executableAt);
     event EmergencyExitDisarmed();
-    event EmergencyExitExecuted(
-        uint128 spotRemoved,
-        uint256 conditionalRemoved,
-        uint256 companySentToBootstrap,
-        uint256 collateralSentToBootstrap,
-        uint256 nativeSentToBootstrap
-    );
+    event EmergencyExitExecuted(uint128 spotRemoved, uint256 conditionalRemoved);
     event IdleSweptToBootstrapRecipient(
         uint256 companySentToBootstrap,
         uint256 collateralSentToBootstrap,
@@ -168,9 +180,9 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     /// @param spotAdapter Adapter managing the spot company/wrapped-native position.
     /// @param conditionalAdapter Adapter managing YES and NO conditional positions.
     /// @param conditionalRouter Router used to split, merge, and redeem conditional positions.
+    /// @param poolStabilityGuard Shared guard enforcing spot-pool TWAP stability before migration.
     /// @param initialOwner Owner of emergency controls.
-    /// @param lpTokenName ERC20 name for manager shares.
-    /// @param lpTokenSymbol ERC20 symbol for manager shares.
+    /// @param lpTokenMetadata ERC20 name and symbol for manager shares.
     constructor(
         address bootstrapRecipient,
         IERC20 companyToken,
@@ -180,16 +192,17 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         IFutarchyLiquidityAdapter spotAdapter,
         IFutarchyLiquidityAdapter conditionalAdapter,
         IFutarchyConditionalRouter conditionalRouter,
+        IPoolStabilityGuard poolStabilityGuard,
         address initialOwner,
-        string memory lpTokenName,
-        string memory lpTokenSymbol
-    ) ERC20(lpTokenName, lpTokenSymbol) {
+        LpTokenMetadata memory lpTokenMetadata
+    ) ERC20(lpTokenMetadata.name, lpTokenMetadata.symbol) {
         if (
             bootstrapRecipient == address(0) || address(companyToken) == address(0)
                 || address(wrappedNative) == address(0) || officialProposer == address(0)
                 || address(proposalSource) == address(0) || address(spotAdapter) == address(0)
                 || address(conditionalAdapter) == address(0)
-                || address(conditionalRouter) == address(0) || initialOwner == address(0)
+                || address(conditionalRouter) == address(0)
+                || address(poolStabilityGuard) == address(0) || initialOwner == address(0)
         ) {
             revert ZeroAddress();
         }
@@ -202,6 +215,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         SPOT_ADAPTER = spotAdapter;
         CONDITIONAL_ADAPTER = conditionalAdapter;
         CONDITIONAL_ROUTER = conditionalRouter;
+        POOL_STABILITY_GUARD = poolStabilityGuard;
 
         bool companyFirst = address(companyToken) < address(wrappedNative);
         TOKEN0 = companyFirst ? address(companyToken) : address(wrappedNative);
@@ -223,77 +237,49 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         token.safeApprove(spender, value);
     }
 
-    /// @notice Initializes first spot liquidity and mints all initial FLM shares to
-    /// `BOOTSTRAP_RECIPIENT`.
-    /// @dev Only `BOOTSTRAP_RECIPIENT` can call this once. `spotAddData` is forwarded to the spot
-    /// adapter and should contain reviewed slippage/deadline parameters.
-    /// @param companyAmount Amount of company token to pull from the bootstrap recipient.
-    /// @param spotAddData Adapter-specific add-liquidity calldata.
-    /// @return liquidityMinted Spot liquidity units minted by the adapter.
-    function initializeFromBootstrap(uint256 companyAmount, bytes calldata spotAddData)
+    /// @notice Initializes first spot liquidity and mints all initial shares to the bootstrap
+    /// recipient. The adapter's immutable execution policy is used.
+    function initializeFromBootstrap(uint256 companyAmount)
         external
         payable
         nonReentrant
         returns (uint128 liquidityMinted)
     {
-        liquidityMinted = _initializeFromBootstrap(companyAmount, msg.value, spotAddData, true);
+        liquidityMinted = _initializeFromBootstrap(companyAmount, msg.value, true);
     }
 
-    /// @notice Initializes first spot liquidity with ERC20 collateral and mints all initial FLM
-    /// shares to `BOOTSTRAP_RECIPIENT`.
-    /// @dev Only `BOOTSTRAP_RECIPIENT` can call this once. The caller must approve both the
-    /// company token and collateral token before calling.
-    /// @param companyAmount Amount of company token to pull from the bootstrap recipient.
-    /// @param collateralAmount ERC20 collateral amount to pull from the bootstrap recipient.
-    /// @param spotAddData Adapter-specific add-liquidity calldata.
-    /// @return liquidityMinted Spot liquidity units minted by the adapter.
-    function initializeFromBootstrap(
-        uint256 companyAmount,
-        uint256 collateralAmount,
-        bytes calldata spotAddData
-    ) external nonReentrant returns (uint128 liquidityMinted) {
-        liquidityMinted = _initializeFromBootstrap(
-            companyAmount, collateralAmount, spotAddData, false
-        );
+    /// @notice ERC20-collateral bootstrap variant.
+    function initializeFromBootstrap(uint256 companyAmount, uint256 collateralAmount)
+        external
+        nonReentrant
+        returns (uint128 liquidityMinted)
+    {
+        liquidityMinted = _initializeFromBootstrap(companyAmount, collateralAmount, false);
     }
 
-    /// @notice Lets anyone add company + native assets into the manager and route to spot
-    /// liquidity.
-    /// @param companyAmount Amount of company token to pull from the caller.
-    /// @param spotAddData Adapter-specific add-liquidity calldata.
-    /// @return liquidityMinted Spot liquidity units minted by the adapter.
-    /// @return sharesMinted FLM shares minted to the caller.
-    function depositToSpot(uint256 companyAmount, bytes calldata spotAddData)
+    /// @notice Deposits company token and native collateral in the vault's existing proportion.
+    /// Excess input is left with the caller and the adapter's immutable policy is used.
+    function depositToSpot(uint256 companyAmount)
         external
         payable
         nonReentrant
-        returns (uint128 liquidityMinted, uint256 sharesMinted)
+        returns (uint256 sharesMinted)
     {
-        (liquidityMinted, sharesMinted) =
-            _depositToSpot(companyAmount, msg.value, spotAddData, true);
+        sharesMinted = _depositToSpot(companyAmount, msg.value, true);
     }
 
-    /// @notice Lets anyone add company + ERC20 collateral assets into the manager and route to
-    /// spot liquidity.
-    /// @dev The caller must approve both the company token and collateral token before calling.
-    /// @param companyAmount Amount of company token to pull from the caller.
-    /// @param collateralAmount Amount of ERC20 collateral token to pull from the caller.
-    /// @param spotAddData Adapter-specific add-liquidity calldata.
-    /// @return liquidityMinted Spot liquidity units minted by the adapter.
-    /// @return sharesMinted FLM shares minted to the caller.
-    function depositToSpot(
-        uint256 companyAmount,
-        uint256 collateralAmount,
-        bytes calldata spotAddData
-    ) external nonReentrant returns (uint128 liquidityMinted, uint256 sharesMinted) {
-        (liquidityMinted, sharesMinted) =
-            _depositToSpot(companyAmount, collateralAmount, spotAddData, false);
+    /// @notice ERC20-collateral deposit variant.
+    function depositToSpot(uint256 companyAmount, uint256 collateralAmount)
+        external
+        nonReentrant
+        returns (uint256 sharesMinted)
+    {
+        sharesMinted = _depositToSpot(companyAmount, collateralAmount, false);
     }
 
     function _initializeFromBootstrap(
         uint256 companyAmount,
         uint256 collateralAmount,
-        bytes calldata spotAddData,
         bool wrapNativeCollateral
     ) internal returns (uint128 liquidityMinted) {
         _assertOnlyBootstrap();
@@ -306,33 +292,42 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         uint256 companyUnused;
         uint256 collateralUnused;
         (liquidityMinted, companyUnused, collateralUnused) =
-            _addToSpot(companyAmount, collateralAmount, spotAddData);
+            _addToSpot(companyAmount, collateralAmount, "");
         _payout(BOOTSTRAP_RECIPIENT, companyUnused, collateralUnused, wrapNativeCollateral);
-        uint256 sharesMinted = _mintShares(BOOTSTRAP_RECIPIENT, liquidityMinted);
-        if (sharesMinted == 0) revert ZeroSharesMinted();
+        _mint(BOOTSTRAP_RECIPIENT, liquidityMinted);
         emit InitializedFromBootstrap(companyAmount, collateralAmount, liquidityMinted);
     }
 
     function _depositToSpot(
         uint256 companyAmount,
         uint256 collateralAmount,
-        bytes calldata spotAddData,
         bool wrapNativeCollateral
-    ) internal returns (uint128 liquidityMinted, uint256 sharesMinted) {
+    ) internal returns (uint256 sharesMinted) {
         _assertNotEmergencyMode();
+        _assertInitialized();
         if (inConditionalMode) revert DepositsDisabledInConditionalMode();
-        _pullBaseAssets(companyAmount, collateralAmount, wrapNativeCollateral);
 
-        uint256 companyUnused;
-        uint256 collateralUnused;
-        (liquidityMinted, companyUnused, collateralUnused) =
-            _addToSpot(companyAmount, collateralAmount, spotAddData);
-        _payout(msg.sender, companyUnused, collateralUnused, wrapNativeCollateral);
-        sharesMinted = _mintShares(msg.sender, liquidityMinted);
-        if (sharesMinted == 0) revert ZeroSharesMinted();
-        emit SpotDeposited(
-            msg.sender, companyAmount, collateralAmount, liquidityMinted, sharesMinted
+        _consolidateVault();
+        uint256 supply = totalSupply();
+        uint256 companyBefore = COMPANY_TOKEN.balanceOf(address(this));
+        uint256 collateralBefore = WRAPPED_NATIVE.balanceOf(address(this));
+        if (companyBefore == 0 || collateralBefore == 0) revert InvalidDepositRatio();
+
+        sharesMinted = _min(
+            Math.mulDiv(companyAmount, supply, companyBefore),
+            Math.mulDiv(collateralAmount, supply, collateralBefore)
         );
+        if (sharesMinted == 0) revert ZeroSharesMinted();
+        uint256 companyAccepted = _mulDivUp(sharesMinted, companyBefore, supply);
+        uint256 collateralAccepted = _mulDivUp(sharesMinted, collateralBefore, supply);
+
+        _pullBaseAssets(companyAccepted, collateralAccepted, wrapNativeCollateral);
+        if (wrapNativeCollateral && collateralAmount > collateralAccepted) {
+            payable(msg.sender).sendValue(collateralAmount - collateralAccepted);
+        }
+        _mint(msg.sender, sharesMinted);
+        _restoreActiveLiquidity();
+        emit SpotDeposited(msg.sender, companyAccepted, collateralAccepted, sharesMinted);
     }
 
     function _pullBaseAssets(
@@ -341,74 +336,100 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         bool wrapNativeCollateral
     ) internal {
         if (companyAmount > 0) {
+            uint256 companyBefore = COMPANY_TOKEN.balanceOf(address(this));
             COMPANY_TOKEN.safeTransferFrom(msg.sender, address(this), companyAmount);
+            if (COMPANY_TOKEN.balanceOf(address(this)) - companyBefore != companyAmount) {
+                revert InvalidAssetTransfer();
+            }
         }
 
         if (collateralAmount == 0) return;
 
+        uint256 collateralBefore = WRAPPED_NATIVE.balanceOf(address(this));
         if (wrapNativeCollateral) {
             WRAPPED_NATIVE.deposit{value: collateralAmount}();
         } else {
             IERC20(address(WRAPPED_NATIVE))
                 .safeTransferFrom(msg.sender, address(this), collateralAmount);
         }
+        if (WRAPPED_NATIVE.balanceOf(address(this)) - collateralBefore != collateralAmount) {
+            revert InvalidAssetTransfer();
+        }
     }
 
-    /// @notice Burns share tokens and redeems underlying assets from all active pools pro-rata.
+    /// @notice Burns shares and redeems the same fraction of every vault asset.
+    /// @dev In conditional mode matched complete sets are merged to base assets and unmatched
+    /// outcome tokens are transferred in kind. Redemption remains available during emergency mode.
     /// @param shares FLM shares to burn from the caller.
     /// @param recipient Recipient of company/collateral assets and any unmerged outcome residue.
     /// @param unwrapNative Whether wrapped collateral should be unwrapped before payout.
-    /// @param spotRemoveData Adapter-specific spot remove-liquidity calldata.
-    /// @param conditionalRemoveData ABI-encoded `(bytes yesRemoveData, bytes noRemoveData)`.
     /// @return companyOut Amount of company token recovered and paid out.
     /// @return collateralOut Amount of wrapped/native collateral recovered and paid out.
-    function redeem(
-        uint256 shares,
-        address recipient,
-        bool unwrapNative,
-        bytes calldata spotRemoveData,
-        bytes calldata conditionalRemoveData
-    ) external nonReentrant returns (uint256 companyOut, uint256 collateralOut) {
+    function redeem(uint256 shares, address recipient, bool unwrapNative)
+        external
+        nonReentrant
+        returns (uint256 companyOut, uint256 collateralOut)
+    {
         if (recipient == address(0)) revert ZeroRecipient();
         uint256 supply = totalSupply();
-        require(shares > 0 && shares <= balanceOf(msg.sender), "invalid shares");
-        RedeemPlan memory plan = _buildRedeemPlan(shares, supply);
-
+        if (shares == 0 || shares > balanceOf(msg.sender)) revert InvalidShares();
+        _consolidateVault();
+        VaultAmounts memory amounts = _redeemAmounts(shares, supply);
         _burn(msg.sender, shares);
 
-        if (plan.spotToRemove > 0) {
-            (uint256 companyFromSpot, uint256 collateralFromSpot) =
-                _removeFromSpot(plan.spotToRemove, spotRemoveData);
-            companyOut += companyFromSpot;
-            collateralOut += collateralFromSpot;
-        }
-        if (plan.conditionalToRemove > 0 && (plan.yesToRemove > 0 || plan.noToRemove > 0)) {
-            (uint256 companyFromConditional, uint256 collateralFromConditional) =
-                _redeemConditional(plan, recipient, conditionalRemoveData);
-            companyOut += companyFromConditional;
-            collateralOut += collateralFromConditional;
+        companyOut = amounts.company;
+        collateralOut = amounts.collateral;
+        if (inConditionalMode) {
+            (uint256 mergedCompany, uint256 mergedCollateral) = _mergeRedeemSlice(amounts.outcomes);
+            companyOut += mergedCompany;
+            collateralOut += mergedCollateral;
+            _transferOutcomeAmounts(recipient, amounts.outcomes);
+            emit OutcomeTokensRedeemed(
+                msg.sender,
+                recipient,
+                amounts.outcomes.yesCompany,
+                amounts.outcomes.noCompany,
+                amounts.outcomes.yesCurrency,
+                amounts.outcomes.noCurrency
+            );
         }
 
         _payout(recipient, companyOut, collateralOut, unwrapNative);
-        emit SharesRedeemed(
-            msg.sender,
-            recipient,
-            shares,
-            plan.spotToRemove,
-            plan.conditionalToRemove,
-            companyOut,
-            collateralOut
-        );
+        if (totalSupply() > 0 && emergencyExitArmedAt == 0) _tryRestoreLiquidity();
+        emit SharesRedeemed(msg.sender, recipient, shares, companyOut, collateralOut);
+    }
+
+    /// @notice Permissionlessly retries deployment of any share-owned idle balances.
+    /// @dev Deliberately not `nonReentrant`: redemption calls this through a failure-isolated
+    /// self-call so an AMM refusal can never block withdrawal. The trusted adapter is manager-only.
+    function restoreLiquidity() external {
+        _assertNotEmergencyMode();
+        if (totalSupply() > 0) _restoreActiveLiquidity();
+    }
+
+    /// @dev Failure-isolated merge primitive. Only a self-call from redemption may invoke it.
+    function mergeOutcomeSlice(bool companyAsset, uint256 amount) external {
+        if (msg.sender != address(this)) revert OnlySelf();
+        IERC20 collateralToken = companyAsset ? COMPANY_TOKEN : IERC20(address(WRAPPED_NATIVE));
+        IERC20 yesToken = IERC20(companyAsset ? activeYesCompanyToken : activeYesCurrencyToken);
+        IERC20 noToken = IERC20(companyAsset ? activeNoCompanyToken : activeNoCurrencyToken);
+        uint256 beforeBalance = collateralToken.balanceOf(address(this));
+        _forceApprove(yesToken, address(CONDITIONAL_ROUTER), amount);
+        _forceApprove(noToken, address(CONDITIONAL_ROUTER), amount);
+        CONDITIONAL_ROUTER.mergePositions(activeProposal, address(collateralToken), amount);
+        _forceApprove(yesToken, address(CONDITIONAL_ROUTER), 0);
+        _forceApprove(noToken, address(CONDITIONAL_ROUTER), 0);
+        if (collateralToken.balanceOf(address(this)) - beforeBalance != amount) {
+            revert IncompleteOutcomeRecovery();
+        }
     }
 
     /// @notice Permissionless, idempotent transition function.
-    /// @dev While in a given mode, sync also compounds liquidity on that active venue.
-    /// `SyncParams` carries adapter-specific slippage/deadline calldata for each possible leg.
-    /// @param params Adapter calldata for compounding, migration, and return-to-spot paths.
+    /// @dev Lifecycle execution uses fixed adapter defaults and manager-side ratio checks.
     /// @return action The transition performed by this call.
-    function sync(SyncParams calldata params) external nonReentrant returns (SyncAction action) {
+    function sync() external nonReentrant returns (SyncAction action) {
         _assertNotEmergencyMode();
-        _compoundActive(params);
+        _assertInitialized();
 
         ProposalData memory proposal = _readProposal();
 
@@ -428,10 +449,10 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         }
 
         if (!inConditionalMode) {
-            return _syncFromSpot(params, proposal, proposalByOfficialCreator);
+            return _syncFromSpot(proposal, proposalByOfficialCreator);
         }
 
-        return _syncFromConditional(params, proposal, proposalByOfficialCreator);
+        return _syncFromConditional(proposal, proposalByOfficialCreator);
     }
 
     function previewLiquidityMigration() external view returns (uint128 liquidityToMove) {
@@ -444,9 +465,8 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
                 && block.timestamp >= emergencyExitArmedAt + EMERGENCY_EXIT_DELAY;
     }
 
-    /// @notice Arms emergency mode. Deposits and sync are blocked until disarmed.
-    /// @dev Owner-only. `emergencyExitAllToBootstrapRecipient` remains unavailable until the delay
-    /// has elapsed.
+    /// @notice Arms emergency mode. Deposits and sync are blocked until disarmed; redemptions stay
+    /// open. The owner may unwind positions after the delay but can never take shareholder assets.
     function armEmergencyExit() external {
         _checkOwner();
         if (emergencyExitExecuted) revert EmergencyExitAlreadyExecuted();
@@ -457,16 +477,17 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
 
     /// @notice Disarms an armed emergency exit before execution.
     /// @dev Owner-only.
-    function disarmEmergencyExit() external {
+    function disarmEmergencyExit() external nonReentrant {
         _checkOwner();
         if (emergencyExitExecuted) revert EmergencyExitAlreadyExecuted();
         if (emergencyExitArmedAt == 0) revert EmergencyExitNotArmed();
         emergencyExitArmedAt = 0;
+        if (totalSupply() > 0) _tryRestoreLiquidity();
         emit EmergencyExitDisarmed();
     }
 
-    /// @notice Sends idle base and active outcome-token balances to `BOOTSTRAP_RECIPIENT`.
-    /// @dev Owner-only. This does not remove active liquidity positions.
+    /// @notice Sends residual balances to `BOOTSTRAP_RECIPIENT` after every share is burned.
+    /// @dev Share-owned assets can never be swept.
     /// @param unwrapNative Whether wrapped collateral should be unwrapped before transfer.
     function sweepIdleToBootstrapRecipient(bool unwrapNative)
         external
@@ -478,6 +499,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         )
     {
         _checkOwner();
+        if (totalSupply() != 0) revert SharesOutstanding();
         (companySentToBootstrap, collateralSentToBootstrap, nativeSentToBootstrap) =
             _sweepIdleToBootstrapRecipient(unwrapNative);
         emit IdleSweptToBootstrapRecipient(
@@ -485,24 +507,9 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         );
     }
 
-    /// @notice Removes all active liquidity and sends recovered assets to `BOOTSTRAP_RECIPIENT`.
-    /// @dev Owner-only, delayed by `EMERGENCY_EXIT_DELAY`, and executable once.
-    /// @param unwrapNative Whether wrapped collateral should be unwrapped before transfer.
-    /// @param spotRemoveData Adapter-specific spot remove-liquidity calldata.
-    /// @param conditionalRemoveData ABI-encoded `(bytes yesRemoveData, bytes noRemoveData)`.
-    function emergencyExitAllToBootstrapRecipient(
-        bool unwrapNative,
-        bytes calldata spotRemoveData,
-        bytes calldata conditionalRemoveData
-    )
-        external
-        nonReentrant
-        returns (
-            uint256 companySentToBootstrap,
-            uint256 collateralSentToBootstrap,
-            uint256 nativeSentToBootstrap
-        )
-    {
+    /// @notice Removes all active liquidity into the vault so shareholders can redeem in kind.
+    /// @dev Owner-only, delayed, executable once, and transfers no shareholder assets.
+    function executeEmergencyExit() external nonReentrant {
         _checkOwner();
         if (emergencyExitExecuted) revert EmergencyExitAlreadyExecuted();
         if (emergencyExitArmedAt == 0) revert EmergencyExitNotArmed();
@@ -510,48 +517,9 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
 
         uint128 spotRemoved = spotLiquidity;
         uint256 conditionalRemoved = _conditionalLiquidityTotal();
-
-        if (spotRemoved > 0) {
-            _removeFromSpot(spotRemoved, spotRemoveData);
-        }
-        if (conditionalRemoved > 0) {
-            (bytes memory yesRemoveData, bytes memory noRemoveData) =
-                _decodeDualData(conditionalRemoveData);
-            if (conditionalYesLiquidity > 0) {
-                _removeFromConditionalPair(
-                    activeYesCompanyToken,
-                    activeYesCurrencyToken,
-                    conditionalYesLiquidity,
-                    yesRemoveData
-                );
-                conditionalYesLiquidity = 0;
-            }
-            if (conditionalNoLiquidity > 0) {
-                _removeFromConditionalPair(
-                    activeNoCompanyToken,
-                    activeNoCurrencyToken,
-                    conditionalNoLiquidity,
-                    noRemoveData
-                );
-                conditionalNoLiquidity = 0;
-            }
-            _recoverCollateralFromOutcomeTokens(false);
-            _sweepActiveOutcomeTokensTo(BOOTSTRAP_RECIPIENT);
-        }
-
-        (companySentToBootstrap, collateralSentToBootstrap, nativeSentToBootstrap) =
-            _sweepIdleToBootstrapRecipient(unwrapNative);
-
-        _clearConditionalModeState();
+        _consolidateVault();
         emergencyExitExecuted = true;
-
-        emit EmergencyExitExecuted(
-            spotRemoved,
-            conditionalRemoved,
-            companySentToBootstrap,
-            collateralSentToBootstrap,
-            nativeSentToBootstrap
-        );
+        emit EmergencyExitExecuted(spotRemoved, conditionalRemoved);
     }
 
     function _validateProposal(
@@ -594,46 +562,79 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         proposal.noPool = data.noPool;
     }
 
-    function _syncFromSpot(
-        SyncParams calldata params,
+    function _outcomeBalances(ProposalData memory proposal)
+        internal
+        view
+        returns (OutcomeAmounts memory amounts)
+    {
+        amounts.yesCompany = IERC20(proposal.yesCompanyToken).balanceOf(address(this));
+        amounts.noCompany = IERC20(proposal.noCompanyToken).balanceOf(address(this));
+        amounts.yesCurrency = IERC20(proposal.yesCurrencyToken).balanceOf(address(this));
+        amounts.noCurrency = IERC20(proposal.noCurrencyToken).balanceOf(address(this));
+    }
+
+    function _outcomeBalanceDeltas(
         ProposalData memory proposal,
-        bool proposalByOfficialCreator
-    ) internal returns (SyncAction) {
+        OutcomeAmounts memory balancesBefore
+    ) internal view returns (OutcomeAmounts memory amounts) {
+        OutcomeAmounts memory balancesAfter = _outcomeBalances(proposal);
+        amounts.yesCompany = balancesAfter.yesCompany - balancesBefore.yesCompany;
+        amounts.noCompany = balancesAfter.noCompany - balancesBefore.noCompany;
+        amounts.yesCurrency = balancesAfter.yesCurrency - balancesBefore.yesCurrency;
+        amounts.noCurrency = balancesAfter.noCurrency - balancesBefore.noCurrency;
+    }
+
+    function _yesOutcomeWins() internal view returns (bool) {
+        bool[] memory winningOutcomes = CONDITIONAL_ROUTER.getWinningOutcomes(
+            IFutarchyProposalCore(activeProposal).conditionId()
+        );
+        if (winningOutcomes.length != 2 || winningOutcomes[0] == winningOutcomes[1]) {
+            revert InvalidSettlementOutcome();
+        }
+        return winningOutcomes[0];
+    }
+
+    function _syncFromSpot(ProposalData memory proposal, bool proposalByOfficialCreator)
+        internal
+        returns (SyncAction)
+    {
         if (!proposalByOfficialCreator || proposal.settled) {
             return SyncAction.None;
         }
 
+        _assertSpotPoolStable();
+        // A previous redemption may have left the surviving holders entirely idle after a
+        // best-effort re-add failed. Rebuild spot liquidity before applying the 80% migration.
+        if (spotLiquidity == 0) _restoreActiveLiquidity();
+
         uint128 liquidityToMove =
             uint128((uint256(spotLiquidity) * MIGRATION_BPS) / BPS_DENOMINATOR);
         if (liquidityToMove > 0) {
-            (uint256 companyOut, uint256 collateralOut) =
-                _removeFromSpot(liquidityToMove, params.spotToConditionalRemoveData);
+            OutcomeAmounts memory balancesBefore = _outcomeBalances(proposal);
+            (uint256 companyOut, uint256 collateralOut) = _removeFromSpot(liquidityToMove, "");
 
             _splitCollateral(proposal.proposal, address(COMPANY_TOKEN), companyOut);
             _splitCollateral(proposal.proposal, address(WRAPPED_NATIVE), collateralOut);
 
-            (bytes memory yesAddData, bytes memory noAddData) =
-                _decodeDualData(params.spotToConditionalAddData);
-            uint128 yesAdded = _addToConditionalPair(
+            OutcomeAmounts memory splitAmounts = _outcomeBalanceDeltas(proposal, balancesBefore);
+            uint128 yesAdded = _addToConditionalPairBounded(
                 proposal.yesCompanyToken,
                 proposal.yesCurrencyToken,
-                IERC20(proposal.yesCompanyToken).balanceOf(address(this)),
-                IERC20(proposal.yesCurrencyToken).balanceOf(address(this)),
-                yesAddData
+                splitAmounts.yesCompany,
+                splitAmounts.yesCurrency,
+                ""
             );
-            uint128 noAdded = _addToConditionalPair(
+            uint128 noAdded = _addToConditionalPairBounded(
                 proposal.noCompanyToken,
                 proposal.noCurrencyToken,
-                IERC20(proposal.noCompanyToken).balanceOf(address(this)),
-                IERC20(proposal.noCurrencyToken).balanceOf(address(this)),
-                noAddData
+                splitAmounts.noCompany,
+                splitAmounts.noCurrency,
+                ""
             );
             conditionalYesLiquidity += yesAdded;
             conditionalNoLiquidity += noAdded;
             uint256 condAdded = uint256(yesAdded) + uint256(noAdded);
             emit LiquidityMigratedToConditional(proposal.proposalId, liquidityToMove, condAdded);
-        } else {
-            emit LiquidityMigratedToConditional(proposal.proposalId, 0, 0);
         }
 
         inConditionalMode = true;
@@ -646,11 +647,10 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         return SyncAction.MigratedToConditional;
     }
 
-    function _syncFromConditional(
-        SyncParams calldata params,
-        ProposalData memory proposal,
-        bool proposalByOfficialCreator
-    ) internal returns (SyncAction) {
+    function _syncFromConditional(ProposalData memory proposal, bool proposalByOfficialCreator)
+        internal
+        returns (SyncAction)
+    {
         // If conditional mode is active, we only transition back after settlement of the active
         // proposal.
         if (!proposalByOfficialCreator || proposal.proposalId != activeProposalId) {
@@ -658,84 +658,48 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         }
         if (!proposal.settled) return SyncAction.None;
 
+        _assertSpotPoolStable();
+
         uint256 condLiq = _conditionalLiquidityTotal();
         uint128 spotAddedBack;
+        bool yesWins = _yesOutcomeWins();
         if (condLiq > 0) {
-            (bytes memory yesRemoveData, bytes memory noRemoveData) =
-                _decodeDualData(params.conditionalToSpotRemoveData);
+            OutcomeAmounts memory removed;
 
             if (conditionalYesLiquidity > 0) {
-                _removeFromConditionalPair(
-                    activeYesCompanyToken,
-                    activeYesCurrencyToken,
-                    conditionalYesLiquidity,
-                    yesRemoveData
+                (removed.yesCompany, removed.yesCurrency) = _removeFromConditionalPair(
+                    activeYesCompanyToken, activeYesCurrencyToken, conditionalYesLiquidity, ""
                 );
                 conditionalYesLiquidity = 0;
             }
             if (conditionalNoLiquidity > 0) {
-                _removeFromConditionalPair(
-                    activeNoCompanyToken,
-                    activeNoCurrencyToken,
-                    conditionalNoLiquidity,
-                    noRemoveData
+                (removed.noCompany, removed.noCurrency) = _removeFromConditionalPair(
+                    activeNoCompanyToken, activeNoCurrencyToken, conditionalNoLiquidity, ""
                 );
                 conditionalNoLiquidity = 0;
             }
-            (uint256 companyOut, uint256 collateralOut) = _recoverCollateralFromOutcomeTokens(true);
-            if (companyOut > 0 || collateralOut > 0) {
-                uint256 companyUnused;
-                uint256 collateralUnused;
-                (spotAddedBack, companyUnused, collateralUnused) =
-                    _addToSpot(companyOut, collateralOut, params.conditionalToSpotAddData);
-                _assertSyncLeftoverWithinBounds(
-                    companyOut, collateralOut, companyUnused, collateralUnused
-                );
-            }
+            (uint256 companyOut, uint256 collateralOut) = _recoverSyncCollateral(removed, yesWins);
+
+            uint256 companyUnused;
+            uint256 collateralUnused;
+            (spotAddedBack, companyUnused, collateralUnused) =
+                _addToSpot(companyOut, collateralOut, "");
+            _assertSyncLeftoverWithinBounds(
+                companyOut, collateralOut, companyUnused, collateralUnused
+            );
         }
+        // A prior redemption may have consolidated every LP position and left the remaining
+        // holders' outcomes idle after a best-effort restore failed. Recover them before clearing
+        // the active token addresses even when there is no conditional LP left to remove.
+        _recoverIdleOutcomeBalances(yesWins);
 
         emit LiquidityMigratedBackToSpot(activeProposalId, condLiq, spotAddedBack);
         _clearConditionalModeState();
         return SyncAction.MigratedBackToSpot;
     }
 
-    function _compoundActive(SyncParams calldata params) internal {
-        uint128 added;
-        if (inConditionalMode) {
-            (bytes memory yesCompoundData, bytes memory noCompoundData) =
-                _decodeDualData(params.conditionalCompoundData);
-
-            uint256 addedTotal;
-            if (conditionalYesLiquidity > 0) {
-                added = _compoundConditionalPair(
-                    activeYesCompanyToken, activeYesCurrencyToken, yesCompoundData
-                );
-                if (added > 0) {
-                    conditionalYesLiquidity += added;
-                    addedTotal += added;
-                }
-            }
-
-            if (conditionalNoLiquidity > 0) {
-                added = _compoundConditionalPair(
-                    activeNoCompanyToken, activeNoCurrencyToken, noCompoundData
-                );
-                if (added > 0) {
-                    conditionalNoLiquidity += added;
-                    addedTotal += added;
-                }
-            }
-
-            if (addedTotal > 0) {
-                emit Compounded(true, addedTotal);
-            }
-        } else {
-            added = SPOT_ADAPTER.compoundPosition(TOKEN0, TOKEN1, params.spotCompoundData);
-            if (added > 0) {
-                spotLiquidity += added;
-                emit Compounded(false, added);
-            }
-        }
+    function _assertSpotPoolStable() internal view {
+        POOL_STABILITY_GUARD.assertStablePair(address(COMPANY_TOKEN), address(WRAPPED_NATIVE));
     }
 
     function _addToSpot(uint256 companyAmount, uint256 collateralAmount, bytes memory data)
@@ -770,12 +734,24 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         uint256 amountADesired,
         uint256 amountBDesired,
         bytes memory data
-    ) internal returns (uint128 liquidityMinted) {
+    ) internal returns (uint128 liquidityMinted, uint256 amountAUnused, uint256 amountBUnused) {
         if (amountADesired == 0 || amountBDesired == 0) {
             revert ZeroLiquidityMinted();
         }
-        (address token0, address token1, uint256 amount0Desired, uint256 amount1Desired) =
-            _sortPairWithAmounts(tokenA, tokenB, amountADesired, amountBDesired);
+        if (tokenA < tokenB) {
+            return _addSortedConditionalPair(tokenA, tokenB, amountADesired, amountBDesired, data);
+        }
+        (liquidityMinted, amountBUnused, amountAUnused) =
+            _addSortedConditionalPair(tokenB, tokenA, amountBDesired, amountADesired, data);
+    }
+
+    function _addSortedConditionalPair(
+        address token0,
+        address token1,
+        uint256 amount0Desired,
+        uint256 amount1Desired,
+        bytes memory data
+    ) internal returns (uint128 liquidityMinted, uint256 amount0Unused, uint256 amount1Unused) {
         _approvePairForAdapter(CONDITIONAL_ADAPTER, token0, token1, amount0Desired, amount1Desired);
 
         uint256 amount0Used;
@@ -787,6 +763,24 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         if (amount0Used > amount0Desired || amount1Used > amount1Desired) {
             revert AdapterOverusedInput();
         }
+        amount0Unused = amount0Desired - amount0Used;
+        amount1Unused = amount1Desired - amount1Used;
+    }
+
+    function _addToConditionalPairBounded(
+        address tokenA,
+        address tokenB,
+        uint256 amountADesired,
+        uint256 amountBDesired,
+        bytes memory data
+    ) internal returns (uint128 liquidityMinted) {
+        uint256 amountAUnused;
+        uint256 amountBUnused;
+        (liquidityMinted, amountAUnused, amountBUnused) =
+            _addToConditionalPair(tokenA, tokenB, amountADesired, amountBDesired, data);
+        _assertSyncLeftoverWithinBounds(
+            amountADesired, amountBDesired, amountAUnused, amountBUnused
+        );
     }
 
     function _removeFromSpot(uint128 liquidity, bytes memory data)
@@ -804,75 +798,118 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         address tokenB,
         uint128 liquidity,
         bytes memory data
-    ) internal {
-        if (liquidity == 0) return;
+    ) internal returns (uint256 amountAOut, uint256 amountBOut) {
+        if (liquidity == 0) return (0, 0);
         (address token0, address token1) = _sortPair(tokenA, tokenB);
-        CONDITIONAL_ADAPTER.removeLiquidity(token0, token1, liquidity, data);
+        (uint256 amount0Out, uint256 amount1Out) =
+            CONDITIONAL_ADAPTER.removeLiquidity(token0, token1, liquidity, data);
+        return tokenA < tokenB ? (amount0Out, amount1Out) : (amount1Out, amount0Out);
     }
 
-    function _buildRedeemPlan(uint256 shares, uint256 supply)
+    /// @dev Full consolidation makes every fee and idle balance part of one observable vault
+    /// balance before shares change. This avoids fee indices and price oracles.
+    function _consolidateVault() internal {
+        if (spotLiquidity > 0) _removeFromSpot(spotLiquidity, "");
+        if (conditionalYesLiquidity > 0) {
+            _removeFromConditionalPair(
+                activeYesCompanyToken, activeYesCurrencyToken, conditionalYesLiquidity, ""
+            );
+            conditionalYesLiquidity = 0;
+        }
+        if (conditionalNoLiquidity > 0) {
+            _removeFromConditionalPair(
+                activeNoCompanyToken, activeNoCurrencyToken, conditionalNoLiquidity, ""
+            );
+            conditionalNoLiquidity = 0;
+        }
+    }
+
+    function _restoreActiveLiquidity() internal {
+        uint256 companyAmount = COMPANY_TOKEN.balanceOf(address(this));
+        uint256 collateralAmount = WRAPPED_NATIVE.balanceOf(address(this));
+        if (companyAmount > 0 && collateralAmount > 0) {
+            _assertSpotPoolStable();
+            _addToSpot(companyAmount, collateralAmount, "");
+        }
+        if (!inConditionalMode) return;
+
+        uint256 yesCompany = IERC20(activeYesCompanyToken).balanceOf(address(this));
+        uint256 yesCurrency = IERC20(activeYesCurrencyToken).balanceOf(address(this));
+        if (yesCompany > 0 && yesCurrency > 0) {
+            POOL_STABILITY_GUARD.assertStablePair(activeYesCompanyToken, activeYesCurrencyToken);
+            (uint128 yesLiquidity,,) = _addToConditionalPair(
+                activeYesCompanyToken, activeYesCurrencyToken, yesCompany, yesCurrency, ""
+            );
+            conditionalYesLiquidity += yesLiquidity;
+        }
+        uint256 noCompany = IERC20(activeNoCompanyToken).balanceOf(address(this));
+        uint256 noCurrency = IERC20(activeNoCurrencyToken).balanceOf(address(this));
+        if (noCompany > 0 && noCurrency > 0) {
+            POOL_STABILITY_GUARD.assertStablePair(activeNoCompanyToken, activeNoCurrencyToken);
+            (uint128 noLiquidity,,) = _addToConditionalPair(
+                activeNoCompanyToken, activeNoCurrencyToken, noCompany, noCurrency, ""
+            );
+            conditionalNoLiquidity += noLiquidity;
+        }
+    }
+
+    function _tryRestoreLiquidity() internal {
+        // ponytail: one isolated self-call replaces fee indices and keeps AMM failure off the
+        // withdrawal path; anyone can retry `restoreLiquidity` later.
+        (bool restored,) = address(this).call(abi.encodeCall(this.restoreLiquidity, ()));
+        if (!restored) emit LiquidityRestoreDeferred();
+    }
+
+    function _redeemAmounts(uint256 shares, uint256 supply)
         internal
         view
-        returns (RedeemPlan memory plan)
+        returns (VaultAmounts memory amounts)
     {
-        if (shares == supply) {
-            plan.spotToRemove = spotLiquidity;
-            plan.yesToRemove = conditionalYesLiquidity;
-            plan.noToRemove = conditionalNoLiquidity;
-            plan.conditionalToRemove = plan.yesToRemove + plan.noToRemove;
-            return plan;
-        }
-
-        plan.spotToRemove = uint128((uint256(spotLiquidity) * shares) / supply);
-        plan.yesToRemove = uint128((uint256(conditionalYesLiquidity) * shares) / supply);
-        plan.noToRemove = uint128((uint256(conditionalNoLiquidity) * shares) / supply);
-        plan.conditionalToRemove = plan.yesToRemove + plan.noToRemove;
-
-        if (
-            plan.spotToRemove == 0 && plan.yesToRemove == 0 && plan.noToRemove == 0
-                && _hasManagedLiquidity()
-        ) {
-            revert ZeroRedeemLiquidity();
-        }
+        amounts.company = _shareOf(COMPANY_TOKEN.balanceOf(address(this)), shares, supply);
+        amounts.collateral = _shareOf(WRAPPED_NATIVE.balanceOf(address(this)), shares, supply);
+        if (!inConditionalMode) return amounts;
+        amounts.outcomes.yesCompany =
+            _shareOf(IERC20(activeYesCompanyToken).balanceOf(address(this)), shares, supply);
+        amounts.outcomes.noCompany =
+            _shareOf(IERC20(activeNoCompanyToken).balanceOf(address(this)), shares, supply);
+        amounts.outcomes.yesCurrency =
+            _shareOf(IERC20(activeYesCurrencyToken).balanceOf(address(this)), shares, supply);
+        amounts.outcomes.noCurrency =
+            _shareOf(IERC20(activeNoCurrencyToken).balanceOf(address(this)), shares, supply);
     }
 
-    function _redeemConditional(
-        RedeemPlan memory plan,
-        address recipient,
-        bytes memory conditionalRemoveData
-    ) internal returns (uint256 companyOut, uint256 collateralOut) {
-        (bytes memory yesRemoveData, bytes memory noRemoveData) =
-            _decodeDualData(conditionalRemoveData);
-
-        uint256 yesCompanyBefore = IERC20(activeYesCompanyToken).balanceOf(address(this));
-        uint256 noCompanyBefore = IERC20(activeNoCompanyToken).balanceOf(address(this));
-        uint256 yesCurrencyBefore = IERC20(activeYesCurrencyToken).balanceOf(address(this));
-        uint256 noCurrencyBefore = IERC20(activeNoCurrencyToken).balanceOf(address(this));
-
-        if (plan.yesToRemove > 0) {
-            _removeFromConditionalPair(
-                activeYesCompanyToken, activeYesCurrencyToken, plan.yesToRemove, yesRemoveData
-            );
-            conditionalYesLiquidity -= plan.yesToRemove;
-        }
-        if (plan.noToRemove > 0) {
-            _removeFromConditionalPair(
-                activeNoCompanyToken, activeNoCurrencyToken, plan.noToRemove, noRemoveData
-            );
-            conditionalNoLiquidity -= plan.noToRemove;
-        }
-        (companyOut, collateralOut) = _recoverCollateralFromOutcomeTokens(false);
-        _transferOutcomeDelta(
-            recipient, yesCompanyBefore, noCompanyBefore, yesCurrencyBefore, noCurrencyBefore
-        );
-    }
-
-    function _compoundConditionalPair(address tokenA, address tokenB, bytes memory data)
+    function _mergeRedeemSlice(OutcomeAmounts memory amounts)
         internal
-        returns (uint128 liquidityAdded)
+        returns (uint256 companyOut, uint256 collateralOut)
     {
-        (address token0, address token1) = _sortPair(tokenA, tokenB);
-        liquidityAdded = CONDITIONAL_ADAPTER.compoundPosition(token0, token1, data);
+        uint256 mergeAmount = _min(amounts.yesCompany, amounts.noCompany);
+        if (mergeAmount > 0 && _tryMergeOutcomeAmount(true, mergeAmount)) {
+            companyOut = mergeAmount;
+            amounts.yesCompany -= mergeAmount;
+            amounts.noCompany -= mergeAmount;
+        }
+
+        mergeAmount = _min(amounts.yesCurrency, amounts.noCurrency);
+        if (mergeAmount > 0 && _tryMergeOutcomeAmount(false, mergeAmount)) {
+            collateralOut = mergeAmount;
+            amounts.yesCurrency -= mergeAmount;
+            amounts.noCurrency -= mergeAmount;
+        }
+    }
+
+    function _transferOutcomeAmounts(address recipient, OutcomeAmounts memory amounts) internal {
+        if (amounts.yesCompany > 0) {
+            IERC20(activeYesCompanyToken).safeTransfer(recipient, amounts.yesCompany);
+        }
+        if (amounts.noCompany > 0) {
+            IERC20(activeNoCompanyToken).safeTransfer(recipient, amounts.noCompany);
+        }
+        if (amounts.yesCurrency > 0) {
+            IERC20(activeYesCurrencyToken).safeTransfer(recipient, amounts.yesCurrency);
+        }
+        if (amounts.noCurrency > 0) {
+            IERC20(activeNoCurrencyToken).safeTransfer(recipient, amounts.noCurrency);
+        }
     }
 
     function _splitCollateral(address proposal, address collateralToken, uint256 amount) internal {
@@ -881,108 +918,98 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         CONDITIONAL_ROUTER.splitPosition(proposal, collateralToken, amount);
     }
 
-    function _recoverCollateralFromOutcomeTokens(bool allowRedeem)
+    function _recoverSyncCollateral(OutcomeAmounts memory amounts, bool yesWins)
         internal
         returns (uint256 companyOut, uint256 collateralOut)
     {
-        if (activeProposal == address(0)) return (0, 0);
-
         uint256 companyBefore = COMPANY_TOKEN.balanceOf(address(this));
         uint256 collateralBefore = WRAPPED_NATIVE.balanceOf(address(this));
 
-        _mergeOutcomePair(
-            activeProposal, address(COMPANY_TOKEN), activeYesCompanyToken, activeNoCompanyToken
+        _recoverOutcomeAmounts(
+            address(COMPANY_TOKEN),
+            activeYesCompanyToken,
+            activeNoCompanyToken,
+            amounts.yesCompany,
+            amounts.noCompany,
+            yesWins
         );
-        _mergeOutcomePair(
-            activeProposal, address(WRAPPED_NATIVE), activeYesCurrencyToken, activeNoCurrencyToken
+        _recoverOutcomeAmounts(
+            address(WRAPPED_NATIVE),
+            activeYesCurrencyToken,
+            activeNoCurrencyToken,
+            amounts.yesCurrency,
+            amounts.noCurrency,
+            yesWins
         );
-
-        if (allowRedeem) {
-            _tryRedeemOutcomeRemainder(
-                activeProposal, address(COMPANY_TOKEN), activeYesCompanyToken, activeNoCompanyToken
-            );
-            _tryRedeemOutcomeRemainder(
-                activeProposal,
-                address(WRAPPED_NATIVE),
-                activeYesCurrencyToken,
-                activeNoCurrencyToken
-            );
-        }
 
         companyOut = COMPANY_TOKEN.balanceOf(address(this)) - companyBefore;
         collateralOut = WRAPPED_NATIVE.balanceOf(address(this)) - collateralBefore;
+        if (
+            companyOut == 0 || collateralOut == 0
+                || companyOut != (yesWins ? amounts.yesCompany : amounts.noCompany)
+                || collateralOut != (yesWins ? amounts.yesCurrency : amounts.noCurrency)
+        ) {
+            revert IncompleteOutcomeRecovery();
+        }
     }
 
-    function _mergeOutcomePair(
-        address proposal,
-        address collateralToken,
-        address yesToken,
-        address noToken
-    ) internal {
-        if (yesToken == address(0) || noToken == address(0)) return;
-        uint256 yesBal = IERC20(yesToken).balanceOf(address(this));
-        uint256 noBal = IERC20(noToken).balanceOf(address(this));
-        uint256 mergeAmount = _min(yesBal, noBal);
-        if (mergeAmount == 0) return;
-
-        _forceApprove(IERC20(yesToken), address(CONDITIONAL_ROUTER), mergeAmount);
-        _forceApprove(IERC20(noToken), address(CONDITIONAL_ROUTER), mergeAmount);
-        CONDITIONAL_ROUTER.mergePositions(proposal, collateralToken, mergeAmount);
+    function _recoverIdleOutcomeBalances(bool yesWins) internal {
+        _recoverOutcomeAmounts(
+            address(COMPANY_TOKEN),
+            activeYesCompanyToken,
+            activeNoCompanyToken,
+            IERC20(activeYesCompanyToken).balanceOf(address(this)),
+            IERC20(activeNoCompanyToken).balanceOf(address(this)),
+            yesWins
+        );
+        _recoverOutcomeAmounts(
+            address(WRAPPED_NATIVE),
+            activeYesCurrencyToken,
+            activeNoCurrencyToken,
+            IERC20(activeYesCurrencyToken).balanceOf(address(this)),
+            IERC20(activeNoCurrencyToken).balanceOf(address(this)),
+            yesWins
+        );
     }
 
-    function _tryRedeemOutcomeRemainder(
-        address proposal,
+    function _recoverOutcomeAmounts(
         address collateralToken,
         address yesToken,
-        address noToken
+        address noToken,
+        uint256 yesAmount,
+        uint256 noAmount,
+        bool yesWins
     ) internal {
-        if (yesToken == address(0) || noToken == address(0)) return;
-        uint256 yesBal = IERC20(yesToken).balanceOf(address(this));
-        uint256 noBal = IERC20(noToken).balanceOf(address(this));
-        uint256 redeemAmount = _max(yesBal, noBal);
+        uint256 mergeAmount = _min(yesAmount, noAmount);
+        if (mergeAmount > 0) {
+            _mergeOutcomeAmount(collateralToken, yesToken, noToken, mergeAmount);
+        }
+
+        uint256 redeemAmount = yesWins ? yesAmount - mergeAmount : noAmount - mergeAmount;
         if (redeemAmount == 0) return;
 
-        _forceApprove(IERC20(yesToken), address(CONDITIONAL_ROUTER), redeemAmount);
-        _forceApprove(IERC20(noToken), address(CONDITIONAL_ROUTER), redeemAmount);
-
-        try CONDITIONAL_ROUTER.redeemPositions(proposal, collateralToken, redeemAmount) {} catch {}
+        address winningToken = yesWins ? yesToken : noToken;
+        _forceApprove(IERC20(winningToken), address(CONDITIONAL_ROUTER), redeemAmount);
+        CONDITIONAL_ROUTER.redeemPositions(activeProposal, collateralToken, redeemAmount);
     }
 
-    function _transferOutcomeDelta(
-        address recipient,
-        uint256 yesCompanyBefore,
-        uint256 noCompanyBefore,
-        uint256 yesCurrencyBefore,
-        uint256 noCurrencyBefore
+    function _mergeOutcomeAmount(
+        address collateralToken,
+        address yesToken,
+        address noToken,
+        uint256 amount
     ) internal {
-        if (activeYesCompanyToken != address(0)) {
-            uint256 yesCompanyAfter = IERC20(activeYesCompanyToken).balanceOf(address(this));
-            if (yesCompanyAfter > yesCompanyBefore) {
-                IERC20(activeYesCompanyToken)
-                    .safeTransfer(recipient, yesCompanyAfter - yesCompanyBefore);
-            }
-        }
-        if (activeNoCompanyToken != address(0)) {
-            uint256 noCompanyAfter = IERC20(activeNoCompanyToken).balanceOf(address(this));
-            if (noCompanyAfter > noCompanyBefore) {
-                IERC20(activeNoCompanyToken)
-                    .safeTransfer(recipient, noCompanyAfter - noCompanyBefore);
-            }
-        }
-        if (activeYesCurrencyToken != address(0)) {
-            uint256 yesCurrencyAfter = IERC20(activeYesCurrencyToken).balanceOf(address(this));
-            if (yesCurrencyAfter > yesCurrencyBefore) {
-                IERC20(activeYesCurrencyToken)
-                    .safeTransfer(recipient, yesCurrencyAfter - yesCurrencyBefore);
-            }
-        }
-        if (activeNoCurrencyToken != address(0)) {
-            uint256 noCurrencyAfter = IERC20(activeNoCurrencyToken).balanceOf(address(this));
-            if (noCurrencyAfter > noCurrencyBefore) {
-                IERC20(activeNoCurrencyToken)
-                    .safeTransfer(recipient, noCurrencyAfter - noCurrencyBefore);
-            }
-        }
+        _forceApprove(IERC20(yesToken), address(CONDITIONAL_ROUTER), amount);
+        _forceApprove(IERC20(noToken), address(CONDITIONAL_ROUTER), amount);
+        CONDITIONAL_ROUTER.mergePositions(activeProposal, collateralToken, amount);
+    }
+
+    function _tryMergeOutcomeAmount(bool companyAsset, uint256 amount)
+        internal
+        returns (bool merged)
+    {
+        (merged,) = address(this)
+            .call(abi.encodeCall(this.mergeOutcomeSlice, (companyAsset, amount)));
     }
 
     function _sweepActiveOutcomeTokensTo(address recipient) internal {
@@ -1017,15 +1044,6 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         activeNoCurrencyToken = address(0);
     }
 
-    function _decodeDualData(bytes memory data)
-        internal
-        pure
-        returns (bytes memory first, bytes memory second)
-    {
-        if (data.length == 0) return ("", "");
-        (first, second) = abi.decode(data, (bytes, bytes));
-    }
-
     function _sortPair(address tokenA, address tokenB)
         internal
         pure
@@ -1037,24 +1055,6 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         } else {
             token0 = tokenB;
             token1 = tokenA;
-        }
-    }
-
-    function _sortPairWithAmounts(address tokenA, address tokenB, uint256 amountA, uint256 amountB)
-        internal
-        pure
-        returns (address token0, address token1, uint256 amount0, uint256 amount1)
-    {
-        if (tokenA < tokenB) {
-            token0 = tokenA;
-            token1 = tokenB;
-            amount0 = amountA;
-            amount1 = amountB;
-        } else {
-            token0 = tokenB;
-            token1 = tokenA;
-            amount0 = amountB;
-            amount1 = amountA;
         }
     }
 
@@ -1077,16 +1077,24 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         return a < b ? a : b;
     }
 
-    function _max(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a > b ? a : b;
+    function _mulDivUp(uint256 value, uint256 numerator, uint256 denominator)
+        internal
+        pure
+        returns (uint256)
+    {
+        return Math.mulDiv(value, numerator, denominator, Math.Rounding.Up);
+    }
+
+    function _shareOf(uint256 balance, uint256 shares, uint256 supply)
+        internal
+        pure
+        returns (uint256)
+    {
+        return shares == supply ? balance : Math.mulDiv(balance, shares, supply);
     }
 
     function _conditionalLiquidityTotal() internal view returns (uint256) {
         return uint256(conditionalYesLiquidity) + uint256(conditionalNoLiquidity);
-    }
-
-    function _hasManagedLiquidity() internal view returns (bool) {
-        return spotLiquidity > 0 || conditionalYesLiquidity > 0 || conditionalNoLiquidity > 0;
     }
 
     function _toTokenOrder(uint256 companyAmount, uint256 collateralAmount)
@@ -1125,23 +1133,6 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         }
         if (amount1 > 0) {
             _forceApprove(IERC20(TOKEN1), address(adapter), amount1);
-        }
-    }
-
-    function _mintShares(address to, uint128 liquidityAdded)
-        internal
-        returns (uint256 sharesMinted)
-    {
-        uint256 supply = totalSupply();
-        uint256 spotLiquidityBefore = spotLiquidity - liquidityAdded;
-        if (supply == 0 || spotLiquidityBefore == 0) {
-            sharesMinted = liquidityAdded;
-        } else {
-            sharesMinted = (uint256(liquidityAdded) * supply) / spotLiquidityBefore;
-        }
-
-        if (sharesMinted > 0) {
-            _mint(to, sharesMinted);
         }
     }
 
@@ -1201,7 +1192,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     ///      Security rationale: forcing close ratio fit means a would-be attacker must move
     ///      conditional and spot together, then unwind both. That is primarily a round trip
     ///      where AMM fees dominate; the fit check prevents one-sided skew extraction.
-    ///      Any allowed residual balances remain on manager for owner-controlled sweeping.
+    ///      Any allowed residual balances remain share-owned on the manager until redemption.
     function _assertSyncLeftoverWithinBounds(
         uint256 companyRecovered,
         uint256 collateralRecovered,
@@ -1225,6 +1216,10 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
 
     function _assertOnlyBootstrap() internal view {
         if (msg.sender != BOOTSTRAP_RECIPIENT) revert OnlyBootstrapRecipient();
+    }
+
+    function _assertInitialized() internal view {
+        if (!initializedFromBootstrap) revert NotInitialized();
     }
 
     function _assertNotEmergencyMode() internal view {

@@ -19,6 +19,7 @@ rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 
 DEPLOY_CONFIG="$OUT_DIR/deploy.json"
+SIMULATED_DEPLOY_CONFIG="$OUT_DIR/deploy-simulated.json"
 DEPLOYMENT_OUTPUT="$OUT_DIR/deployment-output.json"
 SIMULATED_DEPLOYMENT_OUTPUT="$OUT_DIR/simulated-deployment-output.json"
 BATCH_CONFIG="$OUT_DIR/bootstrap.json"
@@ -27,11 +28,14 @@ LOG_FILE="$OUT_DIR/no-proposal.log"
 BAD_LINK_LOG_FILE="$OUT_DIR/bad-link.log"
 
 jq '
-  .owner = "0x1111111111111111111111111111111111111111"
+  .organization = "0x1010101010101010101010101010101010101010"
+  | .factory = "0xfafafafafafafafafafafafafafafafafafafafa"
+  | .owner = "0x1111111111111111111111111111111111111111"
   | .proposalManager = "0x1212121212121212121212121212121212121212"
   | .bootstrapRecipient = "0x2222222222222222222222222222222222222222"
   | .companyToken = "0x3333333333333333333333333333333333333333"
   | .officialProposer = "0x4444444444444444444444444444444444444444"
+  | .poolStabilityGuard = "0x4545454545454545454545454545454545454545"
   | .deployDeadlineProxy = false
   | .validation.enabled = true
   | .validation.expectedProposalToken = "0x5555555555555555555555555555555555555555"
@@ -48,17 +52,24 @@ jq -n --arg configHash "$DEPLOY_CONFIG_HASH" '
   {
     chainId: 100,
     configHash: $configHash,
+    organization: "0x1010101010101010101010101010101010101010",
+    factory: "0xfafafafafafafafafafafafafafafafafafafafa",
     owner: "0x1111111111111111111111111111111111111111",
     proposalManager: "0x1212121212121212121212121212121212121212",
     bootstrapRecipient: "0x2222222222222222222222222222222222222222",
     companyToken: "0x3333333333333333333333333333333333333333",
     wrappedNative: "0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d",
     officialProposer: "0x4444444444444444444444444444444444444444",
+    poolStabilityGuard: "0x4545454545454545454545454545454545454545",
     proposalSource: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     deadlineProxy: "0x0000000000000000000000000000000000000000",
     spotAdapter: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     conditionalAdapter: "0xcccccccccccccccccccccccccccccccccccccccc",
     manager: "0xdddddddddddddddddddddddddddddddddddddddd",
+    factoryCodeHash: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    proposalSourceCreationCodeHash: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    adapterCreationCodeHash: "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    managerCreationCodeHash: "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
     proposalSourceCodeHash: "0x1111111111111111111111111111111111111111111111111111111111111111",
     deadlineProxyCodeHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
     spotAdapterCodeHash: "0x2222222222222222222222222222222222222222222222222222222222222222",
@@ -78,9 +89,6 @@ jq '
   | .recipient = "0x6666666666666666666666666666666666666666"
   | .proposal = "0x7777777777777777777777777777777777777777"
   | .creator = "0x8888888888888888888888888888888888888888"
-  | .spotAdd.amount0Min = 1
-  | .spotAdd.amount1Min = 1
-  | .spotAdd.deadline = 1999999999
   | .validation.enabled = true
   | .validation.expectedProposalToken = "0x9999999999999999999999999999999999999999"
   | .validation.expectedCollateralToken = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -99,13 +107,16 @@ FLM_BATCH_TEMPLATE_CHECK_OUT="$OUT_DIR/generated" \
     --deployment-output "$DEPLOYMENT_OUTPUT" \
     --batch "$BATCH_CONFIG"
 
+jq '.factory = "0x0000000000000000000000000000000000000000"' \
+  "$DEPLOY_CONFIG" > "$SIMULATED_DEPLOY_CONFIG"
+
 PRIVATE_KEY=1 \
-FLM_DEPLOY_CONFIG="$DEPLOY_CONFIG" \
+FLM_DEPLOY_CONFIG="$SIMULATED_DEPLOY_CONFIG" \
 FLM_DEPLOY_OUTPUT="$SIMULATED_DEPLOYMENT_OUTPUT" \
   forge script script/DeployFutarchyLiquidityManager.s.sol --chain-id 100 >/dev/null
 
 bash tools/check-deployment-artifacts.sh \
-  --deploy "$DEPLOY_CONFIG" \
+  --deploy "$SIMULATED_DEPLOY_CONFIG" \
   --deployment-output "$SIMULATED_DEPLOYMENT_OUTPUT"
 
 if bash tools/check-deployment-artifacts.sh \

@@ -14,6 +14,10 @@ cp config/gnosis.example.json config/gnosis.fao.json
 
 Required organization-specific fields:
 
+- `organization`: organization address indexed by the permissionless factory event. The event is
+  an unverified caller claim, not proof that the organization endorsed the deployment.
+- `factory`: reviewed canonical `FutarchyLiquidityManagerFactory` for this dependency set and
+  contract version.
 - `owner`: owner of the proposal source and liquidity manager emergency controls, ideally a Safe.
 - `proposalManager`: operator allowed to update proposal-source metadata, validation, and manual
   settlement without owning emergency controls.
@@ -30,6 +34,8 @@ Gnosis defaults included in the example:
 - `positionManager`: Swapr Algebra non-fungible position manager.
 - `algebraFactory`: Swapr Algebra factory.
 - `futarchyRouter`: futarchy conditional split/merge/redeem router.
+- `poolStabilityGuard`: a reviewed shared `AlgebraPoolStabilityGuard` deployment for the configured
+  `algebraFactory`.
 - `deadlineProxy.conditionalTokens`: canonical Conditional Tokens Framework address.
 
 Validation fields are explicit even when disabled. For production, prefer enabling validation before
@@ -77,6 +83,44 @@ placeholder examples separately in `--allow-placeholders` mode.
 
 ## Broadcast
 
+Deploy the stateless guard once per Algebra factory, then copy the emitted address into each
+reviewed deploy config as `poolStabilityGuard`:
+
+```sh
+PRIVATE_KEY=... \
+FLM_ALGEBRA_FACTORY=0x... \
+FLM_GUARD_DEPLOY_OUTPUT=deployments/flm.guard.gnosis.json \
+forge script script/DeployAlgebraPoolStabilityGuard.s.sol \
+  --rpc-url gnosis \
+  --broadcast \
+  --verify
+```
+
+The guard has no owner or setters. Its factory, 30-minute TWAP window, and 50-tick maximum
+current-to-average deviation are fixed in deployed code. A missing pool, uninitialized pool, or
+unavailable observation history reverts the check.
+
+Deploy the permissionless factory once. It pins the bare creation-code hashes and shared protocol
+dependencies without storing the large child bytecode in its runtime:
+
+```sh
+PRIVATE_KEY=... \
+FLM_POSITION_MANAGER=0x... \
+FLM_ALGEBRA_FACTORY=0x... \
+FLM_CONDITIONAL_ROUTER=0x... \
+FLM_POOL_STABILITY_GUARD=0x... \
+FLM_WRAPPED_NATIVE=0x... \
+FLM_FACTORY_DEPLOY_OUTPUT=deployments/flm.factory.gnosis.json \
+forge script script/DeployFutarchyLiquidityManagerFactory.s.sol \
+  --rpc-url gnosis \
+  --broadcast \
+  --verify
+```
+
+Copy the emitted factory address into the reviewed deploy config. The bundle script checks every
+factory dependency and creation-code hash before broadcasting. For local simulation only, a zero
+factory address makes the script deploy an ephemeral matching factory first.
+
 ```sh
 PRIVATE_KEY=... \
 FLM_DEPLOY_CONFIG=config/gnosis.fao.json \
@@ -87,8 +131,14 @@ forge script script/DeployFutarchyLiquidityManager.s.sol \
   --verify
 ```
 
-The script writes deployed addresses, the reviewed config hash, and deployed code hashes to
-`FLM_DEPLOY_OUTPUT`. Review that output before generating liquidity or proposal batches.
+The script sends the three pinned bare creation-code blobs to the factory, which appends all
+constructor arguments and atomically deploys the source, two adapters, manager, and irreversible
+adapter bindings. It writes the factory, deployed addresses, reviewed config hash, pinned creation
+code hashes, and deployed code hashes to `FLM_DEPLOY_OUTPUT`.
+
+Because creation is permissionless, `LiquidityManagerCreated.organization` is not a canonical
+registry. A UI must show new bundles as unverified until the named organization registers the
+manager or signs an endorsement; it must never infer endorsement from the event alone.
 
 Before signing any operation batch, link it back to the reviewed deploy config and deployment
 output:
@@ -106,16 +156,20 @@ bootstrap recipient, or official proposer.
 
 ## Limited-Funds Deployment Order
 
-1. Deploy the FLM stack from a reviewed JSON config.
-2. Run `tools/preflight-limited-deploy.sh --deploy <reviewed-config> --deployment-output
+1. Deploy or verify the shared stability guard.
+2. Deploy or verify the hash-pinned permissionless factory and record both addresses in the
+   reviewed JSON config.
+3. Create the FLM stack through that factory from the reviewed config.
+4. Run `tools/preflight-limited-deploy.sh --deploy <reviewed-config> --deployment-output
    <deploy-output> --batch <batch-config> ... --proposal <final-proposal> --run-fork-tests` and
    keep the output with the audit materials.
-3. Verify deployed bytecode and constructor arguments.
-4. Configure proposal validation if it was not configured during deployment.
-5. Generate and audit the bootstrap liquidity Safe batch.
-6. Execute with limited funds first.
-7. Confirm spot position token id and balances.
-8. Only then set an official proposal and generate sync batches.
+5. Verify deployed bytecode and constructor arguments.
+6. Configure proposal validation if it was not configured during deployment.
+7. Generate and audit the bootstrap liquidity Safe batch.
+8. Execute with limited funds first.
+9. Confirm spot position token id and balances and wait until the spot pool has usable 30-minute
+   observation history.
+10. Only then set an official proposal and generate sync batches.
 
 ## No Docker Requirement
 

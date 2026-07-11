@@ -25,6 +25,9 @@ protocols:
   - `addFullRangeLiquidity(...)`
   - `removeLiquidity(...)`
   - `compoundPosition(...)`
+- `IPoolStabilityGuard`
+  - `assertStable(pool)`
+  - `assertStablePair(tokenA, tokenB)`
 
 The package provides implementations for the proposal source and one liquidity adapter, but the
 interfaces are the compatibility boundary for FAO or any other organization.
@@ -37,6 +40,7 @@ interfaces are the compatibility boundary for FAO or any other organization.
 - Conditional Tokens Framework.
 - Reality.eth.
 - Algebra/Swapr pool factory.
+- Algebra pool `globalState()` and `getTimepoints(...)` observations.
 - Algebra/Swapr non-fungible position manager.
 - OpenZeppelin contracts.
 

@@ -7,7 +7,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {FutarchyLiquidityManager} from "../src/core/FutarchyLiquidityManager.sol";
 import {FutarchyOfficialProposalSource} from "../src/sources/FutarchyOfficialProposalSource.sol";
-import {SwaprAlgebraLiquidityAdapter} from "../src/adapters/SwaprAlgebraLiquidityAdapter.sol";
 
 contract BuildLiquidityOperationBatch is Script {
     using stdJson for string;
@@ -91,9 +90,7 @@ contract BuildLiquidityOperationBatch is Script {
         }
 
         if (_eq(cfg.operation, "sync")) {
-            return _txJson(
-                cfg.manager, 0, abi.encodeCall(FutarchyLiquidityManager.sync, (_syncParams(json)))
-            );
+            return _txJson(cfg.manager, 0, abi.encodeCall(FutarchyLiquidityManager.sync, ()));
         }
 
         if (_eq(cfg.operation, "redeem")) {
@@ -101,14 +98,7 @@ contract BuildLiquidityOperationBatch is Script {
                 cfg.manager,
                 0,
                 abi.encodeCall(
-                    FutarchyLiquidityManager.redeem,
-                    (
-                        cfg.shares,
-                        cfg.recipient,
-                        cfg.unwrapNative,
-                        _exitParams(json, ".spotExit"),
-                        _dualExitParams(json)
-                    )
+                    FutarchyLiquidityManager.redeem, (cfg.shares, cfg.recipient, cfg.unwrapNative)
                 )
             );
         }
@@ -148,14 +138,9 @@ contract BuildLiquidityOperationBatch is Script {
             );
         }
 
-        if (_eq(cfg.operation, "emergencyExitAllToBootstrapRecipient")) {
+        if (_eq(cfg.operation, "executeEmergencyExit")) {
             return _txJson(
-                cfg.manager,
-                0,
-                abi.encodeCall(
-                    FutarchyLiquidityManager.emergencyExitAllToBootstrapRecipient,
-                    (cfg.unwrapNative, _exitParams(json, ".spotExit"), _dualExitParams(json))
-                )
+                cfg.manager, 0, abi.encodeCall(FutarchyLiquidityManager.executeEmergencyExit, ())
             );
         }
 
@@ -172,7 +157,7 @@ contract BuildLiquidityOperationBatch is Script {
         revert("unsupported operation");
     }
 
-    function _encodeBootstrapCall(string memory json, BatchConfig memory cfg)
+    function _encodeBootstrapCall(string memory, BatchConfig memory cfg)
         internal
         view
         returns (bytes memory)
@@ -181,21 +166,14 @@ contract BuildLiquidityOperationBatch is Script {
             require(cfg.nativeValue == 0, "mixed collateral value");
             require(cfg.collateralToken != address(0), "collateral token");
             return abi.encodeWithSignature(
-                "initializeFromBootstrap(uint256,uint256,bytes)",
-                cfg.companyAmount,
-                cfg.collateralAmount,
-                _addParams(json, ".spotAdd")
+                "initializeFromBootstrap(uint256,uint256)", cfg.companyAmount, cfg.collateralAmount
             );
         }
 
-        return abi.encodeWithSignature(
-            "initializeFromBootstrap(uint256,bytes)",
-            cfg.companyAmount,
-            _addParams(json, ".spotAdd")
-        );
+        return abi.encodeWithSignature("initializeFromBootstrap(uint256)", cfg.companyAmount);
     }
 
-    function _encodeDepositCall(string memory json, BatchConfig memory cfg)
+    function _encodeDepositCall(string memory, BatchConfig memory cfg)
         internal
         view
         returns (bytes memory)
@@ -204,65 +182,11 @@ contract BuildLiquidityOperationBatch is Script {
             require(cfg.nativeValue == 0, "mixed collateral value");
             require(cfg.collateralToken != address(0), "collateral token");
             return abi.encodeWithSignature(
-                "depositToSpot(uint256,uint256,bytes)",
-                cfg.companyAmount,
-                cfg.collateralAmount,
-                _addParams(json, ".spotAdd")
+                "depositToSpot(uint256,uint256)", cfg.companyAmount, cfg.collateralAmount
             );
         }
 
-        return abi.encodeWithSignature(
-            "depositToSpot(uint256,bytes)", cfg.companyAmount, _addParams(json, ".spotAdd")
-        );
-    }
-
-    function _syncParams(string memory json)
-        internal
-        view
-        returns (FutarchyLiquidityManager.SyncParams memory params)
-    {
-        params.spotCompoundData = _exitParams(json, ".spotExit");
-        params.conditionalCompoundData = _dualExitParams(json);
-        params.spotToConditionalRemoveData = _exitParams(json, ".spotExit");
-        params.spotToConditionalAddData =
-            abi.encode(_addParams(json, ".yesAdd"), _addParams(json, ".noAdd"));
-        params.conditionalToSpotRemoveData = _dualExitParams(json);
-        params.conditionalToSpotAddData = _addParams(json, ".spotAdd");
-    }
-
-    function _addParams(string memory json, string memory base)
-        internal
-        view
-        returns (bytes memory)
-    {
-        return abi.encode(
-            SwaprAlgebraLiquidityAdapter.AddParams({
-                tickLower: int24(json.readInt(string.concat(base, ".tickLower"))),
-                tickUpper: int24(json.readInt(string.concat(base, ".tickUpper"))),
-                amount0Min: json.readUint(string.concat(base, ".amount0Min")),
-                amount1Min: json.readUint(string.concat(base, ".amount1Min")),
-                deadline: json.readUint(string.concat(base, ".deadline")),
-                sqrtPriceX96: uint160(json.readUint(string.concat(base, ".sqrtPriceX96")))
-            })
-        );
-    }
-
-    function _exitParams(string memory json, string memory base)
-        internal
-        view
-        returns (bytes memory)
-    {
-        return abi.encode(
-            SwaprAlgebraLiquidityAdapter.ExitParams({
-                amount0Min: json.readUint(string.concat(base, ".amount0Min")),
-                amount1Min: json.readUint(string.concat(base, ".amount1Min")),
-                deadline: json.readUint(string.concat(base, ".deadline"))
-            })
-        );
-    }
-
-    function _dualExitParams(string memory json) internal view returns (bytes memory) {
-        return abi.encode(_exitParams(json, ".yesExit"), _exitParams(json, ".noExit"));
+        return abi.encodeWithSignature("depositToSpot(uint256)", cfg.companyAmount);
     }
 
     function _validation(string memory json, string memory base)
@@ -388,12 +312,11 @@ contract BuildLiquidityOperationBatch is Script {
         return string.concat(
             "# FLM Safe Batch Summary\n\n",
             _summaryHeader(cfg, outputPath),
-            _summaryAdapterParams(json),
+            _summaryAdapterParams(json, cfg.operation),
             _summaryValidation(json),
             "## Review Checklist\n\n",
             "- Confirm every `to` address in the Safe JSON matches this summary.\n",
             "- Confirm `value` is nonzero only for native-collateral calls.\n",
-            "- Confirm slippage minimums and deadlines came from a fresh quote.\n",
             "- Decode every `data` field before signing.\n"
         );
     }
@@ -489,59 +412,12 @@ contract BuildLiquidityOperationBatch is Script {
         );
     }
 
-    function _summaryAdapterParams(string memory json) internal view returns (string memory) {
-        return string.concat(
-            "## Adapter Parameters\n\n",
-            _addParamSummary(json, "spotAdd", ".spotAdd"),
-            _exitParamSummary(json, "spotExit", ".spotExit"),
-            _addParamSummary(json, "yesAdd", ".yesAdd"),
-            _addParamSummary(json, "noAdd", ".noAdd"),
-            _exitParamSummary(json, "yesExit", ".yesExit"),
-            _exitParamSummary(json, "noExit", ".noExit"),
-            "\n"
-        );
-    }
-
-    function _addParamSummary(string memory json, string memory label, string memory base)
+    function _summaryAdapterParams(string memory, string memory)
         internal
-        view
+        pure
         returns (string memory)
     {
-        return string.concat(
-            "- `",
-            label,
-            "` tickLower `",
-            vm.toString(json.readInt(string.concat(base, ".tickLower"))),
-            "`, tickUpper `",
-            vm.toString(json.readInt(string.concat(base, ".tickUpper"))),
-            "`, amount0Min `",
-            vm.toString(json.readUint(string.concat(base, ".amount0Min"))),
-            "`, amount1Min `",
-            vm.toString(json.readUint(string.concat(base, ".amount1Min"))),
-            "`, deadline `",
-            vm.toString(json.readUint(string.concat(base, ".deadline"))),
-            "`, sqrtPriceX96 `",
-            vm.toString(json.readUint(string.concat(base, ".sqrtPriceX96"))),
-            "`\n"
-        );
-    }
-
-    function _exitParamSummary(string memory json, string memory label, string memory base)
-        internal
-        view
-        returns (string memory)
-    {
-        return string.concat(
-            "- `",
-            label,
-            "` amount0Min `",
-            vm.toString(json.readUint(string.concat(base, ".amount0Min"))),
-            "`, amount1Min `",
-            vm.toString(json.readUint(string.concat(base, ".amount1Min"))),
-            "`, deadline `",
-            vm.toString(json.readUint(string.concat(base, ".deadline"))),
-            "`\n"
-        );
+        return "## Adapter Parameters\n\n- None; the manager uses fixed on-chain execution policy.\n\n";
     }
 
     function _summaryValidation(string memory json) internal view returns (string memory) {

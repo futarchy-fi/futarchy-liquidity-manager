@@ -31,7 +31,13 @@ check_contract \
   "DeadlineBoundedRealityProxy" \
   "src/oracles/DeadlineBoundedRealityProxy.sol:DeadlineBoundedRealityProxy"
 check_contract \
+  "AlgebraPoolStabilityGuard" \
+  "src/oracles/AlgebraPoolStabilityGuard.sol:AlgebraPoolStabilityGuard"
+check_contract \
   "SwaprAlgebraLiquidityAdapter" \
   "src/adapters/SwaprAlgebraLiquidityAdapter.sol:SwaprAlgebraLiquidityAdapter"
+check_contract \
+  "FutarchyLiquidityManagerFactory" \
+  "src/factories/FutarchyLiquidityManagerFactory.sol:FutarchyLiquidityManagerFactory"
 
 echo "API freeze guard passed"

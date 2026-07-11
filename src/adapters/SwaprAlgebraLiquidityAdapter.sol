@@ -8,9 +8,8 @@ import {ISwaprAlgebraPositionManager} from "../interfaces/ISwaprAlgebraPositionM
 
 /// @title SwaprAlgebraLiquidityAdapter
 /// @notice Swapr Algebra V3 adapter for a single position per ordered token pair.
-/// @dev The adapter custodies Algebra position NFTs. It is intentionally generic and has no
-/// FAO-specific logic. Callers must pass reviewed `AddParams`/`ExitParams` calldata for real
-/// execution so slippage and deadlines are explicit.
+/// @dev The adapter custodies Algebra position NFTs and can only be operated by its bound manager.
+/// It is intentionally generic and has no FAO-specific logic.
 contract SwaprAlgebraLiquidityAdapter is IFutarchyLiquidityAdapter {
     using SafeERC20 for IERC20;
 
@@ -52,6 +51,9 @@ contract SwaprAlgebraLiquidityAdapter is IFutarchyLiquidityAdapter {
     ISwaprAlgebraPositionManager public immutable POSITION_MANAGER;
     int24 public immutable DEFAULT_TICK_LOWER;
     int24 public immutable DEFAULT_TICK_UPPER;
+    address public MANAGER;
+
+    address private immutable _bindingAuthority;
 
     mapping(bytes32 pairKey => uint256 tokenId) public positionTokenId;
 
@@ -59,8 +61,12 @@ contract SwaprAlgebraLiquidityAdapter is IFutarchyLiquidityAdapter {
     error InvalidTickRange();
     error PositionNotFound();
     error InsufficientPositionLiquidity();
+    error ManagerAlreadyBound();
+    error UnauthorizedBindingAuthority();
+    error UnauthorizedManager();
     error ZeroAddress();
 
+    event ManagerBound(address indexed manager);
     event PositionMinted(bytes32 indexed pairKey, uint256 indexed tokenId, uint128 liquidity);
     event LiquidityIncreased(bytes32 indexed pairKey, uint256 indexed tokenId, uint128 liquidity);
     event LiquidityRemoved(bytes32 indexed pairKey, uint256 indexed tokenId, uint128 liquidity);
@@ -80,6 +86,23 @@ contract SwaprAlgebraLiquidityAdapter is IFutarchyLiquidityAdapter {
         POSITION_MANAGER = positionManager;
         DEFAULT_TICK_LOWER = defaultTickLower;
         DEFAULT_TICK_UPPER = defaultTickUpper;
+        _bindingAuthority = msg.sender;
+    }
+
+    modifier onlyManager() {
+        if (msg.sender != MANAGER) revert UnauthorizedManager();
+        _;
+    }
+
+    /// @notice Irreversibly binds the adapter to its liquidity manager.
+    /// @dev Only the contract or account that deployed this adapter may bind it.
+    function bindManager(address manager) external {
+        if (msg.sender != _bindingAuthority) revert UnauthorizedBindingAuthority();
+        if (MANAGER != address(0)) revert ManagerAlreadyBound();
+        if (manager == address(0)) revert ZeroAddress();
+
+        MANAGER = manager;
+        emit ManagerBound(manager);
     }
 
     /// @notice Pulls tokens from the caller and adds liquidity to this adapter's pair position.
@@ -91,7 +114,11 @@ contract SwaprAlgebraLiquidityAdapter is IFutarchyLiquidityAdapter {
         uint256 amount0Desired,
         uint256 amount1Desired,
         bytes calldata data
-    ) external returns (uint128 liquidityMinted, uint256 amount0Used, uint256 amount1Used) {
+    )
+        external
+        onlyManager
+        returns (uint128 liquidityMinted, uint256 amount0Used, uint256 amount1Used)
+    {
         bytes32 key = _pairKey(token0, token1);
         AddParams memory params = _decodeAddParams(data);
         _pullAndApprove(token0, amount0Desired, msg.sender);
@@ -125,6 +152,7 @@ contract SwaprAlgebraLiquidityAdapter is IFutarchyLiquidityAdapter {
     /// removed.
     function removeLiquidity(address token0, address token1, uint128 liquidity, bytes calldata data)
         external
+        onlyManager
         returns (uint256 amount0Out, uint256 amount1Out)
     {
         bytes32 key = _pairKey(token0, token1);
@@ -167,6 +195,7 @@ contract SwaprAlgebraLiquidityAdapter is IFutarchyLiquidityAdapter {
     /// @dev Returns zero when no position exists or no fees are collectable.
     function compoundPosition(address token0, address token1, bytes calldata data)
         external
+        onlyManager
         returns (uint128 liquidityAdded)
     {
         bytes32 key = _pairKey(token0, token1);

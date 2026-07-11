@@ -34,7 +34,7 @@
       "status": "ready-to-audit",
       "evidence": [
         {
-          "description": "Swapr Algebra NFPM fork smoke test.",
+          "description": "Swapr Algebra NFPM smoke test plus real full-unwind spot and conditional public-vault gas checks.",
           "path": "test/fork/SwaprAlgebraLiquidityAdapterFork.t.sol"
         },
         {
@@ -44,6 +44,10 @@
         {
           "description": "Futarchy conditional router split behavior fork test.",
           "path": "test/fork/FutarchyRouterSplitFork.t.sol"
+        },
+        {
+          "description": "Shared Algebra stability guard resolves and checks the live GNO/sDAI spot pool over its 30-minute window.",
+          "path": "test/fork/AlgebraPoolStabilityGuardFork.t.sol"
         },
         {
           "description": "Fork tests are documented as a required final target-address check.",
@@ -60,12 +64,16 @@
       "status": "ready-to-audit",
       "evidence": [
         {
-          "description": "Core manager tests cover proportional mint/redeem behavior, bad proposal safety, emergency exit behavior, and fuzz cases.",
+          "description": "Core manager tests cover proportional principal/fee/idle accounting, deposit dilution, conditional in-kind fallback, non-custodial emergency exit, and fuzz cases.",
           "path": "test/FutarchyLiquidityManager.t.sol"
         },
         {
           "description": "Adapter over-pull safety test.",
           "path": "test/FutarchyLiquidityManagerAdapterSafety.t.sol"
+        },
+        {
+          "description": "Algebra guard tests cover inclusive 50-tick boundaries, signed TWAP rounding, and fail-closed history reads.",
+          "path": "test/AlgebraPoolStabilityGuard.t.sol"
         },
         {
           "description": "Invariant suite covers LP backing, conditional accounting, and adapter liquidity consistency.",
@@ -110,7 +118,7 @@
           "path": "src/interfaces/IFutarchyOfficialProposalSource.sol"
         },
         {
-          "description": "Adapter interface with slippage and deadline parameters visible at the boundary.",
+          "description": "Generic adapter interface remains explicit while manager callers supply no adapter execution parameters.",
           "path": "src/interfaces/IFutarchyLiquidityAdapter.sol"
         }
       ],
@@ -141,6 +149,10 @@
         {
           "description": "Deployment script reads JSON config instead of hard-coded production addresses and records config/deployed-code hashes in the deployment output.",
           "path": "script/DeployFutarchyLiquidityManager.s.sol"
+        },
+        {
+          "description": "Dedicated script deploys one immutable Algebra stability guard for reuse across managers and factories.",
+          "path": "script/DeployAlgebraPoolStabilityGuard.s.sol"
         },
         {
           "description": "Gnosis example config keeps every deployment address and validation bound reviewable.",
@@ -192,7 +204,7 @@
           "path": "script/BuildLiquidityOperationBatch.s.sol"
         },
         {
-          "description": "Operation runbook documents calldata audit procedure, slippage, and deadlines.",
+          "description": "Operation runbook documents fixed manager execution policy and calldata audit procedure.",
           "path": "docs/operations.md"
         },
         {
@@ -205,7 +217,7 @@
           "ciStep": "Batch template generation"
         },
         {
-          "description": "Strict batch validation rejects placeholder targets, zero liquidity amounts, missing deadlines, and zero slippage minimums.",
+          "description": "Strict batch validation rejects placeholder targets and zero operation amounts.",
           "path": "tools/validate-configs.sh"
         },
         {
@@ -213,9 +225,7 @@
           "path": "tools/check-deployment-artifacts.sh"
         }
       ],
-      "remaining": [
-        "Fill real operation configs with fresh quotes, deadlines, and nonzero slippage minimums before signing."
-      ]
+      "remaining": []
     },
     {
       "id": "limited-funds-deploy",
