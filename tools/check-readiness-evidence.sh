@@ -20,7 +20,8 @@ jq -e '
   def nonempty: type == "string" and length > 0;
   def known_status:
     . == "ready-to-audit"
-    or . == "awaits-final-inputs";
+    or . == "awaits-final-inputs"
+    or . == "canary-live";
   type == "object"
   and .version == 1
   and (.status | nonempty)
@@ -41,7 +42,7 @@ jq -e '
     and (.remaining | type == "array")
     and all(.remaining[]; nonempty)
     and (
-      if .status == "awaits-final-inputs"
+      if (.status == "awaits-final-inputs" or .status == "canary-live")
       then (.remaining | length > 0)
       else true
       end
