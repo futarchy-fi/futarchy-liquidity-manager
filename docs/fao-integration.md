@@ -19,14 +19,20 @@ FAO-side code or operations should:
 
 ## Minimal Bootstrap Flow
 
-1. Deploy `FutarchyOfficialProposalSource`.
-2. Optionally deploy `DeadlineBoundedRealityProxy` for new FLM-grade proposal factories.
-3. Deploy one `SwaprAlgebraLiquidityAdapter` for spot and one for conditional pools.
-4. Deploy `FutarchyLiquidityManager`.
-5. Approve company tokens from `bootstrapRecipient` to the manager.
-6. For native collateral, call `initializeFromBootstrap(companyAmount, spotAddData)` with native
-   value. For ERC20 collateral, approve the collateral token and call
-   `initializeFromBootstrap(companyAmount, collateralAmount, spotAddData)`.
+1. Deploy one `AlgebraPoolStabilityGuard` for the target Algebra factory, or reuse its reviewed
+   deployment across every FAO/FLM manager on that chain.
+2. Deploy `FutarchyOfficialProposalSource`.
+3. Optionally deploy `DeadlineBoundedRealityProxy` for new FLM-grade proposal factories.
+4. Deploy one `SwaprAlgebraLiquidityAdapter` for spot and one for conditional pools.
+5. Deploy `FutarchyLiquidityManager` with the shared guard address.
+6. Irreversibly bind both adapters to the manager from their deployment authority.
+7. Approve company tokens from `bootstrapRecipient` to the manager.
+8. For native collateral, call `initializeFromBootstrap(companyAmount)` with native value. For
+   ERC20 collateral, approve the collateral token and call
+   `initializeFromBootstrap(companyAmount, collateralAmount)`. No caller supplies adapter data.
+9. Public LPs may call `depositToSpot` only outside conditional and emergency modes. Deposits are
+   accepted in the existing two-asset vault proportion and excess input is refunded or unpulled.
+10. LPs may call `redeem(shares, recipient, unwrapNative)` in every lifecycle and emergency state.
 
 ## Proposal Flow
 
@@ -35,8 +41,11 @@ FAO-side code or operations should:
 3. Configure proposal validation bounds for the token pair, CTF oracle, Reality contract,
    arbitrator, opening delay, timeout, and min bond.
 4. Call `setOfficialProposal`.
-5. Call `sync` to migrate 80% of spot liquidity into conditional pools.
-6. After settlement, call `sync` again to return conditional liquidity to spot.
+5. Call `sync` to migrate 80% of spot liquidity into conditional pools. The call fails closed if
+   the established spot pool lacks 30 minutes of history or its current tick is more than 50 ticks
+   from that TWAP. Newly seeded YES/NO pools do not need pre-existing 30-minute history.
+6. After settlement, call `sync` again to return conditional liquidity to spot. The same spot-pool
+   guard runs before conditional positions are removed.
 
 ## Out Of Scope
 

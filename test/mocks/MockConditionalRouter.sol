@@ -8,6 +8,11 @@ import {MockMintableERC20} from "./MockMintableERC20.sol";
 contract MockConditionalRouter is IFutarchyConditionalRouter {
     using SafeERC20 for IERC20;
 
+    bool public winnerIsYes;
+    bool public redeemReverts;
+    bool public mergeReverts;
+    bool public mergeUnderpays;
+
     struct OutcomeConfig {
         address yesToken;
         address noToken;
@@ -23,11 +28,24 @@ contract MockConditionalRouter is IFutarchyConditionalRouter {
         address collateralToken,
         address yesToken,
         address noToken,
-        bool winnerIsYes
+        bool _winnerIsYes
     ) external {
+        winnerIsYes = _winnerIsYes;
         outcomeConfig[proposal][collateralToken] = OutcomeConfig({
-            yesToken: yesToken, noToken: noToken, winnerIsYes: winnerIsYes, exists: true
+            yesToken: yesToken, noToken: noToken, winnerIsYes: _winnerIsYes, exists: true
         });
+    }
+
+    function setRedeemReverts(bool value) external {
+        redeemReverts = value;
+    }
+
+    function setMergeReverts(bool value) external {
+        mergeReverts = value;
+    }
+
+    function setMergeUnderpays(bool value) external {
+        mergeUnderpays = value;
     }
 
     function splitPosition(address proposal, address collateralToken, uint256 amount) external {
@@ -41,6 +59,7 @@ contract MockConditionalRouter is IFutarchyConditionalRouter {
     }
 
     function mergePositions(address proposal, address collateralToken, uint256 amount) external {
+        require(!mergeReverts, "merge failed");
         OutcomeConfig memory cfg = outcomeConfig[proposal][collateralToken];
         require(cfg.exists, "missing outcome config");
         if (amount == 0) return;
@@ -55,12 +74,14 @@ contract MockConditionalRouter is IFutarchyConditionalRouter {
 
         uint256 collateralBal = IERC20(collateralToken).balanceOf(address(this));
         uint256 payout = _min(mergeAmount, collateralBal);
+        if (mergeUnderpays && payout > 0) payout--;
         if (payout > 0) {
             IERC20(collateralToken).safeTransfer(msg.sender, payout);
         }
     }
 
     function redeemPositions(address proposal, address collateralToken, uint256 amount) external {
+        require(!redeemReverts, "redeem failed");
         OutcomeConfig memory cfg = outcomeConfig[proposal][collateralToken];
         require(cfg.exists, "missing outcome config");
         if (amount == 0) return;
@@ -73,6 +94,11 @@ contract MockConditionalRouter is IFutarchyConditionalRouter {
 
         IERC20(winningToken).safeTransferFrom(msg.sender, address(this), redeemAmount);
         IERC20(collateralToken).safeTransfer(msg.sender, redeemAmount);
+    }
+
+    function getWinningOutcomes(bytes32) external view returns (bool[] memory outcomes) {
+        outcomes = new bool[](2);
+        outcomes[winnerIsYes ? 0 : 1] = true;
     }
 
     function _min(uint256 a, uint256 b) internal pure returns (uint256) {

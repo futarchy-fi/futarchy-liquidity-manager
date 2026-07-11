@@ -3,7 +3,7 @@
   "name": "FLM emergency exit all",
   "createdFromSafeAddress": "0x0000000000000000000000000000000000000000",
   "createdFromOwnerAddress": "0x0000000000000000000000000000000000000000",
-  "operation": "emergencyExitAllToBootstrapRecipient",
+  "operation": "executeEmergencyExit",
   "manager": "0x0000000000000000000000000000000000000000",
   "proposalSource": "0x0000000000000000000000000000000000000000",
   "companyToken": "0x0000000000000000000000000000000000000000",
@@ -17,45 +17,6 @@
   "proposalId": 0,
   "proposal": "0x0000000000000000000000000000000000000000",
   "creator": "0x0000000000000000000000000000000000000000",
-  "spotAdd": {
-    "tickLower": -887220,
-    "tickUpper": 887220,
-    "amount0Min": 0,
-    "amount1Min": 0,
-    "deadline": 0,
-    "sqrtPriceX96": 0
-  },
-  "spotExit": {
-    "amount0Min": 0,
-    "amount1Min": 0,
-    "deadline": 0
-  },
-  "yesAdd": {
-    "tickLower": -887220,
-    "tickUpper": 887220,
-    "amount0Min": 0,
-    "amount1Min": 0,
-    "deadline": 0,
-    "sqrtPriceX96": 0
-  },
-  "noAdd": {
-    "tickLower": -887220,
-    "tickUpper": 887220,
-    "amount0Min": 0,
-    "amount1Min": 0,
-    "deadline": 0,
-    "sqrtPriceX96": 0
-  },
-  "yesExit": {
-    "amount0Min": 0,
-    "amount1Min": 0,
-    "deadline": 0
-  },
-  "noExit": {
-    "amount0Min": 0,
-    "amount1Min": 0,
-    "deadline": 0
-  },
   "validation": {
     "enabled": false,
     "expectedProposalToken": "0x0000000000000000000000000000000000000000",

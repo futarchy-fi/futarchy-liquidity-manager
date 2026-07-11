@@ -39,3 +39,14 @@ for file in "${FILES[@]}"; do
 
   echo "batch template generation passed: $file"
 done
+
+for legacy_key in spotAdd spotExit yesAdd noAdd yesExit noExit; do
+  legacy_json="${OUT_DIR}/legacy-${legacy_key}.json"
+  jq --arg key "$legacy_key" '. + {($key): {}}' config/safe-batch.example.json > "$legacy_json"
+  if tools/validate-configs.sh --allow-placeholders --batch "$legacy_json" >/dev/null 2>&1; then
+    echo "batch template check failed: accepted legacy key ${legacy_key}" >&2
+    exit 1
+  fi
+done
+
+echo "legacy adapter parameter rejection passed"

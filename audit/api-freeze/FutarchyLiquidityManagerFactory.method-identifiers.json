@@ -1,0 +1,14 @@
+{
+  "ADAPTER_CREATION_CODE_HASH()": "59f06526",
+  "ALGEBRA_FACTORY()": "9949da1f",
+  "CONDITIONAL_ROUTER()": "cd91811e",
+  "DEFAULT_TICK_LOWER()": "820c161e",
+  "DEFAULT_TICK_UPPER()": "94e49769",
+  "MANAGER_CREATION_CODE_HASH()": "461d4ffe",
+  "MAX_INIT_CODE_SIZE()": "9056eb1c",
+  "POOL_STABILITY_GUARD()": "b7a44a99",
+  "POSITION_MANAGER()": "1bea83fe",
+  "PROPOSAL_SOURCE_CREATION_CODE_HASH()": "296bd630",
+  "WRAPPED_NATIVE()": "d999984d",
+  "createLiquidityManager((address,address,address,address,address,address,string,string,bytes),(bytes,bytes,bytes))": "c9056e87"
+}

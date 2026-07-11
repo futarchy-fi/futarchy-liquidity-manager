@@ -6,6 +6,11 @@ The core idea is that LPs deposit a company token and collateral once, receive F
 and the manager handles spot liquidity, conditional YES/NO migration during an official
 proposal, and return to spot after settlement.
 
+Public deposits are accepted only in spot mode and in the vault's existing two-asset proportion.
+Redemption is always available, including conditional and emergency modes. Share changes fully
+unwind active positions first so principal, fees, and idle balances remain pro-rata; callers supply
+no adapter ticks, slippage, deadlines, or initialization prices.
+
 ## Layout
 
 - `src/core/` - generic audited FLM state machine.
@@ -56,6 +61,23 @@ RUN_GNOSIS_FORK_TESTS=true forge test --match-path 'test/fork/*'
 Generate a deployment from explicit JSON config:
 
 ```sh
+FLM_ALGEBRA_FACTORY=0x... \
+forge script script/DeployAlgebraPoolStabilityGuard.s.sol \
+  --rpc-url gnosis \
+  --broadcast
+
+# Deploy the canonical permissionless factory once with the reviewed shared dependencies.
+PRIVATE_KEY=... \
+FLM_POSITION_MANAGER=0x... \
+FLM_ALGEBRA_FACTORY=0x... \
+FLM_CONDITIONAL_ROUTER=0x... \
+FLM_POOL_STABILITY_GUARD=0x... \
+FLM_WRAPPED_NATIVE=0x... \
+forge script script/DeployFutarchyLiquidityManagerFactory.s.sol \
+  --rpc-url gnosis \
+  --broadcast
+
+# Put the shared guard and factory addresses in the deploy config before validating.
 tools/validate-configs.sh --deploy config/gnosis.production.json
 
 FLM_DEPLOY_CONFIG=config/gnosis.production.json \

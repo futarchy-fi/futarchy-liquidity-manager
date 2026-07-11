@@ -82,6 +82,8 @@ deploy_schema_filter='
   def address: type == "string" and test("^0x[0-9a-fA-F]{40}$");
   type == "object"
   and (.chainId | type == "number" and . > 0)
+  and (.organization | address)
+  and (.factory | address)
   and (.owner | address)
   and (.proposalManager | address)
   and (.bootstrapRecipient | address)
@@ -90,6 +92,7 @@ deploy_schema_filter='
   and (.wrappedNative | address)
   and (.positionManager | address)
   and (.algebraFactory | address)
+  and (.poolStabilityGuard | address)
   and (.futarchyRouter | address)
   and (.tickLower | type == "number")
   and (.tickUpper | type == "number")
@@ -119,7 +122,9 @@ deploy_strict_filter='
   def address: type == "string" and test("^0x[0-9a-fA-F]{40}$");
   def zero: "0x0000000000000000000000000000000000000000";
   def nzaddress: address and (ascii_downcase != zero);
-  (.owner | nzaddress)
+  (.organization | nzaddress)
+  and (.factory | nzaddress)
+  and (.owner | nzaddress)
   and (.proposalManager | nzaddress)
   and (.bootstrapRecipient | nzaddress)
   and (.companyToken | nzaddress)
@@ -127,6 +132,7 @@ deploy_strict_filter='
   and (.wrappedNative | nzaddress)
   and (.positionManager | nzaddress)
   and (.algebraFactory | nzaddress)
+  and (.poolStabilityGuard | nzaddress)
   and (.futarchyRouter | nzaddress)
   and (.validation.enabled == true)
   and (.validation.expectedProposalToken | nzaddress)
@@ -159,18 +165,6 @@ batch_schema_filter='
   def address: type == "string" and test("^0x[0-9a-fA-F]{40}$");
   def oneof($values): . as $value | $values | index($value) != null;
   def nonnegative: type == "number" and . >= 0;
-  def addparams($p):
-    ($p.tickLower | type == "number")
-    and ($p.tickUpper | type == "number")
-    and ($p.tickLower < $p.tickUpper)
-    and ($p.amount0Min | nonnegative)
-    and ($p.amount1Min | nonnegative)
-    and ($p.deadline | nonnegative)
-    and ($p.sqrtPriceX96 | nonnegative);
-  def exitparams($p):
-    ($p.amount0Min | nonnegative)
-    and ($p.amount1Min | nonnegative)
-    and ($p.deadline | nonnegative);
   type == "object"
   and (.chainId | type == "number" and . > 0)
   and (.name | type == "string" and length > 0)
@@ -186,7 +180,7 @@ batch_schema_filter='
       "setProposalValidationConfig",
       "armEmergencyExit",
       "disarmEmergencyExit",
-      "emergencyExitAllToBootstrapRecipient",
+      "executeEmergencyExit",
       "sweepIdleToBootstrapRecipient"
     ])
   )
@@ -203,12 +197,6 @@ batch_schema_filter='
   and (.proposalId | nonnegative)
   and (.proposal | address)
   and (.creator | address)
-  and addparams(.spotAdd)
-  and exitparams(.spotExit)
-  and addparams(.yesAdd)
-  and addparams(.noAdd)
-  and exitparams(.yesExit)
-  and exitparams(.noExit)
   and (.validation.enabled | type == "boolean")
   and (.validation.expectedProposalToken | address)
   and (.validation.expectedCollateralToken | address)
@@ -222,6 +210,12 @@ batch_schema_filter='
   and (.validation.maxTimeout >= .validation.minTimeout)
   and (.validation.maxMinBond | nonnegative)
   and (.validation.requirePools | type == "boolean")
+  and (has("spotAdd") | not)
+  and (has("spotExit") | not)
+  and (has("yesAdd") | not)
+  and (has("noAdd") | not)
+  and (has("yesExit") | not)
+  and (has("noExit") | not)
 '
 
 batch_strict_filter='
@@ -230,15 +224,6 @@ batch_strict_filter='
   def nzaddress: address and (ascii_downcase != zero);
   def positive: type == "number" and . > 0;
   def oneof($values): . as $value | $values | index($value) != null;
-  def addstrict($p):
-    ($p.tickLower < $p.tickUpper)
-    and ($p.amount0Min | positive)
-    and ($p.amount1Min | positive)
-    and ($p.deadline | positive);
-  def exitstrict($p):
-    ($p.amount0Min | positive)
-    and ($p.amount1Min | positive)
-    and ($p.deadline | positive);
   def validationstrict:
     (.validation.enabled == true)
     and (.validation.expectedProposalToken | nzaddress)
@@ -272,7 +257,7 @@ batch_strict_filter='
       "redeem",
       "armEmergencyExit",
       "disarmEmergencyExit",
-      "emergencyExitAllToBootstrapRecipient",
+      "executeEmergencyExit",
       "sweepIdleToBootstrapRecipient"
     ]))
     then (.manager | nzaddress)
@@ -291,19 +276,6 @@ batch_strict_filter='
       (.companyToken | nzaddress)
       and (.companyAmount | positive)
       and fundingstrict
-      and addstrict(.spotAdd)
-    else true
-    end
-  )
-  and (
-    if $op == "sync"
-    then
-      addstrict(.spotAdd)
-      and exitstrict(.spotExit)
-      and addstrict(.yesAdd)
-      and addstrict(.noAdd)
-      and exitstrict(.yesExit)
-      and exitstrict(.noExit)
     else true
     end
   )
@@ -312,18 +284,6 @@ batch_strict_filter='
     then
       (.shares | positive)
       and (.recipient | nzaddress)
-      and exitstrict(.spotExit)
-      and exitstrict(.yesExit)
-      and exitstrict(.noExit)
-    else true
-    end
-  )
-  and (
-    if $op == "emergencyExitAllToBootstrapRecipient"
-    then
-      exitstrict(.spotExit)
-      and exitstrict(.yesExit)
-      and exitstrict(.noExit)
     else true
     end
   )
@@ -360,7 +320,7 @@ if [[ ${#BATCH_FILES[@]} -gt 0 ]]; then
     require_jq "$file" "$batch_schema_filter" "batch config schema is invalid"
     if [[ "$ALLOW_PLACEHOLDERS" == false ]]; then
       require_jq "$file" "$batch_strict_filter" \
-        "strict batch config must use real targets, amounts, deadlines, and slippage minimums"
+        "strict batch config must use real targets and nonzero operation amounts"
     fi
     echo "batch config validation passed: $file"
   done

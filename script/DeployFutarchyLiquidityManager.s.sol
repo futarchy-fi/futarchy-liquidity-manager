@@ -5,20 +5,32 @@ import {Script, console2} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {FutarchyLiquidityManager, IWrappedNative} from "../src/core/FutarchyLiquidityManager.sol";
+import {IWrappedNative} from "../src/core/FutarchyLiquidityManager.sol";
+import {
+    FutarchyLiquidityManagerFactory
+} from "../src/factories/FutarchyLiquidityManagerFactory.sol";
 import {FutarchyOfficialProposalSource} from "../src/sources/FutarchyOfficialProposalSource.sol";
 import {DeadlineBoundedRealityProxy} from "../src/oracles/DeadlineBoundedRealityProxy.sol";
-import {SwaprAlgebraLiquidityAdapter} from "../src/adapters/SwaprAlgebraLiquidityAdapter.sol";
 import {IAlgebraFactoryLike} from "../src/interfaces/IAlgebraFactoryLike.sol";
 import {IFutarchyConditionalRouter} from "../src/interfaces/IFutarchyConditionalRouter.sol";
+import {IPoolStabilityGuard} from "../src/interfaces/IPoolStabilityGuard.sol";
 import {IConditionalTokensCore, IRealityETHCore} from "../src/interfaces/IFutarchyTradingCore.sol";
 import {ISwaprAlgebraPositionManager} from "../src/interfaces/ISwaprAlgebraPositionManager.sol";
 
 contract DeployFutarchyLiquidityManager is Script {
     using stdJson for string;
 
+    string internal constant PROPOSAL_SOURCE_ARTIFACT =
+        "src/sources/FutarchyOfficialProposalSource.sol:FutarchyOfficialProposalSource";
+    string internal constant ADAPTER_ARTIFACT =
+        "src/adapters/SwaprAlgebraLiquidityAdapter.sol:SwaprAlgebraLiquidityAdapter";
+    string internal constant MANAGER_ARTIFACT =
+        "src/core/FutarchyLiquidityManager.sol:FutarchyLiquidityManager";
+
     struct DeployConfig {
         uint256 chainId;
+        address organization;
+        address factory;
         address owner;
         address proposalManager;
         address bootstrapRecipient;
@@ -27,6 +39,7 @@ contract DeployFutarchyLiquidityManager is Script {
         address wrappedNative;
         address positionManager;
         address algebraFactory;
+        address poolStabilityGuard;
         address futarchyRouter;
         int24 tickLower;
         int24 tickUpper;
@@ -40,6 +53,7 @@ contract DeployFutarchyLiquidityManager is Script {
     }
 
     struct DeployedContracts {
+        address factory;
         address proposalSource;
         address deadlineProxy;
         address spotAdapter;
@@ -56,6 +70,7 @@ contract DeployFutarchyLiquidityManager is Script {
         bytes32 configHash = keccak256(bytes(vm.readFile(configPath)));
         DeployConfig memory cfg = _readConfig(configPath);
         _assertDeployConfig(cfg);
+        FutarchyLiquidityManagerFactory.CreationCodes memory codes = _creationCodes();
 
         vm.startBroadcast(privateKey);
 
@@ -74,47 +89,33 @@ contract DeployFutarchyLiquidityManager is Script {
             }
         }
 
-        deployed.proposalSource = address(
-            new FutarchyOfficialProposalSource(
-                cfg.owner,
-                cfg.proposalManager,
-                cfg.officialProposer,
-                IAlgebraFactoryLike(cfg.algebraFactory),
-                _encodeInitialValidationConfig(cfg.validation)
-            )
-        );
+        FutarchyLiquidityManagerFactory factory = _factory(cfg, codes);
+        deployed.factory = address(factory);
+        cfg.factory = deployed.factory;
 
-        deployed.spotAdapter = address(
-            new SwaprAlgebraLiquidityAdapter(
-                ISwaprAlgebraPositionManager(cfg.positionManager), cfg.tickLower, cfg.tickUpper
-            )
-        );
-
-        deployed.conditionalAdapter = address(
-            new SwaprAlgebraLiquidityAdapter(
-                ISwaprAlgebraPositionManager(cfg.positionManager), cfg.tickLower, cfg.tickUpper
-            )
-        );
-
-        deployed.manager = address(
-            new FutarchyLiquidityManager(
-                cfg.bootstrapRecipient,
-                IERC20(cfg.companyToken),
-                IWrappedNative(cfg.wrappedNative),
-                cfg.officialProposer,
-                FutarchyOfficialProposalSource(deployed.proposalSource),
-                SwaprAlgebraLiquidityAdapter(deployed.spotAdapter),
-                SwaprAlgebraLiquidityAdapter(deployed.conditionalAdapter),
-                IFutarchyConditionalRouter(cfg.futarchyRouter),
-                cfg.owner,
-                cfg.lpTokenName,
-                cfg.lpTokenSymbol
-            )
-        );
+        FutarchyLiquidityManagerFactory.DeployedContracts memory bundle =
+            factory.createLiquidityManager(
+                FutarchyLiquidityManagerFactory.CreateParams({
+                    organization: cfg.organization,
+                    owner: cfg.owner,
+                    proposalManager: cfg.proposalManager,
+                    bootstrapRecipient: cfg.bootstrapRecipient,
+                    companyToken: IERC20(cfg.companyToken),
+                    officialProposer: cfg.officialProposer,
+                    lpTokenName: cfg.lpTokenName,
+                    lpTokenSymbol: cfg.lpTokenSymbol,
+                    proposalValidationConfigData: _encodeInitialValidationConfig(cfg.validation)
+                }),
+                codes
+            );
+        deployed.proposalSource = bundle.proposalSource;
+        deployed.spotAdapter = bundle.spotAdapter;
+        deployed.conditionalAdapter = bundle.conditionalAdapter;
+        deployed.manager = bundle.manager;
 
         vm.stopBroadcast();
 
-        _writeDeploymentOutput(outputPath, cfg, configHash, deployed);
+        _writeDeploymentOutput(outputPath, cfg, configHash, deployed, codes);
 
         console2.log("Config:", configPath);
         console2.log("Output:", outputPath);
@@ -124,16 +125,20 @@ contract DeployFutarchyLiquidityManager is Script {
         console2.log("Company token:", cfg.companyToken);
         console2.log("Wrapped native:", cfg.wrappedNative);
         console2.log("Official proposer:", cfg.officialProposer);
+        console2.log("Factory:", deployed.factory);
         console2.log("Proposal source:", deployed.proposalSource);
         console2.log("Deadline proxy:", deployed.deadlineProxy);
         console2.log("Spot adapter:", deployed.spotAdapter);
         console2.log("Conditional adapter:", deployed.conditionalAdapter);
+        console2.log("Pool stability guard:", cfg.poolStabilityGuard);
         console2.log("Liquidity manager:", deployed.manager);
     }
 
     function _readConfig(string memory path) internal view returns (DeployConfig memory cfg) {
         string memory json = vm.readFile(path);
         cfg.chainId = json.readUint(".chainId");
+        cfg.organization = json.readAddress(".organization");
+        cfg.factory = json.readAddress(".factory");
         cfg.owner = json.readAddress(".owner");
         cfg.proposalManager = json.readAddress(".proposalManager");
         cfg.bootstrapRecipient = json.readAddress(".bootstrapRecipient");
@@ -142,6 +147,7 @@ contract DeployFutarchyLiquidityManager is Script {
         cfg.wrappedNative = json.readAddress(".wrappedNative");
         cfg.positionManager = json.readAddress(".positionManager");
         cfg.algebraFactory = json.readAddress(".algebraFactory");
+        cfg.poolStabilityGuard = json.readAddress(".poolStabilityGuard");
         cfg.futarchyRouter = json.readAddress(".futarchyRouter");
         cfg.tickLower = int24(json.readInt(".tickLower"));
         cfg.tickUpper = int24(json.readInt(".tickUpper"));
@@ -177,6 +183,7 @@ contract DeployFutarchyLiquidityManager is Script {
 
     function _assertDeployConfig(DeployConfig memory cfg) internal view {
         require(block.chainid == cfg.chainId, "wrong chain");
+        _requireNonzero(cfg.organization, "organization");
         _requireNonzero(cfg.owner, "owner");
         _requireNonzero(cfg.proposalManager, "proposalManager");
         _requireNonzero(cfg.bootstrapRecipient, "bootstrapRecipient");
@@ -185,6 +192,7 @@ contract DeployFutarchyLiquidityManager is Script {
         _requireNonzero(cfg.wrappedNative, "wrappedNative");
         _requireNonzero(cfg.positionManager, "positionManager");
         _requireNonzero(cfg.algebraFactory, "algebraFactory");
+        _requireNonzero(cfg.poolStabilityGuard, "poolStabilityGuard");
         _requireNonzero(cfg.futarchyRouter, "futarchyRouter");
         require(cfg.tickLower < cfg.tickUpper, "bad ticks");
 
@@ -199,6 +207,74 @@ contract DeployFutarchyLiquidityManager is Script {
         require(value != address(0), label);
     }
 
+    function _creationCodes()
+        internal
+        view
+        returns (FutarchyLiquidityManagerFactory.CreationCodes memory)
+    {
+        return FutarchyLiquidityManagerFactory.CreationCodes({
+            proposalSource: vm.getCode(PROPOSAL_SOURCE_ARTIFACT),
+            adapter: vm.getCode(ADAPTER_ARTIFACT),
+            manager: vm.getCode(MANAGER_ARTIFACT)
+        });
+    }
+
+    function _factory(
+        DeployConfig memory cfg,
+        FutarchyLiquidityManagerFactory.CreationCodes memory codes
+    ) internal returns (FutarchyLiquidityManagerFactory factory) {
+        if (cfg.factory != address(0)) {
+            factory = FutarchyLiquidityManagerFactory(cfg.factory);
+            _assertFactoryConfiguration(factory, cfg, codes);
+            return factory;
+        }
+
+        factory = new FutarchyLiquidityManagerFactory(
+            ISwaprAlgebraPositionManager(cfg.positionManager),
+            IAlgebraFactoryLike(cfg.algebraFactory),
+            IFutarchyConditionalRouter(cfg.futarchyRouter),
+            IPoolStabilityGuard(cfg.poolStabilityGuard),
+            IWrappedNative(cfg.wrappedNative),
+            cfg.tickLower,
+            cfg.tickUpper,
+            keccak256(codes.proposalSource),
+            keccak256(codes.adapter),
+            keccak256(codes.manager)
+        );
+    }
+
+    function _assertFactoryConfiguration(
+        FutarchyLiquidityManagerFactory factory,
+        DeployConfig memory cfg,
+        FutarchyLiquidityManagerFactory.CreationCodes memory codes
+    ) internal view {
+        require(address(factory).code.length != 0, "factory has no code");
+        require(
+            address(factory.POSITION_MANAGER()) == cfg.positionManager, "factory positionManager"
+        );
+        require(address(factory.ALGEBRA_FACTORY()) == cfg.algebraFactory, "factory algebraFactory");
+        require(
+            address(factory.CONDITIONAL_ROUTER()) == cfg.futarchyRouter, "factory conditionalRouter"
+        );
+        require(
+            address(factory.POOL_STABILITY_GUARD()) == cfg.poolStabilityGuard,
+            "factory poolStabilityGuard"
+        );
+        require(address(factory.WRAPPED_NATIVE()) == cfg.wrappedNative, "factory wrappedNative");
+        require(factory.DEFAULT_TICK_LOWER() == cfg.tickLower, "factory tickLower");
+        require(factory.DEFAULT_TICK_UPPER() == cfg.tickUpper, "factory tickUpper");
+        require(
+            factory.PROPOSAL_SOURCE_CREATION_CODE_HASH() == keccak256(codes.proposalSource),
+            "factory proposalSource code"
+        );
+        require(
+            factory.ADAPTER_CREATION_CODE_HASH() == keccak256(codes.adapter), "factory adapter code"
+        );
+        require(
+            factory.MANAGER_CREATION_CODE_HASH() == keccak256(codes.manager), "factory manager code"
+        );
+    }
+
     function _encodeInitialValidationConfig(
         FutarchyOfficialProposalSource.ProposalValidationConfig memory config
     ) internal pure returns (bytes memory) {
@@ -210,12 +286,13 @@ contract DeployFutarchyLiquidityManager is Script {
         string memory path,
         DeployConfig memory cfg,
         bytes32 configHash,
-        DeployedContracts memory deployed
+        DeployedContracts memory deployed,
+        FutarchyLiquidityManagerFactory.CreationCodes memory codes
     ) internal {
         string memory key = "deployment";
         _serializeDeploymentConfig(key, cfg, configHash);
         _serializeDeploymentAddresses(key, deployed);
-        string memory output = _serializeDeploymentCodeHashes(key, deployed);
+        string memory output = _serializeDeploymentCodeHashes(key, deployed, codes);
         vm.writeJson(output, path);
     }
 
@@ -226,12 +303,15 @@ contract DeployFutarchyLiquidityManager is Script {
     ) internal {
         vm.serializeUint(key, "chainId", cfg.chainId);
         vm.serializeBytes32(key, "configHash", configHash);
+        vm.serializeAddress(key, "organization", cfg.organization);
+        vm.serializeAddress(key, "factory", cfg.factory);
         vm.serializeAddress(key, "owner", cfg.owner);
         vm.serializeAddress(key, "proposalManager", cfg.proposalManager);
         vm.serializeAddress(key, "bootstrapRecipient", cfg.bootstrapRecipient);
         vm.serializeAddress(key, "companyToken", cfg.companyToken);
         vm.serializeAddress(key, "wrappedNative", cfg.wrappedNative);
         vm.serializeAddress(key, "officialProposer", cfg.officialProposer);
+        vm.serializeAddress(key, "poolStabilityGuard", cfg.poolStabilityGuard);
     }
 
     function _serializeDeploymentAddresses(string memory key, DeployedContracts memory deployed)
@@ -244,10 +324,15 @@ contract DeployFutarchyLiquidityManager is Script {
         vm.serializeAddress(key, "manager", deployed.manager);
     }
 
-    function _serializeDeploymentCodeHashes(string memory key, DeployedContracts memory deployed)
-        internal
-        returns (string memory)
-    {
+    function _serializeDeploymentCodeHashes(
+        string memory key,
+        DeployedContracts memory deployed,
+        FutarchyLiquidityManagerFactory.CreationCodes memory codes
+    ) internal returns (string memory) {
+        vm.serializeBytes32(key, "factoryCodeHash", deployed.factory.codehash);
+        vm.serializeBytes32(key, "proposalSourceCreationCodeHash", keccak256(codes.proposalSource));
+        vm.serializeBytes32(key, "adapterCreationCodeHash", keccak256(codes.adapter));
+        vm.serializeBytes32(key, "managerCreationCodeHash", keccak256(codes.manager));
         vm.serializeBytes32(key, "proposalSourceCodeHash", deployed.proposalSource.codehash);
         vm.serializeBytes32(key, "deadlineProxyCodeHash", deployed.deadlineProxy.codehash);
         vm.serializeBytes32(key, "spotAdapterCodeHash", deployed.spotAdapter.codehash);

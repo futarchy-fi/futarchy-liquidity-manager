@@ -151,17 +151,24 @@ deployment_output_filter='
   type == "object"
   and (.chainId | chain)
   and (.configHash | nzbytes32)
+  and (.organization | nzaddress)
+  and (.factory | nzaddress)
   and (.owner | nzaddress)
   and (.proposalManager | nzaddress)
   and (.bootstrapRecipient | nzaddress)
   and (.companyToken | nzaddress)
   and (.wrappedNative | nzaddress)
   and (.officialProposer | nzaddress)
+  and (.poolStabilityGuard | nzaddress)
   and (.proposalSource | nzaddress)
   and (.deadlineProxy | address)
   and (.spotAdapter | nzaddress)
   and (.conditionalAdapter | nzaddress)
   and (.manager | nzaddress)
+  and (.factoryCodeHash | nzbytes32)
+  and (.proposalSourceCreationCodeHash | nzbytes32)
+  and (.adapterCreationCodeHash | nzbytes32)
+  and (.managerCreationCodeHash | nzbytes32)
   and (.proposalSourceCodeHash | nzbytes32)
   and (.deadlineProxyCodeHash | bytes32)
   and (.spotAdapterCodeHash | nzbytes32)
@@ -173,12 +180,15 @@ deploy_config_filter='
   def address: type == "string" and test("^0x[0-9a-fA-F]{40}$");
   type == "object"
   and (.chainId | type == "number" and . > 0)
+  and (.organization | address)
+  and (.factory | address)
   and (.owner | address)
   and (.proposalManager | address)
   and (.bootstrapRecipient | address)
   and (.companyToken | address)
   and (.wrappedNative | address)
   and (.officialProposer | address)
+  and (.poolStabilityGuard | address)
 '
 
 batch_filter='
@@ -198,12 +208,15 @@ require_jq "$DEPLOYMENT_OUTPUT" "$deployment_output_filter" "deployment output s
 
 deployment_chain="$(json_string "$DEPLOYMENT_OUTPUT" '.chainId')"
 deployment_config_hash="$(json_address "$DEPLOYMENT_OUTPUT" '.configHash')"
+deployment_organization="$(json_address "$DEPLOYMENT_OUTPUT" '.organization')"
+deployment_factory="$(json_address "$DEPLOYMENT_OUTPUT" '.factory')"
 deployment_owner="$(json_address "$DEPLOYMENT_OUTPUT" '.owner')"
 deployment_proposal_manager="$(json_address "$DEPLOYMENT_OUTPUT" '.proposalManager')"
 deployment_bootstrap="$(json_address "$DEPLOYMENT_OUTPUT" '.bootstrapRecipient')"
 deployment_company="$(json_address "$DEPLOYMENT_OUTPUT" '.companyToken')"
 deployment_collateral="$(json_address "$DEPLOYMENT_OUTPUT" '.wrappedNative')"
 deployment_official_proposer="$(json_address "$DEPLOYMENT_OUTPUT" '.officialProposer')"
+deployment_pool_stability_guard="$(json_address "$DEPLOYMENT_OUTPUT" '.poolStabilityGuard')"
 deployment_proposal_source="$(json_address "$DEPLOYMENT_OUTPUT" '.proposalSource')"
 deployment_manager="$(json_address "$DEPLOYMENT_OUTPUT" '.manager')"
 
@@ -213,6 +226,13 @@ if [[ -n "$DEPLOY_CONFIG" ]]; then
   require_same_value "deploy chainId" \
     "$(json_string "$DEPLOYMENT_OUTPUT" '.chainId')" \
     "$(json_string "$DEPLOY_CONFIG" '.chainId')"
+  require_same_address "deploy organization" \
+    "$deployment_organization" \
+    "$(json_address "$DEPLOY_CONFIG" '.organization')"
+  config_factory="$(json_address "$DEPLOY_CONFIG" '.factory')"
+  if [[ "$(lower "$config_factory")" != "0x0000000000000000000000000000000000000000" ]]; then
+    require_same_address "deploy factory" "$deployment_factory" "$config_factory"
+  fi
   require_same_address "deploy owner" \
     "$deployment_owner" \
     "$(json_address "$DEPLOY_CONFIG" '.owner')"
@@ -231,6 +251,9 @@ if [[ -n "$DEPLOY_CONFIG" ]]; then
   require_same_address "deploy officialProposer" \
     "$deployment_official_proposer" \
     "$(json_address "$DEPLOY_CONFIG" '.officialProposer')"
+  require_same_address "deploy poolStabilityGuard" \
+    "$deployment_pool_stability_guard" \
+    "$(json_address "$DEPLOY_CONFIG" '.poolStabilityGuard')"
 fi
 
 if [[ ${#BATCH_FILES[@]} -gt 0 ]]; then
@@ -241,7 +264,7 @@ if [[ ${#BATCH_FILES[@]} -gt 0 ]]; then
     require_same_value "${batch} chainId" "$(json_string "$batch" '.chainId')" "$deployment_chain"
 
     case "$operation" in
-      initializeFromBootstrap|depositToSpot|sync|redeem|armEmergencyExit|disarmEmergencyExit|emergencyExitAllToBootstrapRecipient|sweepIdleToBootstrapRecipient)
+      initializeFromBootstrap|depositToSpot|sync|redeem|armEmergencyExit|disarmEmergencyExit|executeEmergencyExit|sweepIdleToBootstrapRecipient)
         require_same_address "${batch} manager" \
           "$(json_address "$batch" '.manager')" \
           "$deployment_manager"
@@ -281,7 +304,7 @@ if [[ ${#BATCH_FILES[@]} -gt 0 ]]; then
           "$deployment_owner" \
           "$deployment_proposal_manager"
         ;;
-      armEmergencyExit|disarmEmergencyExit|emergencyExitAllToBootstrapRecipient|sweepIdleToBootstrapRecipient)
+      armEmergencyExit|disarmEmergencyExit|executeEmergencyExit|sweepIdleToBootstrapRecipient)
         require_same_address "${batch} createdFromSafeAddress" \
           "$(json_address "$batch" '.createdFromSafeAddress')" \
           "$deployment_owner"

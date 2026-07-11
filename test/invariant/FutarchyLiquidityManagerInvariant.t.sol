@@ -13,6 +13,7 @@ import {MockFutarchyLiquidityAdapter} from "../mocks/MockFutarchyLiquidityAdapte
 import {MockFutarchyProposalLike} from "../mocks/MockFutarchyProposalLike.sol";
 import {MockMintableERC20} from "../mocks/MockMintableERC20.sol";
 import {MockOfficialProposalSource} from "../mocks/MockOfficialProposalSource.sol";
+import {MockPoolStabilityGuard} from "../mocks/MockPoolStabilityGuard.sol";
 import {MockWrappedNative} from "../mocks/MockWrappedNative.sol";
 
 contract FutarchyLiquidityManagerHandler is Test {
@@ -70,7 +71,7 @@ contract FutarchyLiquidityManagerHandler is Test {
         vm.deal(address(this), address(this).balance + nativeAmount);
         company.approve(address(manager), companyAmount);
 
-        try manager.depositToSpot{value: nativeAmount}(companyAmount, "") {} catch {}
+        try manager.depositToSpot{value: nativeAmount}(companyAmount) {} catch {}
     }
 
     function redeem(uint96 sharesSeed) external {
@@ -78,7 +79,7 @@ contract FutarchyLiquidityManagerHandler is Test {
         if (balance == 0) return;
 
         uint256 shares = bound(uint256(sharesSeed), 1, balance);
-        try manager.redeem(shares, address(this), false, "", "") {} catch {}
+        try manager.redeem(shares, address(this), false) {} catch {}
     }
 
     function migrateToConditional() external {
@@ -98,7 +99,7 @@ contract FutarchyLiquidityManagerHandler is Test {
             address(0xB0B)
         );
 
-        try manager.sync(_emptySyncParams()) {
+        try manager.sync() {
             migrations++;
         } catch {}
     }
@@ -124,16 +125,10 @@ contract FutarchyLiquidityManagerHandler is Test {
         );
         source.setSettled(true);
 
-        try manager.sync(_emptySyncParams()) {
+        try manager.sync() {
             settlements++;
         } catch {}
     }
-
-    function _emptySyncParams()
-        internal
-        pure
-        returns (FutarchyLiquidityManager.SyncParams memory params)
-    {}
 }
 
 contract FutarchyLiquidityManagerInvariantTest is StdInvariant, Test {
@@ -174,6 +169,7 @@ contract FutarchyLiquidityManagerInvariantTest is StdInvariant, Test {
         spotAdapter = new MockFutarchyLiquidityAdapter();
         conditionalAdapter = new MockFutarchyLiquidityAdapter();
         router = new MockConditionalRouter();
+        MockPoolStabilityGuard stabilityGuard = new MockPoolStabilityGuard();
 
         router.setOutcomeConfig(
             address(proposal), address(company), address(yesCompany), address(noCompany), true
@@ -195,9 +191,9 @@ contract FutarchyLiquidityManagerInvariantTest is StdInvariant, Test {
             spotAdapter,
             conditionalAdapter,
             router,
+            stabilityGuard,
             owner,
-            "Futarchy LP",
-            "fLP"
+            FutarchyLiquidityManager.LpTokenMetadata({name: "Futarchy LP", symbol: "fLP"})
         );
 
         handler = new FutarchyLiquidityManagerHandler(

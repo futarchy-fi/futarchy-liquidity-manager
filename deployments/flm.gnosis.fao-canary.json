@@ -1,0 +1,50 @@
+{
+  "chainId": 100,
+  "configHash": "0x9cef8dbe15a706f237a8bb2cc34c6bf8c9eff166a7c8f0a43551c2a26a4fe77f",
+  "organization": "0x693E3FB46Bb36eE43C702FE94f9463df0691b43d",
+  "factory": "0x1814aDfEBEBC0C345dBed93DFc54c69738bF7f54",
+  "owner": "0x693E3FB46Bb36eE43C702FE94f9463df0691b43d",
+  "proposalManager": "0x693E3FB46Bb36eE43C702FE94f9463df0691b43d",
+  "bootstrapRecipient": "0x693E3FB46Bb36eE43C702FE94f9463df0691b43d",
+  "companyToken": "0x9C58BAcC331c9aa871AFD802DB6379a98e80CEdb",
+  "wrappedNative": "0xaf204776c7245bF4147c2612BF6e5972Ee483701",
+  "officialProposer": "0x693E3FB46Bb36eE43C702FE94f9463df0691b43d",
+  "poolStabilityGuard": "0xCf2B0311c926fdfB83e5232E85E72c7236dedEC9",
+  "proposalSource": "0xEae82707D329e5b7a086F09e914bD5dC4CAd3086",
+  "deadlineProxy": "0x0000000000000000000000000000000000000000",
+  "spotAdapter": "0xc47Fd01C6Aa0A1e8481bF1B459797E4A85e8Fc79",
+  "conditionalAdapter": "0x968f23FEc037818215Bc0424BD818B71dC7CDd0E",
+  "manager": "0xaECcbAc5D30604D78bb25d5e35ACB07Bbbb1C666",
+  "factoryCodeHash": "0x58ddbe9b6a529e144fe142b8e6f027afd87f24927ba1410a6691a1d3b5317370",
+  "proposalSourceCreationCodeHash": "0xe541187065605577bac74fe69f1c3449e6371028c93127d3aab622529170cf88",
+  "adapterCreationCodeHash": "0x386c287790289b5055110b855c3a520b49c9b330cd9b8c47e734aa9d6c459f48",
+  "managerCreationCodeHash": "0x97bf8517669822d2c9b1d2cdfa844ed9cfe09950a8e57fb834ba5665c4fcc1f4",
+  "proposalSourceCodeHash": "0xc7d336cf2aa60d87e3d1271f707c7540db6cd229115e686e1c3cfd2a8b60b58c",
+  "deadlineProxyCodeHash": "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
+  "spotAdapterCodeHash": "0xe785feef7e01e33a49ab86bda623417aaaaa6f61db9f53eab79ad13243678a25",
+  "conditionalAdapterCodeHash": "0xe785feef7e01e33a49ab86bda623417aaaaa6f61db9f53eab79ad13243678a25",
+  "managerCodeHash": "0xebdb73074b09c3e9b62b310e76cd0ca454b7ae08bbea00124e611ddb2b1dfbca",
+  "transactions": {
+    "guardDeployment": "0x94073b1c30e600b7750f0d9ad91fbae319af335ea9ba8b34efa732e37b4a0921",
+    "factoryDeployment": "0xb6ffebab8be4dee6b5ea7231375618de3d616b137d32188e44f24548c38de8ba",
+    "bundleDeployment": "0x8069a454c4dab6b9e256ea9b0f107b49cf38a0f37330e855e6ddc03b18feb000",
+    "bootstrap": "0x9e52f4c7f485fc731754d8a5a83d6ba9efd58f6645375c2f655f4ce8b3392d52",
+    "partialRedemption": "0xd1fff1453963a821132130bd8b15638a652821821c01080e476bd37032f97ee3"
+  },
+  "canary": {
+    "companyInput": "1000000000000000",
+    "collateralInput": "200000000000000000",
+    "sharesInitiallyMinted": "9863938762183627",
+    "sharesRedeemed": "986393876218362",
+    "status": "restoration-deferred-assets-idle-and-redeemable"
+  },
+  "verification": {
+    "provider": "Gnosis Blockscout",
+    "guard": true,
+    "factory": true,
+    "proposalSource": true,
+    "spotAdapter": true,
+    "conditionalAdapter": true,
+    "manager": true
+  }
+}

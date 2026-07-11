@@ -26,8 +26,8 @@ tools/preflight-limited-deploy.sh \
 ```
 
 Strict mode rejects placeholder Safe/owner/target addresses, zero liquidity amounts for bootstrap
-and deposit batches, mixed native/ERC20 collateral funding, missing deadlines, and zero slippage
-minimums on liquidity add/remove paths. When `--deployment-output` is supplied, preflight also
+and deposit batches, and mixed native/ERC20 collateral funding. When `--deployment-output` is
+supplied, preflight also
 verifies the deployment output hash schema, recomputes the reviewed deploy config hash when
 `--deploy` is supplied, and checks that the batch references the deployed manager, proposal source,
 tokens, owner Safe or proposal-manager Safe, bootstrap recipient, and official proposer expected
@@ -57,29 +57,36 @@ Start from the closest operation-specific template instead of editing the generi
 - `config/batches/set-official-proposal.example.json` after proposal validation is configured.
 - `config/batches/arm-emergency-exit.example.json` to start the emergency delay.
 - `config/batches/disarm-emergency-exit.example.json` to cancel an armed emergency exit.
-- `config/batches/emergency-exit.example.json` for the delayed full emergency exit.
-- `config/batches/sweep-idle.example.json` for idle asset recovery to the bootstrap recipient.
+- `config/batches/emergency-exit.example.json` for the delayed non-custodial emergency unwind.
+- `config/batches/sweep-idle.example.json` for residual recovery after share supply reaches zero.
 
-All templates keep every slippage/deadline field visible even when the selected operation does not
-use that leg. This makes reviews mechanical: fill the operation fields, run strict validation,
-generate the batch, then audit the summary and calldata.
+Share-changing calls accept no adapter calldata. Ticks, pool initialization, deadlines, and
+slippage parameters therefore cannot be selected by a depositor, redeemer, or emergency operator.
 
 ## Supported Operations
 
 - `initializeFromBootstrap`
   - Transactions: company-token approval, optional collateral-token approval, then
     `manager.initializeFromBootstrap`.
-  - Uses `companyAmount`, either `nativeValue` or `collateralAmount`, and `spotAdd`.
+  - Uses `companyAmount` and either `nativeValue` or `collateralAmount`.
 - `depositToSpot`
   - Transactions: company-token approval, optional collateral-token approval, then
     `manager.depositToSpot`.
-  - Uses `companyAmount`, either `nativeValue` or `collateralAmount`, and `spotAdd`.
+  - The amounts are maxima. The manager accepts the existing vault proportion and refunds or does
+    not pull the excess.
 - `sync`
   - Transaction: `manager.sync`.
-  - Uses `spotExit`, `spotAdd`, `yesAdd`, `noAdd`, `yesExit`, and `noExit`.
+  - Takes no execution parameters. Slippage bounds, deadlines, and full-range ticks are enforced by
+    the manager and its bound adapters. Before either migration direction removes liquidity, the
+    immutable shared guard requires the established spot pool's current tick to be within 50 ticks
+    of its 30-minute TWAP; missing history fails closed.
 - `redeem`
   - Transaction: `manager.redeem`.
-  - Uses `shares`, `recipient`, `unwrapNative`, `spotExit`, `yesExit`, and `noExit`.
+  - Uses `shares`, `recipient`, and `unwrapNative`.
+  - Removes all active positions to account for principal, fees, and idle balances, pays the
+    withdrawing fraction, then tries to restore the remaining positions. In conditional mode it
+    merges only the withdrawing slice's matched complete sets; if the router rejects a merge, that
+    slice is transferred in kind. Unmatched outcome tokens are always transferred in kind.
 - `setOfficialProposal`
   - Transaction: `proposalSource.setOfficialProposal`.
   - Must be submitted by the owner or proposal manager.
@@ -90,24 +97,22 @@ generate the batch, then audit the summary and calldata.
   - Uses `validation`.
 - `armEmergencyExit`
 - `disarmEmergencyExit`
-- `emergencyExitAllToBootstrapRecipient`
-  - Uses `unwrapNative`, `spotExit`, `yesExit`, and `noExit`.
+- `executeEmergencyExit`
+  - After the delay, removes active positions into the manager without transferring shareholder
+    assets. Redemption remains open.
 - `sweepIdleToBootstrapRecipient`
-  - Uses `unwrapNative`.
+  - Uses `unwrapNative` and reverts while any FLM share exists.
 
-## Slippage And Deadlines
+## Fixed Execution Policy
 
-All adapter calldata is generated from explicit JSON fields:
-
-- `amount0Min`
-- `amount1Min`
-- `deadline`
-- `sqrtPriceX96` for add/mint paths
-- `tickLower`
-- `tickUpper`
-
-For real execution, set nonzero `amount0Min`, `amount1Min`, and `deadline` values based on a fresh
-quote. The examples use zeros only as placeholders.
+The manager passes empty adapter calldata for bootstrap, deposits, redemptions, restoration,
+emergency unwind, and `sync`. The bound adapter therefore uses immutable ticks, the current block as
+deadline, existing pools, and no caller-selected initialization price. Lifecycle `sync` additionally
+enforces the manager's TWAP guard and symmetric 50-bps inventory-use bound. Restoration requires
+each exact spot/YES/NO pair to pass the shared stability guard, then permits asymmetric fee inventory
+to remain idle and share-owned. A failed best-effort post-redemption restore leaves all remaining
+assets idle and emits `LiquidityRestoreDeferred`; anyone may retry `restoreLiquidity()` after the
+pool has sufficient stable history.
 
 For ERC20 collateral such as sDAI, set `collateralToken` to the deployed collateral token,
 `collateralAmount` to the amount being supplied, `nativeValue` to zero, and `unwrapNative` to false.
@@ -118,5 +123,5 @@ For ERC20 collateral such as sDAI, set `collateralToken` to the deployed collate
 2. Run `tools/preflight-limited-deploy.sh --deployment-output <deploy-output> --batch <final-config>`.
 3. Review the generated Markdown summary and Safe transaction-builder JSON.
 4. Decode each `data` field with `cast calldata-decode` or a Safe UI preview.
-5. Confirm `to`, `value`, deadlines, slippage, and token approvals.
+5. Confirm `to`, `value`, share amount, recipient, and token approvals.
 6. Sign only after calldata matches the reviewed config.
