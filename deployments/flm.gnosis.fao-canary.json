@@ -37,5 +37,14 @@
     "sharesInitiallyMinted": "9863938762183627",
     "sharesRedeemed": "986393876218362",
     "status": "restoration-deferred-assets-idle-and-redeemable"
+  },
+  "verification": {
+    "provider": "Gnosis Blockscout",
+    "guard": true,
+    "factory": true,
+    "proposalSource": true,
+    "spotAdapter": true,
+    "conditionalAdapter": true,
+    "manager": true
   }
 }
