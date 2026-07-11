@@ -29,14 +29,20 @@
     "factoryDeployment": "0xb6ffebab8be4dee6b5ea7231375618de3d616b137d32188e44f24548c38de8ba",
     "bundleDeployment": "0x8069a454c4dab6b9e256ea9b0f107b49cf38a0f37330e855e6ddc03b18feb000",
     "bootstrap": "0x9e52f4c7f485fc731754d8a5a83d6ba9efd58f6645375c2f655f4ce8b3392d52",
-    "partialRedemption": "0xd1fff1453963a821132130bd8b15638a652821821c01080e476bd37032f97ee3"
+    "partialRedemption": "0xd1fff1453963a821132130bd8b15638a652821821c01080e476bd37032f97ee3",
+    "permissionlessRestore": "0x097aa46f80960c6c20719be77baf53116fca6e0005134bdc1eb1e6342046cd72"
   },
   "canary": {
     "companyInput": "1000000000000000",
     "collateralInput": "200000000000000000",
     "sharesInitiallyMinted": "9863938762183627",
     "sharesRedeemed": "986393876218362",
-    "status": "restoration-deferred-assets-idle-and-redeemable"
+    "sharesRemaining": "8877544885965265",
+    "spotLiquidityAfterRestore": "8877544885965265",
+    "spotPositionTokenIdAfterRestore": "4901",
+    "managerCompanyDustAfterRestore": "4894706405",
+    "managerCollateralDustAfterRestore": "0",
+    "status": "canary-live"
   },
   "verification": {
     "provider": "Gnosis Blockscout",

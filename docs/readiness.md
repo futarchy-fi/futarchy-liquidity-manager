@@ -11,8 +11,13 @@ Gnosis. `config/gnosis.fao-canary.json` and `deployments/flm.gnosis.fao-canary.j
 exact configuration, runtime hashes, addresses, and transactions. A disposable GNO/sDAI bundle
 was bootstrapped and partially redeemed successfully. When the live spot pool moved outside the
 50-tick/30-minute guard, redemption still completed and restoration was safely deferred with all
-remaining assets idle, share-owned, and redeemable. This proves the withdrawal failure boundary;
-it is not approval to scale value before external review and a conditional lifecycle canary.
+remaining assets idle, share-owned, and redeemable. After the TWAP converged, the permissionless
+`restoreLiquidity()` entry point succeeded in transaction
+`0x097aa46f80960c6c20719be77baf53116fca6e0005134bdc1eb1e6342046cd72` and minted adapter-owned
+position NFT 4901. The restored spot liquidity equals the remaining share supply; all sDAI is
+managed and only 4,894,706,405 wei of GNO rounding dust remains idle. This proves both the
+withdrawal failure boundary and permissionless recovery liveness; it is not approval to scale
+value before external review and a conditional lifecycle canary.
 
 ## Ready To Audit
 
