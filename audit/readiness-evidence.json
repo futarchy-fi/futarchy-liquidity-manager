@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "status": "ready-to-audit; limited-funds-deploy-awaits-final-inputs",
+  "status": "ready-to-audit; limited-funds-gnosis-canary-live",
   "requirements": [
     {
       "id": "api-and-scope-freeze",
@@ -230,7 +230,7 @@
     {
       "id": "limited-funds-deploy",
       "title": "Limited-funds deployment readiness",
-      "status": "awaits-final-inputs",
+      "status": "canary-live",
       "evidence": [
         {
           "description": "Limited deploy preflight runs strict config validation, renders Safe JSON plus Markdown summaries, and binds fork tests to final proposal/company/collateral addresses.",
@@ -252,12 +252,19 @@
         {
           "description": "Deployment runbook documents limited-funds deployment order.",
           "path": "docs/deployment.md"
+        },
+        {
+          "description": "Committed Gnosis FAO canary config binds the reviewed ownerless guard and hash-pinned permissionless factory.",
+          "path": "config/gnosis.fao-canary.json"
+        },
+        {
+          "description": "On-chain canary receipt records transaction hashes, runtime hashes, bundle addresses, and bounded bootstrap exposure.",
+          "path": "deployments/flm.gnosis.fao-canary.json"
         }
       ],
       "remaining": [
-        "Provide final deployment config, final batch configs, selected proposal/token addresses, Safe owner, proposal manager, bootstrap recipient, signers, and monitoring process.",
-        "Run the limited deploy preflight on those final inputs with --deployment-output, --proposal, and --run-fork-tests, then retain generated artifacts.",
-        "Execute the first transaction set with limited funds and verify positions and balances before scaling."
+        "Run a bounded spot-to-conditional-to-settlement canary against a selected validated proposal and retain its operation artifacts.",
+        "Complete external review and independently select production owner/proposal-manager/bootstrap roles before scaling beyond disposable canary value."
       ]
     }
   ]

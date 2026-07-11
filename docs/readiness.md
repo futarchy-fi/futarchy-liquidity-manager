@@ -4,6 +4,16 @@ This file tracks the remaining gap between this repository and a limited-funds r
 The machine-checkable evidence index is `audit/readiness-evidence.json`; CI validates it with
 `tools/check-readiness-evidence.sh`.
 
+## Limited Gnosis Canary
+
+The reviewed ownerless stability guard and hash-pinned permissionless factory are deployed on
+Gnosis. `config/gnosis.fao-canary.json` and `deployments/flm.gnosis.fao-canary.json` record the
+exact configuration, runtime hashes, addresses, and transactions. A disposable GNO/sDAI bundle
+was bootstrapped and partially redeemed successfully. When the live spot pool moved outside the
+50-tick/30-minute guard, redemption still completed and restoration was safely deferred with all
+remaining assets idle, share-owned, and redeemable. This proves the withdrawal failure boundary;
+it is not approval to scale value before external review and a conditional lifecycle canary.
+
 ## Ready To Audit
 
 - API and scope freeze: no FAO-specific imports, sale contracts, SnapshotX contracts, or
