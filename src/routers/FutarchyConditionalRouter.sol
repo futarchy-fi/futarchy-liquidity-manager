@@ -30,11 +30,13 @@ interface IFutarchyRootProposal {
 /// @title FutarchyConditionalRouter
 /// @notice Converts root binary futarchy collateral to and from Wrapped1155 outcome ERC20s.
 /// @dev Deliberately excludes nested conditions. Every asset-changing path preserves pre-existing
-/// router balances and verifies exact 1:1 deltas before returning assets to the caller.
+/// ERC20 balances and verifies exact 1:1 deltas before returning assets to the caller. Winning
+/// ERC1155 balances sent to the predictable address before deployment are discarded on redemption.
 contract FutarchyConditionalRouter is IFutarchyConditionalRouter, ERC1155Holder, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     bytes32 private constant ROOT_COLLECTION = bytes32(0);
+    address private constant DEAD = 0x000000000000000000000000000000000000dEaD;
 
     IFutarchyConditionalTokens public immutable CONDITIONAL_TOKENS;
     IFutarchyWrapped1155Factory public immutable WRAPPED_1155_FACTORY;
@@ -162,8 +164,14 @@ contract FutarchyConditionalRouter is IFutarchyConditionalRouter, ERC1155Holder,
         uint256 outcomeIndex = winningIndexSet == 1 ? 0 : 1;
         Position memory winningPosition =
             _position(proposalLike, collateralToken, conditionId, firstCollateral, outcomeIndex);
-        if (CONDITIONAL_TOKENS.balanceOf(address(this), winningPosition.tokenId) != 0) {
-            revert UnexpectedConditionalTokenBalance(winningPosition.tokenId);
+        uint256 preexisting = CONDITIONAL_TOKENS.balanceOf(address(this), winningPosition.tokenId);
+        if (preexisting != 0) {
+            CONDITIONAL_TOKENS.safeTransferFrom(
+                address(this), DEAD, winningPosition.tokenId, preexisting, ""
+            );
+            if (CONDITIONAL_TOKENS.balanceOf(address(this), winningPosition.tokenId) != 0) {
+                revert UnexpectedConditionalTokenBalance(winningPosition.tokenId);
+            }
         }
 
         IERC20 collateral = IERC20(collateralToken);
