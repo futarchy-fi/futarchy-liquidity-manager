@@ -13,9 +13,19 @@ import {
     MockWrappedOutcome
 } from "./mocks/MockRouterWrapped1155Factory.sol";
 
+contract FutarchyConditionalRouterDeployer {
+    function deploy(
+        MockRouterConditionalTokens conditionalTokens,
+        MockRouterWrapped1155Factory wrapped1155Factory
+    ) external returns (FutarchyConditionalRouter) {
+        return new FutarchyConditionalRouter(conditionalTokens, wrapped1155Factory);
+    }
+}
+
 contract FutarchyConditionalRouterTest is Test {
     uint256 private constant AMOUNT = 10 ether;
     bytes32 private constant CONDITION_ID = keccak256("condition");
+    address private constant DEAD = 0x000000000000000000000000000000000000dEaD;
 
     MockMintableERC20 private company;
     MockMintableERC20 private collateral;
@@ -95,6 +105,38 @@ contract FutarchyConditionalRouterTest is Test {
         assertEq(IERC20(wrappers[2]).balanceOf(user), AMOUNT);
         assertEq(IERC20(wrappers[3]).balanceOf(user), AMOUNT - 4 ether);
         _assertNoRouterDust();
+    }
+
+    function test_redeem_discards_underlying_prefunded_before_router_deployment() public {
+        _split(address(company));
+        conditionalTokens.setPayout(CONDITION_ID, 1, 1, 0);
+
+        FutarchyConditionalRouterDeployer deployer = new FutarchyConditionalRouterDeployer();
+        address predicted = vm.computeCreateAddress(address(deployer), 1);
+        uint256 winningTokenId = _tokenId(address(company), 1);
+        uint256 donation = 1;
+        conditionalTokens.mintPosition(user, winningTokenId, donation);
+        vm.prank(user);
+        conditionalTokens.safeTransferFrom(user, predicted, winningTokenId, donation, "");
+        assertEq(predicted.code.length, 0);
+        assertEq(conditionalTokens.balanceOf(predicted, winningTokenId), donation);
+
+        FutarchyConditionalRouter prefundedRouter =
+            deployer.deploy(conditionalTokens, wrapped1155Factory);
+        assertEq(address(prefundedRouter), predicted);
+        vm.prank(user);
+        IERC20(wrappers[0]).approve(address(prefundedRouter), type(uint256).max);
+
+        uint256 companyBefore = company.balanceOf(user);
+        vm.prank(user);
+        prefundedRouter.redeemPositions(address(proposal), address(company), 4 ether);
+
+        assertEq(company.balanceOf(user), companyBefore + 4 ether);
+        assertEq(IERC20(wrappers[0]).balanceOf(user), AMOUNT - 4 ether);
+        assertEq(conditionalTokens.balanceOf(address(prefundedRouter), winningTokenId), 0);
+        assertEq(conditionalTokens.balanceOf(DEAD, winningTokenId), donation);
+        assertEq(company.balanceOf(address(prefundedRouter)), 0);
+        assertEq(IERC20(wrappers[0]).balanceOf(address(prefundedRouter)), 0);
     }
 
     function test_getWinningOutcomes_reports_unresolved_and_resolved_state() public {
