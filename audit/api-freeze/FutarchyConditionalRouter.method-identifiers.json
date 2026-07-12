@@ -1,0 +1,11 @@
+{
+  "CONDITIONAL_TOKENS()": "165d1f36",
+  "WRAPPED_1155_FACTORY()": "4b81f3ab",
+  "getWinningOutcomes(bytes32)": "02bd74c3",
+  "mergePositions(address,address,uint256)": "7abef8d1",
+  "onERC1155BatchReceived(address,address,uint256[],uint256[],bytes)": "bc197c81",
+  "onERC1155Received(address,address,uint256,uint256,bytes)": "f23a6e61",
+  "redeemPositions(address,address,uint256)": "721ae889",
+  "splitPosition(address,address,uint256)": "d5f82280",
+  "supportsInterface(bytes4)": "01ffc9a7"
+}

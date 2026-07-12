@@ -39,5 +39,14 @@ check_contract \
 check_contract \
   "FutarchyLiquidityManagerFactory" \
   "src/factories/FutarchyLiquidityManagerFactory.sol:FutarchyLiquidityManagerFactory"
+check_contract \
+  "UniswapV3LiquidityAdapter" \
+  "src/adapters/UniswapV3LiquidityAdapter.sol:UniswapV3LiquidityAdapter"
+check_contract \
+  "UniV3PoolStabilityGuard" \
+  "src/oracles/UniV3PoolStabilityGuard.sol:UniV3PoolStabilityGuard"
+check_contract \
+  "FutarchyConditionalRouter" \
+  "src/routers/FutarchyConditionalRouter.sol:FutarchyConditionalRouter"
 
 echo "API freeze guard passed"
