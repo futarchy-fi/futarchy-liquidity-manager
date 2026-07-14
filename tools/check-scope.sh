@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 
-PATTERN='FAOSale|FAOToken|FutarchyArbitration|SXArbitration|SnapshotX|sx-evm|/Users/kas/FAO|\.\./FAO'
+PATTERN='FAOSale|FAOToken|FutarchyArbitration|SXArbitration|SnapshotX|sx-evm|(/Users|/home)/[^/]+/FAO|\.\./FAO'
 PATHS=(src script test config tools foundry.toml .github)
 
 if git grep -n -E "$PATTERN" -- "${PATHS[@]}" ':(exclude)tools/check-scope.sh'; then
