@@ -508,6 +508,23 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(noCurrency.balanceOf(bootstrapRecipient), 8 ether);
     }
 
+    function test_conditional_redeem_falls_back_when_merge_partially_consumes() public {
+        _bootstrap();
+        _activateProposal(true);
+        router.setMergeUnderconsumes(true);
+
+        vm.prank(bootstrapRecipient);
+        (uint256 companyOut, uint256 collateralOut) =
+            manager.redeem(10 ether, bootstrapRecipient, false);
+
+        assertEq(companyOut, 2 ether);
+        assertEq(collateralOut, 2 ether);
+        assertEq(yesCompany.balanceOf(bootstrapRecipient), 8 ether);
+        assertEq(noCompany.balanceOf(bootstrapRecipient), 8 ether);
+        assertEq(yesCurrency.balanceOf(bootstrapRecipient), 8 ether);
+        assertEq(noCurrency.balanceOf(bootstrapRecipient), 8 ether);
+    }
+
     function test_final_unresolved_redeem_does_not_block_later_settlement() public {
         _bootstrap();
         _activateProposal(true);

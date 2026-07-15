@@ -33,12 +33,13 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 - Partial redemption removes proportional spot, YES, and NO liquidity; accounts for principal,
   fees, and six idle token balances; never restores liquidity; cannot reduce any survivor's
   per-share claim on those balances; handles divergent YES/NO liquidity and post-swap principal
-  composition; assigns fees and six-token donations arriving after a conditional exit only to the
-  remaining shares; settles after randomized one-to-four partial exits; and gives final rounding
-  residue to the last holder. The stateful manager invariant campaign also interleaves deposits,
-  activation, fees, donations, redemptions, and settlement; every successful deposit and redemption
-  checks survivor-favoring liquidity and six-token balance ratios, all six tokens remain in known
-  custody, and zero share supply leaves no managed asset balance.
+  composition; falls back to exact in-kind outcomes when a merge reverts, partially consumes
+  wrappers, or underpays; assigns fees and six-token donations arriving after a conditional exit
+  only to the remaining shares; settles after randomized one-to-four partial exits; and gives final
+  rounding residue to the last holder. The stateful manager invariant campaign also interleaves
+  deposits, activation, fees, donations, redemptions, and settlement; every successful deposit and
+  redemption checks survivor-favoring liquidity and six-token balance ratios, all six tokens remain
+  in known custody, and zero share supply leaves no managed asset balance.
 - Unit, fuzz, invariant, API-freeze, scope, configuration, batch-template, and fork fixtures are
   machine checked in CI. The real Algebra fork suite also captures the cooldown liveness failure
   and bounds a live-fee partial removal at 150,000 gas (116,245 measured). Both the public-vault and
