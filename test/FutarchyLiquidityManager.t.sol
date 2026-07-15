@@ -585,6 +585,46 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(manager.totalSupply(), 0);
     }
 
+    function test_conditional_fees_and_six_token_donations_after_exit_belong_to_survivor() public {
+        _bootstrap();
+        _activateProposal(true);
+        vm.prank(bootstrapRecipient);
+        assertTrue(manager.transfer(depositor, 50 ether));
+
+        vm.prank(bootstrapRecipient);
+        (uint256 firstCompany, uint256 firstCollateral) =
+            manager.redeem(50 ether, bootstrapRecipient, false);
+        assertEq(firstCompany, 50 ether);
+        assertEq(firstCollateral, 50 ether);
+
+        _accruePairFees(spotAdapter, company, wrappedNative, 1 ether, 2 ether);
+        _accruePairFees(conditionalAdapter, yesCompany, yesCurrency, 3 ether, 4 ether);
+        _accruePairFees(conditionalAdapter, noCompany, noCurrency, 5 ether, 6 ether);
+        company.mint(address(manager), 7 ether);
+        wrappedNative.mint(address(manager), 8 ether);
+        yesCompany.mint(address(manager), 9 ether);
+        noCompany.mint(address(manager), 10 ether);
+        yesCurrency.mint(address(manager), 11 ether);
+        noCurrency.mint(address(manager), 12 ether);
+        company.mint(address(router), 12 ether);
+        wrappedNative.mint(address(router), 15 ether);
+
+        vm.prank(depositor);
+        (uint256 survivorCompany, uint256 survivorCollateral) =
+            manager.redeem(50 ether, depositor, false);
+
+        assertEq(survivorCompany, 70 ether);
+        assertEq(survivorCollateral, 75 ether);
+        assertEq(yesCompany.balanceOf(depositor), 0);
+        assertEq(noCompany.balanceOf(depositor), 3 ether);
+        assertEq(yesCurrency.balanceOf(depositor), 0);
+        assertEq(noCurrency.balanceOf(depositor), 3 ether);
+        assertEq(manager.totalSupply(), 0);
+        assertEq(manager.spotLiquidity(), 0);
+        assertEq(manager.conditionalYesLiquidity(), 0);
+        assertEq(manager.conditionalNoLiquidity(), 0);
+    }
+
     function test_bootstrap_deposit_and_redeem_with_erc20_collateral() public {
         MockMintableERC20 collateral = new MockMintableERC20("Savings DAI", "sDAI");
         MockFutarchyLiquidityAdapter localSpotAdapter = new MockFutarchyLiquidityAdapter();

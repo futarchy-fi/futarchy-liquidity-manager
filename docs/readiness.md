@@ -20,8 +20,9 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 - Partial redemption removes proportional spot, YES, and NO liquidity; accounts for principal,
   fees, and six idle token balances; never restores liquidity; cannot reduce any survivor's
   per-share claim on those balances; handles divergent YES/NO liquidity and post-swap principal
-  composition; settles after randomized one-to-four partial exits; and gives final rounding residue
-  to the last holder.
+  composition; assigns fees and six-token donations arriving after a conditional exit only to the
+  remaining shares; settles after randomized one-to-four partial exits; and gives final rounding
+  residue to the last holder.
 - Unit, fuzz, invariant, API-freeze, scope, configuration, batch-template, and fork fixtures are
   machine checked in CI. The real Algebra fork suite also captures the cooldown liveness failure
   and bounds a live-fee partial removal at 150,000 gas (116,245 measured). The real Uniswap V3
