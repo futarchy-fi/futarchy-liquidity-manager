@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "status": "ready-to-audit; limited-funds-gnosis-canary-live",
+  "status": "ready-to-audit; no-funds-prototype",
   "requirements": [
     {
       "id": "api-and-scope-freeze",
@@ -64,7 +64,7 @@
       "status": "ready-to-audit",
       "evidence": [
         {
-          "description": "Core manager tests cover proportional principal/fee/idle accounting, deposit dilution, conditional in-kind fallback, non-custodial emergency exit, and fuzz cases.",
+          "description": "Core manager tests cover proportional principal/fee/idle accounting, sequential six-token conservation and survivor-favoring rounding, deposit dilution, conditional in-kind fallback, and non-custodial emergency exit.",
           "path": "test/FutarchyLiquidityManager.t.sol"
         },
         {
@@ -76,7 +76,7 @@
           "path": "test/AlgebraPoolStabilityGuard.t.sol"
         },
         {
-          "description": "Invariant suite covers LP backing, conditional accounting, and adapter liquidity consistency.",
+          "description": "The initialized invariant harness exercises atomic activation and CTF settlement while checking conditional binding and adapter-liquidity consistency across deposit, redeem, activation, and settlement calls.",
           "path": "test/invariant/FutarchyLiquidityManagerInvariant.t.sol"
         },
         {
@@ -230,7 +230,7 @@
     {
       "id": "limited-funds-deploy",
       "title": "Limited-funds deployment readiness",
-      "status": "canary-live",
+      "status": "awaits-final-inputs",
       "evidence": [
         {
           "description": "Limited deploy preflight runs strict config validation, renders Safe JSON plus Markdown summaries, and binds fork tests to final proposal/company/collateral addresses.",
@@ -250,6 +250,10 @@
           "path": "docs/readiness.md"
         },
         {
+          "description": "The production-successor specification records the immutable burn-liveness, atomicity, redemption, gas, and fork-proof gates that must replace the Algebra prototype.",
+          "path": "docs/production-amm-successor.md"
+        },
+        {
           "description": "Deployment runbook documents limited-funds deployment order.",
           "path": "docs/deployment.md"
         },
@@ -263,6 +267,7 @@
         }
       ],
       "remaining": [
+        "Replace the Swapr Algebra conditional adapter with an integration that cannot be denied burn access by mutable cooldowns or third-party position activity.",
         "Run a bounded spot-to-conditional-to-settlement canary against a selected validated proposal and retain its operation artifacts.",
         "Complete external review and independently select production owner/proposal-manager/bootstrap roles before scaling beyond disposable canary value."
       ]
