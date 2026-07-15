@@ -210,6 +210,7 @@ contract SwaprAlgebraLiquidityAdapterForkTest is Test {
         vm.deal(address(this), 10 ether);
         IERC20(GNOSIS_GNO).approve(address(manager), type(uint256).max);
         manager.initializeFromBootstrap{value: 2 ether}(0.02 ether);
+        uint256 bootstrapShares = manager.balanceOf(address(this));
 
         address depositor = address(0xBEEF);
         deal(GNOSIS_GNO, depositor, 1 ether);
@@ -219,10 +220,26 @@ contract SwaprAlgebraLiquidityAdapterForkTest is Test {
         uint256 gasBefore = gasleft();
         uint256 shares = manager.depositToSpot{value: 2 ether}(0.02 ether);
         uint256 depositGas = gasBefore - gasleft();
+        uint256 spotTokenId = spotAdapter.getPositionTokenId(GNOSIS_GNO, GNOSIS_WXDAI);
+        assertGt(spotTokenId, 0, "deposited spot NFT missing");
         gasBefore = gasleft();
         manager.redeem(shares, depositor, false);
         uint256 redeemGas = gasBefore - gasleft();
         vm.stopPrank();
+
+        assertEq(
+            spotAdapter.getPositionTokenId(GNOSIS_GNO, GNOSIS_WXDAI),
+            spotTokenId,
+            "partial manager redemption replaced spot NFT"
+        );
+        manager.redeem(bootstrapShares, address(this), false);
+        assertEq(manager.totalSupply(), 0, "final holder shares remain");
+        assertEq(manager.spotLiquidity(), 0, "final spot liquidity remains");
+        assertEq(
+            spotAdapter.getPositionTokenId(GNOSIS_GNO, GNOSIS_WXDAI),
+            0,
+            "final manager redemption retained spot NFT"
+        );
 
         emit log_named_uint("full-unwind deposit gas", depositGas);
         emit log_named_uint("full-unwind redeem gas", redeemGas);
