@@ -70,18 +70,18 @@ contract FutarchyConditionalRouterSepoliaForkTest is Test {
         collateral.approve(address(router), type(uint256).max);
 
         uint256 companyBefore = company.balanceOf(address(this));
-        router.splitPosition(address(proposal), address(company), amount);
+        router.splitPosition(address(company), conditionId, wrappers[0], wrappers[1], amount);
         assertEq(company.balanceOf(address(this)), companyBefore - amount);
         _assertWrapperReserve(ctf, wrappers[0], address(company), conditionId, 1, amount);
         _assertWrapperReserve(ctf, wrappers[1], address(company), conditionId, 2, amount);
         IERC20(wrappers[0]).approve(address(router), amount);
         IERC20(wrappers[1]).approve(address(router), amount);
-        router.mergePositions(address(proposal), address(company), amount);
+        router.mergePositions(address(company), conditionId, wrappers[0], wrappers[1], amount);
         assertEq(company.balanceOf(address(this)), companyBefore);
         _assertWrapperReserve(ctf, wrappers[0], address(company), conditionId, 1, 0);
         _assertWrapperReserve(ctf, wrappers[1], address(company), conditionId, 2, 0);
 
-        router.splitPosition(address(proposal), address(collateral), amount);
+        router.splitPosition(address(collateral), conditionId, wrappers[2], wrappers[3], amount);
         uint256 yesCollateralId = _tokenId(ctf, address(collateral), conditionId, 1);
         vm.expectRevert();
         wrappedFactory.unwrap(CTF, yesCollateralId, 1, address(router), wrapperData[2]);
@@ -92,7 +92,7 @@ contract FutarchyConditionalRouterSepoliaForkTest is Test {
         ctf.reportPayouts(questionId, payouts);
         IERC20(wrappers[2]).approve(address(router), 4 ether);
         uint256 collateralBefore = collateral.balanceOf(address(this));
-        router.redeemPositions(address(proposal), address(collateral), 4 ether);
+        router.redeemPositions(address(collateral), conditionId, wrappers[2], wrappers[3], 4 ether);
         assertEq(collateral.balanceOf(address(this)), collateralBefore + 4 ether);
         _assertWrapperReserve(
             ctf, wrappers[2], address(collateral), conditionId, 1, amount - 4 ether

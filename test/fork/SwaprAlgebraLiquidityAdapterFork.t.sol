@@ -6,6 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {SwaprAlgebraLiquidityAdapter} from "../../src/adapters/SwaprAlgebraLiquidityAdapter.sol";
 import {ISwaprAlgebraPositionManager} from "../../src/interfaces/ISwaprAlgebraPositionManager.sol";
+import {IFutarchyLiquidityAdapter} from "../../src/interfaces/IFutarchyLiquidityAdapter.sol";
 import {
     FutarchyLiquidityManager,
     IWrappedNative
@@ -76,16 +77,10 @@ contract SwaprAlgebraLiquidityAdapterForkTest is Test {
             ISwaprAlgebraPositionManager(SWAPR_POSITION_MANAGER).positions(tokenId);
         assertEq(currentLiquidity, liquidityMinted);
 
-        (uint256 amount0Out, uint256 amount1Out) = adapter.removeLiquidity(
-            GNOSIS_GNO,
-            GNOSIS_WXDAI,
-            currentLiquidity,
-            abi.encode(
-                SwaprAlgebraLiquidityAdapter.ExitParams({
-                    amount0Min: 0, amount1Min: 0, deadline: block.timestamp + 20 minutes
-                })
-            )
-        );
+        IFutarchyLiquidityAdapter.Removal memory removed =
+            adapter.removeLiquidityDetailed(GNOSIS_GNO, GNOSIS_WXDAI, currentLiquidity);
+        uint256 amount0Out = removed.principal0 + removed.fees0;
+        uint256 amount1Out = removed.principal1 + removed.fees1;
 
         assertGt(amount0Out + amount1Out, 0);
         assertEq(adapter.getPositionTokenId(GNOSIS_GNO, GNOSIS_WXDAI), 0);
@@ -132,16 +127,10 @@ contract SwaprAlgebraLiquidityAdapterForkTest is Test {
         assertEq(amount0Used, 1);
         assertEq(amount1Used, 1);
 
-        (uint256 amount0Out, uint256 amount1Out) = adapter.removeLiquidity(
-            token0,
-            token1,
-            liquidity,
-            abi.encode(
-                SwaprAlgebraLiquidityAdapter.ExitParams({
-                    amount0Min: 0, amount1Min: 0, deadline: block.timestamp + 20 minutes
-                })
-            )
-        );
+        IFutarchyLiquidityAdapter.Removal memory removed =
+            adapter.removeLiquidityDetailed(token0, token1, liquidity);
+        uint256 amount0Out = removed.principal0 + removed.fees0;
+        uint256 amount1Out = removed.principal1 + removed.fees1;
 
         assertEq(amount0Out, 0);
         assertEq(amount1Out, 0);
@@ -158,7 +147,6 @@ contract SwaprAlgebraLiquidityAdapterForkTest is Test {
             address(this),
             IERC20(GNOSIS_GNO),
             IWrappedNative(GNOSIS_WXDAI),
-            address(0xC0DE),
             new MockOfficialProposalSource(),
             spotAdapter,
             new MockFutarchyLiquidityAdapter(),
@@ -241,7 +229,6 @@ contract SwaprAlgebraLiquidityAdapterForkTest is Test {
             address(this),
             IERC20(GNOSIS_GNO),
             IWrappedNative(GNOSIS_WXDAI),
-            address(0xC0DE),
             source,
             spotAdapter,
             conditionalAdapter,

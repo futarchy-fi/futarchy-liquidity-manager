@@ -114,8 +114,8 @@ deploy_schema_filter='
   and (.validation.minTimeout | type == "number" and . >= 0)
   and (.validation.maxTimeout | type == "number" and . >= 0)
   and (.validation.maxTimeout >= .validation.minTimeout)
+  and (.validation.minConditionalLifetime | type == "number" and . >= 0)
   and (.validation.maxMinBond | type == "number" and . >= 0)
-  and (.validation.requirePools | type == "boolean")
 '
 
 deploy_strict_filter='
@@ -149,13 +149,18 @@ deploy_strict_filter='
   and (.validation.maxOpeningDelay > 0)
   and (.validation.minTimeout > 0)
   and (.validation.maxTimeout >= .validation.minTimeout)
-  and (.validation.requirePools == true)
+  and (.validation.minConditionalLifetime >= 86400)
+  and (
+    .validation.maxOpeningDelay + .validation.maxTimeout
+    >= .validation.minConditionalLifetime
+  )
   and (
     if .deployDeadlineProxy == true
     then
       (.deadlineProxy.conditionalTokens | nzaddress)
       and (.deadlineProxy.realitio | nzaddress)
       and (.deadlineProxy.maxQuestionDuration > 0)
+      and (.deadlineProxy.maxQuestionDuration >= .validation.minConditionalLifetime)
     else true
     end
   )
@@ -208,8 +213,8 @@ batch_schema_filter='
   and (.validation.minTimeout | nonnegative)
   and (.validation.maxTimeout | nonnegative)
   and (.validation.maxTimeout >= .validation.minTimeout)
+  and (.validation.minConditionalLifetime | nonnegative)
   and (.validation.maxMinBond | nonnegative)
-  and (.validation.requirePools | type == "boolean")
   and (has("spotAdd") | not)
   and (has("spotExit") | not)
   and (has("yesAdd") | not)
@@ -235,7 +240,11 @@ batch_strict_filter='
     and (.validation.maxOpeningDelay > 0)
     and (.validation.minTimeout > 0)
     and (.validation.maxTimeout >= .validation.minTimeout)
-    and (.validation.requirePools == true);
+    and (.validation.minConditionalLifetime >= 86400)
+    and (
+      .validation.maxOpeningDelay + .validation.maxTimeout
+      >= .validation.minConditionalLifetime
+    );
   def fundingstrict:
     (
       (.nativeValue | positive)

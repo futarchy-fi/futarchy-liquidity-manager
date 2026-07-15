@@ -1,5 +1,10 @@
 # Atomic lifecycle and proportional redemption amendment
 
+The current Swapr Algebra implementation does not meet this threat model when a nonzero mutable
+pool cooldown is enabled: repeated third-party dust mints can reset the public position timestamp
+and block every burn indefinitely. Donation accounting is safe only while burns remain available;
+this adapter must not be funded.
+
 ## Status
 
 This document specifies the next FLM contract version. It replaces the current two-transaction

@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {UniswapV3LiquidityAdapter} from "../../src/adapters/UniswapV3LiquidityAdapter.sol";
+import {IFutarchyLiquidityAdapter} from "../../src/interfaces/IFutarchyLiquidityAdapter.sol";
 import {IUniswapV3FactoryLike} from "../../src/interfaces/IUniswapV3FactoryLike.sol";
 import {
     IUniswapV3NonfungiblePositionManager
@@ -77,16 +78,16 @@ contract UniswapV3SepoliaForkTest is Test {
 
         (,,,,,,, uint128 currentLiquidity,,,,) = npm.positions(tokenId);
         assertEq(currentLiquidity, firstLiquidity + secondLiquidity);
-        (uint256 partial0, uint256 partial1) =
-            adapter.removeLiquidity(address(token0), address(token1), currentLiquidity / 3, "");
-        assertGt(partial0, 0);
-        assertGt(partial1, 0);
+        IFutarchyLiquidityAdapter.Removal memory partialRemoval =
+            adapter.removeLiquidityDetailed(address(token0), address(token1), currentLiquidity / 3);
+        assertGt(partialRemoval.principal0 + partialRemoval.fees0, 0);
+        assertGt(partialRemoval.principal1 + partialRemoval.fees1, 0);
 
         (,,,,,,, currentLiquidity,,,,) = npm.positions(tokenId);
-        (uint256 final0, uint256 final1) =
-            adapter.removeLiquidity(address(token0), address(token1), currentLiquidity, "");
-        assertGt(final0, 0);
-        assertGt(final1, 0);
+        IFutarchyLiquidityAdapter.Removal memory finalRemoval =
+            adapter.removeLiquidityDetailed(address(token0), address(token1), currentLiquidity);
+        assertGt(finalRemoval.principal0 + finalRemoval.fees0, 0);
+        assertGt(finalRemoval.principal1 + finalRemoval.fees1, 0);
         assertEq(adapter.getPositionTokenId(address(token0), address(token1)), 0);
         vm.expectRevert();
         npm.ownerOf(tokenId);

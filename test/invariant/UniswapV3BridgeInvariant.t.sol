@@ -50,7 +50,7 @@ contract UniswapV3LiquidityAdapterHandler {
         if (tokenId == 0) return;
         (,,,,,,, uint128 liquidity,,,,) = positionManager.positions(tokenId);
         uint128 amount = uint128(1 + (uint256(liquiditySeed) % liquidity));
-        adapter.removeLiquidity(address(token0), address(token1), amount, "");
+        adapter.removeLiquidityDetailed(address(token0), address(token1), amount);
     }
 
     function accrueAndCompound(uint96 amount0Seed, uint96 amount1Seed) external {
@@ -61,7 +61,6 @@ contract UniswapV3LiquidityAdapterHandler {
         token0.mint(address(this), amount0);
         token1.mint(address(this), amount1);
         positionManager.accrueFees(tokenId, amount0, amount1);
-        adapter.compoundPosition(address(token0), address(token1), "");
     }
 }
 

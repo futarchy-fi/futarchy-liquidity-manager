@@ -3,5 +3,6 @@
   "MAX_TICK_DEVIATION()": "741f43b7",
   "TWAP_WINDOW()": "e2c1d1d1",
   "assertStable(address)": "87862d5b",
-  "assertStablePair(address,address)": "ffa281af"
+  "assertStablePair(address,address)": "ffa281af",
+  "assertStablePairAndGetSqrtPrice(address,address)": "34e9f316"
 }

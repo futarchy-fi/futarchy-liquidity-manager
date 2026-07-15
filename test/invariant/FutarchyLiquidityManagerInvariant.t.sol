@@ -186,7 +186,6 @@ contract FutarchyLiquidityManagerInvariantTest is StdInvariant, Test {
             bootstrapRecipient,
             company,
             IWrappedNative(address(wrappedNative)),
-            officialProposer,
             source,
             spotAdapter,
             conditionalAdapter,

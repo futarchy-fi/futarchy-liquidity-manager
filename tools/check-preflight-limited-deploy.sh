@@ -43,6 +43,7 @@ jq '
   | .validation.trustedOracle = "0x7777777777777777777777777777777777777777"
   | .validation.realitio = "0x8888888888888888888888888888888888888888"
   | .validation.trustedArbitrator = "0x9999999999999999999999999999999999999999"
+  | .validation.minConditionalLifetime = 86400
   | .validation.maxMinBond = 1
 ' config/gnosis.example.json > "$DEPLOY_CONFIG"
 
@@ -95,6 +96,7 @@ jq '
   | .validation.trustedOracle = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
   | .validation.realitio = "0xcccccccccccccccccccccccccccccccccccccccc"
   | .validation.trustedArbitrator = "0xdddddddddddddddddddddddddddddddddddddddd"
+  | .validation.minConditionalLifetime = 86400
   | .validation.maxMinBond = 1
 ' config/batches/bootstrap.example.json > "$BATCH_CONFIG"
 

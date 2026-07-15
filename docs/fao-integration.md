@@ -1,5 +1,10 @@
 # FAO Integration Boundary
 
+The current Swapr Algebra implementation is a no-funds prototype. FAO must not route treasury or LP
+assets into it: permissionless pool precreation, mutable liquidity-cooldown griefing, and activation
+gas fragility remain unresolved. The integration flow below specifies interfaces, not deployment
+approval.
+
 FAO should consume this package as a generic liquidity module. This repository should not import
 FAO sale, arbitration, SnapshotX, frontend, or SDK contracts.
 

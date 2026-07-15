@@ -7,11 +7,17 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {
     IUniswapV3NonfungiblePositionManager
 } from "../../src/interfaces/IUniswapV3NonfungiblePositionManager.sol";
+import {MockUniswapV3FactoryLike} from "./MockUniswapV3FactoryLike.sol";
 
 contract MockUniswapV3NonfungiblePositionManager is IUniswapV3NonfungiblePositionManager {
     using SafeERC20 for IERC20;
 
     uint256 internal constant BPS_DENOMINATOR = 10_000;
+    address public immutable factory;
+
+    constructor() {
+        factory = address(new MockUniswapV3FactoryLike());
+    }
 
     struct Position {
         address token0;
@@ -211,12 +217,15 @@ contract MockUniswapV3NonfungiblePositionManager is IUniswapV3NonfungiblePositio
     }
 
     /// @dev Exists only so tests can prove the adapter never invokes pool initialization.
-    function createAndInitializePoolIfNecessary(address, address, uint24, uint160)
+    function createAndInitializePoolIfNecessary(address token0, address token1, uint24 fee, uint160)
         external
+        payable
         returns (address)
     {
         poolInitializationCalls++;
-        return address(0xBEEF);
+        address pool = address(0xBEEF);
+        MockUniswapV3FactoryLike(factory).setPool(token0, token1, fee, pool);
+        return pool;
     }
 
     function _useInputs(

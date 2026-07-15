@@ -1,5 +1,10 @@
 # Audit Scope
 
+The current Swapr Algebra path is a no-funds prototype. A factory owner may enable mutable
+`liquidityCooldown`, after which repeated third-party dust mints reset the shared position timestamp
+and can indefinitely block spot and conditional burns. This unresolved trust boundary prevents the
+bundle from satisfying always-redeemable custody.
+
 ## Objective
 
 Make futarchy liquidity provision operationally simple without giving a proposal manager the

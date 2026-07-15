@@ -4,6 +4,9 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import {VmSafe} from "forge-std/Vm.sol";
 
+import {
+    SwaprAlgebraDirectConditionalAdapter
+} from "../src/adapters/SwaprAlgebraDirectConditionalAdapter.sol";
 import {SwaprAlgebraLiquidityAdapter} from "../src/adapters/SwaprAlgebraLiquidityAdapter.sol";
 import {FutarchyLiquidityManager, IWrappedNative} from "../src/core/FutarchyLiquidityManager.sol";
 import {
@@ -25,6 +28,14 @@ contract EmptyFactoryDeployment {
     }
 }
 
+contract FactoryOnlyAlgebraPositionManager {
+    address public immutable factory;
+
+    constructor(address poolFactory) {
+        factory = poolFactory;
+    }
+}
+
 contract FutarchyLiquidityManagerFactoryTest is Test {
     MockMintableERC20 internal company;
     MockWrappedNative internal wrappedNative;
@@ -33,12 +44,11 @@ contract FutarchyLiquidityManagerFactoryTest is Test {
     MockPoolStabilityGuard internal stabilityGuard;
     FutarchyLiquidityManagerFactory internal factory;
 
-    ISwaprAlgebraPositionManager internal positionManager =
-        ISwaprAlgebraPositionManager(address(0xCAFE));
+    ISwaprAlgebraPositionManager internal positionManager;
 
     address internal organization = address(0x0A6);
     address internal owner = address(0x0A11CE);
-    address internal proposalManager = address(0x0B055);
+    address internal proposalManager;
     address internal bootstrapRecipient = address(0xB007);
     address internal officialProposer = address(0x0FF1C1A1);
     address internal creator = address(0xC0FFEE);
@@ -47,30 +57,27 @@ contract FutarchyLiquidityManagerFactoryTest is Test {
     int24 internal constant TICK_UPPER = 887_220;
 
     function setUp() public {
+        proposalManager = address(this);
         company = new MockMintableERC20("Company", "COMP");
         wrappedNative = new MockWrappedNative();
         algebraFactory = new MockAlgebraFactoryLike();
-        conditionalRouter = new MockConditionalRouter();
-        stabilityGuard = new MockPoolStabilityGuard();
-
-        factory = new FutarchyLiquidityManagerFactory(
-            positionManager,
-            algebraFactory,
-            conditionalRouter,
-            stabilityGuard,
-            IWrappedNative(address(wrappedNative)),
-            TICK_LOWER,
-            TICK_UPPER,
-            keccak256(type(FutarchyOfficialProposalSource).creationCode),
-            keccak256(type(SwaprAlgebraLiquidityAdapter).creationCode),
-            keccak256(type(FutarchyLiquidityManager).creationCode)
+        positionManager = ISwaprAlgebraPositionManager(
+            address(new FactoryOnlyAlgebraPositionManager(address(algebraFactory)))
         );
+        conditionalRouter = new MockConditionalRouter();
+        conditionalRouter.setConditionalTokens(address(0xC0DE));
+        stabilityGuard = new MockPoolStabilityGuard();
+        stabilityGuard.setFactory(address(algebraFactory));
+
+        factory = _newFactory(positionManager, algebraFactory, stabilityGuard);
     }
 
     function test_anyWalletDeploysDefaultFlmBundle() public {
         vm.prank(creator);
         FutarchyLiquidityManagerFactory.DeployedContracts memory deployed =
-            factory.createLiquidityManager(_createParams(""), _creationCodes());
+            factory.createLiquidityManager(
+                _createParams(_defaultValidationConfigData()), _creationCodes()
+            );
 
         _assertDeployedBundle(deployed);
     }
@@ -82,7 +89,9 @@ contract FutarchyLiquidityManagerFactoryTest is Test {
     function test_managerRuntimeKeepsEip170Reserve() public {
         if (vm.isContext(VmSafe.ForgeContext.Coverage)) return;
         FutarchyLiquidityManagerFactory.DeployedContracts memory deployed =
-            factory.createLiquidityManager(_createParams(""), _creationCodes());
+            factory.createLiquidityManager(
+                _createParams(_defaultValidationConfigData()), _creationCodes()
+            );
         assertLe(deployed.manager.code.length, 24_448);
     }
 
@@ -108,10 +117,10 @@ contract FutarchyLiquidityManagerFactoryTest is Test {
         adapter.addFullRangeLiquidity(address(1), address(2), 0, 0, "");
 
         vm.expectRevert(SwaprAlgebraLiquidityAdapter.UnauthorizedManager.selector);
-        adapter.removeLiquidity(address(1), address(2), 1, "");
+        adapter.addFreshFullRangeLiquidity(address(1), address(2), 1, 1, 1);
 
         vm.expectRevert(SwaprAlgebraLiquidityAdapter.UnauthorizedManager.selector);
-        adapter.compoundPosition(address(1), address(2), "");
+        adapter.removeLiquidityDetailed(address(1), address(2), 1);
     }
 
     function test_passesInitialProposalValidationConfigToProposalSource() public {
@@ -122,13 +131,13 @@ contract FutarchyLiquidityManagerFactoryTest is Test {
                 expectedCollateralToken: address(wrappedNative),
                 conditionalTokens: address(0xC0DE),
                 trustedOracle: address(0x0A0),
-                realitio: address(0x0A1),
-                trustedArbitrator: address(0x0A2),
-                maxOpeningDelay: 7 days,
-                minTimeout: 1 hours,
-                maxTimeout: 7 days,
-                maxMinBond: 1 ether,
-                requirePools: true
+                realitio: address(0),
+                trustedArbitrator: address(0),
+                maxOpeningDelay: 0,
+                minTimeout: 0,
+                maxTimeout: 0,
+                minConditionalLifetime: 0,
+                maxMinBond: 1 ether
             });
 
         FutarchyLiquidityManagerFactory.DeployedContracts memory deployed =
@@ -145,8 +154,8 @@ contract FutarchyLiquidityManagerFactoryTest is Test {
             uint32 maxOpeningDelay,
             uint32 minTimeout,
             uint32 maxTimeout,
-            uint256 maxMinBond,
-            bool requirePools
+            uint32 minConditionalLifetime,
+            uint256 maxMinBond
         ) = FutarchyOfficialProposalSource(deployed.proposalSource).proposalValidationConfig();
 
         assertTrue(enabled);
@@ -154,13 +163,13 @@ contract FutarchyLiquidityManagerFactoryTest is Test {
         assertEq(expectedCollateralToken, address(wrappedNative));
         assertEq(conditionalTokens, address(0xC0DE));
         assertEq(trustedOracle, address(0x0A0));
-        assertEq(realitio, address(0x0A1));
-        assertEq(trustedArbitrator, address(0x0A2));
-        assertEq(maxOpeningDelay, 7 days);
-        assertEq(minTimeout, 1 hours);
-        assertEq(maxTimeout, 7 days);
+        assertEq(realitio, address(0));
+        assertEq(trustedArbitrator, address(0));
+        assertEq(maxOpeningDelay, 0);
+        assertEq(minTimeout, 0);
+        assertEq(maxTimeout, 0);
+        assertEq(minConditionalLifetime, 0);
         assertEq(maxMinBond, 1 ether);
-        assertTrue(requirePools);
     }
 
     function test_revertsOnZeroCreateParams() public {
@@ -187,10 +196,24 @@ contract FutarchyLiquidityManagerFactoryTest is Test {
 
     function test_revertsOnSwappedCreationCode() public {
         FutarchyLiquidityManagerFactory.CreationCodes memory codes = _creationCodes();
-        codes.proposalSource = codes.adapter;
+        codes.proposalSource = codes.spotAdapter;
 
         bytes32 expected = factory.PROPOSAL_SOURCE_CREATION_CODE_HASH();
         bytes32 actual = keccak256(codes.proposalSource);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                FutarchyLiquidityManagerFactory.CreationCodeHashMismatch.selector, expected, actual
+            )
+        );
+        factory.createLiquidityManager(_createParams(""), codes);
+    }
+
+    function test_revertsOnSwappedAdapterCreationCodes() public {
+        FutarchyLiquidityManagerFactory.CreationCodes memory codes = _creationCodes();
+        codes.conditionalAdapter = codes.spotAdapter;
+
+        bytes32 expected = factory.CONDITIONAL_ADAPTER_CREATION_CODE_HASH();
+        bytes32 actual = keccak256(codes.conditionalAdapter);
         vm.expectRevert(
             abi.encodeWithSelector(
                 FutarchyLiquidityManagerFactory.CreationCodeHashMismatch.selector, expected, actual
@@ -223,6 +246,7 @@ contract FutarchyLiquidityManagerFactoryTest is Test {
             TICK_UPPER,
             keccak256(type(FutarchyOfficialProposalSource).creationCode),
             keccak256(type(SwaprAlgebraLiquidityAdapter).creationCode),
+            keccak256(type(SwaprAlgebraDirectConditionalAdapter).creationCode),
             keccak256(type(EmptyFactoryDeployment).creationCode)
         );
         FutarchyLiquidityManagerFactory.CreationCodes memory codes = _creationCodes();
@@ -250,6 +274,7 @@ contract FutarchyLiquidityManagerFactoryTest is Test {
             TICK_UPPER,
             keccak256(type(FutarchyOfficialProposalSource).creationCode),
             keccak256(type(SwaprAlgebraLiquidityAdapter).creationCode),
+            keccak256(type(SwaprAlgebraDirectConditionalAdapter).creationCode),
             keccak256(type(FutarchyLiquidityManager).creationCode)
         );
     }
@@ -266,8 +291,26 @@ contract FutarchyLiquidityManagerFactoryTest is Test {
             TICK_UPPER,
             keccak256(type(FutarchyOfficialProposalSource).creationCode),
             keccak256(type(SwaprAlgebraLiquidityAdapter).creationCode),
+            keccak256(type(SwaprAlgebraDirectConditionalAdapter).creationCode),
             keccak256(type(FutarchyLiquidityManager).creationCode)
         );
+    }
+
+    function test_revertsWhenPositionManagerUsesDifferentAlgebraFactory() public {
+        ISwaprAlgebraPositionManager mismatchedPositionManager = ISwaprAlgebraPositionManager(
+            address(new FactoryOnlyAlgebraPositionManager(address(new MockAlgebraFactoryLike())))
+        );
+
+        vm.expectRevert(FutarchyLiquidityManagerFactory.InvalidAmmWiring.selector);
+        _newFactory(mismatchedPositionManager, algebraFactory, stabilityGuard);
+    }
+
+    function test_revertsWhenStabilityGuardUsesDifferentAlgebraFactory() public {
+        MockPoolStabilityGuard mismatchedGuard = new MockPoolStabilityGuard();
+        mismatchedGuard.setFactory(address(new MockAlgebraFactoryLike()));
+
+        vm.expectRevert(FutarchyLiquidityManagerFactory.InvalidAmmWiring.selector);
+        _newFactory(positionManager, algebraFactory, mismatchedGuard);
     }
 
     function test_revertsOnInvalidFactoryTickRange() public {
@@ -282,6 +325,7 @@ contract FutarchyLiquidityManagerFactoryTest is Test {
             TICK_LOWER,
             keccak256(type(FutarchyOfficialProposalSource).creationCode),
             keccak256(type(SwaprAlgebraLiquidityAdapter).creationCode),
+            keccak256(type(SwaprAlgebraDirectConditionalAdapter).creationCode),
             keccak256(type(FutarchyLiquidityManager).creationCode)
         );
     }
@@ -298,6 +342,7 @@ contract FutarchyLiquidityManagerFactoryTest is Test {
             TICK_UPPER,
             keccak256(type(FutarchyOfficialProposalSource).creationCode),
             keccak256(type(SwaprAlgebraLiquidityAdapter).creationCode),
+            keccak256(type(SwaprAlgebraDirectConditionalAdapter).creationCode),
             bytes32(0)
         );
     }
@@ -317,26 +362,27 @@ contract FutarchyLiquidityManagerFactoryTest is Test {
         assertEq(source.proposalManager(), proposalManager);
         assertEq(source.officialProposer(), officialProposer);
         assertEq(address(source.ALGEBRA_FACTORY()), address(algebraFactory));
+        assertEq(source.activationTarget(), deployed.manager);
 
         SwaprAlgebraLiquidityAdapter spotAdapter =
             SwaprAlgebraLiquidityAdapter(deployed.spotAdapter);
-        SwaprAlgebraLiquidityAdapter conditionalAdapter =
-            SwaprAlgebraLiquidityAdapter(deployed.conditionalAdapter);
+        SwaprAlgebraDirectConditionalAdapter conditionalAdapter =
+            SwaprAlgebraDirectConditionalAdapter(deployed.conditionalAdapter);
         assertEq(address(spotAdapter.POSITION_MANAGER()), address(positionManager));
-        assertEq(address(conditionalAdapter.POSITION_MANAGER()), address(positionManager));
+        assertEq(address(spotAdapter.FACTORY()), address(algebraFactory));
+        assertEq(address(conditionalAdapter.FACTORY()), address(algebraFactory));
         assertEq(spotAdapter.MANAGER(), deployed.manager);
         assertEq(conditionalAdapter.MANAGER(), deployed.manager);
         assertEq(spotAdapter.DEFAULT_TICK_LOWER(), TICK_LOWER);
         assertEq(spotAdapter.DEFAULT_TICK_UPPER(), TICK_UPPER);
-        assertEq(conditionalAdapter.DEFAULT_TICK_LOWER(), TICK_LOWER);
-        assertEq(conditionalAdapter.DEFAULT_TICK_UPPER(), TICK_UPPER);
+        assertEq(conditionalAdapter.TICK_LOWER(), TICK_LOWER);
+        assertEq(conditionalAdapter.TICK_UPPER(), TICK_UPPER);
 
         FutarchyLiquidityManager manager = FutarchyLiquidityManager(payable(deployed.manager));
         assertEq(manager.owner(), owner);
         assertEq(manager.BOOTSTRAP_RECIPIENT(), bootstrapRecipient);
         assertEq(address(manager.COMPANY_TOKEN()), address(company));
         assertEq(address(manager.WRAPPED_NATIVE()), address(wrappedNative));
-        assertEq(manager.OFFICIAL_PROPOSER(), officialProposer);
         assertEq(address(manager.PROPOSAL_SOURCE()), deployed.proposalSource);
         assertEq(address(manager.SPOT_ADAPTER()), deployed.spotAdapter);
         assertEq(address(manager.CONDITIONAL_ADAPTER()), deployed.conditionalAdapter);
@@ -371,8 +417,48 @@ contract FutarchyLiquidityManagerFactoryTest is Test {
     {
         return FutarchyLiquidityManagerFactory.CreationCodes({
             proposalSource: type(FutarchyOfficialProposalSource).creationCode,
-            adapter: type(SwaprAlgebraLiquidityAdapter).creationCode,
+            spotAdapter: type(SwaprAlgebraLiquidityAdapter).creationCode,
+            conditionalAdapter: type(SwaprAlgebraDirectConditionalAdapter).creationCode,
             manager: type(FutarchyLiquidityManager).creationCode
         });
+    }
+
+    function _defaultValidationConfigData() internal view returns (bytes memory) {
+        return abi.encode(
+            FutarchyOfficialProposalSource.ProposalValidationConfig({
+                enabled: true,
+                expectedProposalToken: address(company),
+                expectedCollateralToken: address(wrappedNative),
+                conditionalTokens: address(0xC0DE),
+                trustedOracle: address(0x0A0),
+                realitio: address(0),
+                trustedArbitrator: address(0),
+                maxOpeningDelay: 0,
+                minTimeout: 0,
+                maxTimeout: 0,
+                minConditionalLifetime: 0,
+                maxMinBond: 0
+            })
+        );
+    }
+
+    function _newFactory(
+        ISwaprAlgebraPositionManager positionManager_,
+        MockAlgebraFactoryLike algebraFactory_,
+        MockPoolStabilityGuard stabilityGuard_
+    ) internal returns (FutarchyLiquidityManagerFactory) {
+        return new FutarchyLiquidityManagerFactory(
+            positionManager_,
+            algebraFactory_,
+            conditionalRouter,
+            stabilityGuard_,
+            IWrappedNative(address(wrappedNative)),
+            TICK_LOWER,
+            TICK_UPPER,
+            keccak256(type(FutarchyOfficialProposalSource).creationCode),
+            keccak256(type(SwaprAlgebraLiquidityAdapter).creationCode),
+            keccak256(type(SwaprAlgebraDirectConditionalAdapter).creationCode),
+            keccak256(type(FutarchyLiquidityManager).creationCode)
+        );
     }
 }

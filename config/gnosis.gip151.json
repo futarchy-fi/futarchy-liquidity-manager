@@ -33,7 +33,7 @@
     "maxOpeningDelay": 604800,
     "minTimeout": 3600,
     "maxTimeout": 604800,
-    "maxMinBond": 1000000000000000000,
-    "requirePools": true
+    "minConditionalLifetime": 86400,
+    "maxMinBond": 1000000000000000000
   }
 }

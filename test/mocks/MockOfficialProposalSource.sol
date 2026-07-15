@@ -5,12 +5,27 @@ import {
     IFutarchyOfficialProposalSource
 } from "../../src/interfaces/IFutarchyOfficialProposalSource.sol";
 
+interface IMockActivationTarget {
+    function activateOfficialProposal(
+        IFutarchyOfficialProposalSource.ProposalActivationData calldata proposal
+    ) external;
+}
+
+interface IMockFreshPoolLookup {
+    function freshPoolByPair(bytes32 pairKey) external view returns (address);
+}
+
+interface IMockProposalCondition {
+    function conditionId() external view returns (bytes32);
+}
+
 contract MockOfficialProposalSource is IFutarchyOfficialProposalSource {
     uint256 public proposalId;
     address public proposal;
     address public creator;
     bool public exists;
     bool public settled;
+    bytes32 public conditionId;
     address public proposalToken;
     address public collateralToken;
     address public yesCompanyToken;
@@ -19,6 +34,32 @@ contract MockOfficialProposalSource is IFutarchyOfficialProposalSource {
     address public noCurrencyToken;
     address public yesPool;
     address public noPool;
+    IMockFreshPoolLookup public poolLookup;
+
+    function proposalValidationConfigFrozen() external pure returns (bool) {
+        return true;
+    }
+
+    function setPoolLookup(address lookup) external {
+        poolLookup = IMockFreshPoolLookup(lookup);
+    }
+
+    function activate(address target) external {
+        IMockActivationTarget(target)
+            .activateOfficialProposal(
+                IFutarchyOfficialProposalSource.ProposalActivationData({
+                    proposalId: proposalId,
+                    proposal: proposal,
+                    conditionId: conditionId,
+                    proposalToken: proposalToken,
+                    collateralToken: collateralToken,
+                    yesCompanyToken: yesCompanyToken,
+                    noCompanyToken: noCompanyToken,
+                    yesCurrencyToken: yesCurrencyToken,
+                    noCurrencyToken: noCurrencyToken
+                })
+            );
+    }
 
     function createProposal(
         address _creator,
@@ -60,6 +101,7 @@ contract MockOfficialProposalSource is IFutarchyOfficialProposalSource {
         newProposalId = proposalId + 1;
         proposalId = newProposalId;
         proposal = _proposal;
+        conditionId = IMockProposalCondition(_proposal).conditionId();
         creator = _creator;
         exists = true;
         settled = false;
@@ -86,6 +128,7 @@ contract MockOfficialProposalSource is IFutarchyOfficialProposalSource {
         proposalToken = address(0);
         collateralToken = address(0);
         proposal = address(0);
+        conditionId = bytes32(0);
         yesCompanyToken = address(0);
         noCompanyToken = address(0);
         yesCurrencyToken = address(0);
@@ -99,8 +142,16 @@ contract MockOfficialProposalSource is IFutarchyOfficialProposalSource {
         view
         returns (uint256, address, bool, bool, address, address, address, address)
     {
-        return
-            (proposalId, creator, exists, settled, proposalToken, collateralToken, yesPool, noPool);
+        return (
+            proposalId,
+            creator,
+            exists,
+            settled,
+            proposalToken,
+            collateralToken,
+            _resolvedPool(yesCompanyToken, yesCurrencyToken, yesPool),
+            _resolvedPool(noCompanyToken, noCurrencyToken, noPool)
+        );
     }
 
     function officialProposalExtended()
@@ -113,13 +164,24 @@ contract MockOfficialProposalSource is IFutarchyOfficialProposalSource {
         proposalData.creator = creator;
         proposalData.exists = exists;
         proposalData.settled = settled;
+        proposalData.conditionId = conditionId;
         proposalData.proposalToken = proposalToken;
         proposalData.collateralToken = collateralToken;
         proposalData.yesCompanyToken = yesCompanyToken;
         proposalData.noCompanyToken = noCompanyToken;
         proposalData.yesCurrencyToken = yesCurrencyToken;
         proposalData.noCurrencyToken = noCurrencyToken;
-        proposalData.yesPool = yesPool;
-        proposalData.noPool = noPool;
+        proposalData.yesPool = _resolvedPool(yesCompanyToken, yesCurrencyToken, yesPool);
+        proposalData.noPool = _resolvedPool(noCompanyToken, noCurrencyToken, noPool);
+    }
+
+    function _resolvedPool(address tokenA, address tokenB, address configured)
+        internal
+        view
+        returns (address)
+    {
+        if (configured != address(0) || address(poolLookup) == address(0)) return configured;
+        (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
+        return poolLookup.freshPoolByPair(keccak256(abi.encode(token0, token1)));
     }
 }

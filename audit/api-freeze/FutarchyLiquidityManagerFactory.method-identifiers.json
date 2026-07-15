@@ -1,6 +1,6 @@
 {
-  "ADAPTER_CREATION_CODE_HASH()": "59f06526",
   "ALGEBRA_FACTORY()": "9949da1f",
+  "CONDITIONAL_ADAPTER_CREATION_CODE_HASH()": "9e92a64e",
   "CONDITIONAL_ROUTER()": "cd91811e",
   "DEFAULT_TICK_LOWER()": "820c161e",
   "DEFAULT_TICK_UPPER()": "94e49769",
@@ -9,6 +9,7 @@
   "POOL_STABILITY_GUARD()": "b7a44a99",
   "POSITION_MANAGER()": "1bea83fe",
   "PROPOSAL_SOURCE_CREATION_CODE_HASH()": "296bd630",
+  "SPOT_ADAPTER_CREATION_CODE_HASH()": "65c15946",
   "WRAPPED_NATIVE()": "d999984d",
-  "createLiquidityManager((address,address,address,address,address,address,string,string,bytes),(bytes,bytes,bytes))": "c9056e87"
+  "createLiquidityManager((address,address,address,address,address,address,string,string,bytes),(bytes,bytes,bytes,bytes))": "ff0d96f7"
 }

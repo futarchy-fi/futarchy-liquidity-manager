@@ -22,8 +22,10 @@ contract DeployFutarchyLiquidityManager is Script {
 
     string internal constant PROPOSAL_SOURCE_ARTIFACT =
         "src/sources/FutarchyOfficialProposalSource.sol:FutarchyOfficialProposalSource";
-    string internal constant ADAPTER_ARTIFACT =
+    string internal constant SPOT_ADAPTER_ARTIFACT =
         "src/adapters/SwaprAlgebraLiquidityAdapter.sol:SwaprAlgebraLiquidityAdapter";
+    string internal constant CONDITIONAL_ADAPTER_ARTIFACT =
+        "src/adapters/SwaprAlgebraDirectConditionalAdapter.sol:SwaprAlgebraDirectConditionalAdapter";
     string internal constant MANAGER_ARTIFACT =
         "src/core/FutarchyLiquidityManager.sol:FutarchyLiquidityManager";
 
@@ -120,7 +122,7 @@ contract DeployFutarchyLiquidityManager is Script {
         console2.log("Config:", configPath);
         console2.log("Output:", outputPath);
         console2.log("Owner:", cfg.owner);
-        console2.log("Proposal manager:", cfg.proposalManager);
+        console2.log("Lifecycle coordinator:", cfg.proposalManager);
         console2.log("Bootstrap recipient:", cfg.bootstrapRecipient);
         console2.log("Company token:", cfg.companyToken);
         console2.log("Wrapped native:", cfg.wrappedNative);
@@ -177,8 +179,9 @@ contract DeployFutarchyLiquidityManager is Script {
         config.maxOpeningDelay = uint32(json.readUint(string.concat(base, ".maxOpeningDelay")));
         config.minTimeout = uint32(json.readUint(string.concat(base, ".minTimeout")));
         config.maxTimeout = uint32(json.readUint(string.concat(base, ".maxTimeout")));
+        config.minConditionalLifetime =
+            uint32(json.readUint(string.concat(base, ".minConditionalLifetime")));
         config.maxMinBond = json.readUint(string.concat(base, ".maxMinBond"));
-        config.requirePools = json.readBool(string.concat(base, ".requirePools"));
     }
 
     function _assertDeployConfig(DeployConfig memory cfg) internal view {
@@ -186,6 +189,7 @@ contract DeployFutarchyLiquidityManager is Script {
         _requireNonzero(cfg.organization, "organization");
         _requireNonzero(cfg.owner, "owner");
         _requireNonzero(cfg.proposalManager, "proposalManager");
+        require(cfg.proposalManager.code.length != 0, "proposalManager must be a contract");
         _requireNonzero(cfg.bootstrapRecipient, "bootstrapRecipient");
         _requireNonzero(cfg.companyToken, "companyToken");
         _requireNonzero(cfg.officialProposer, "officialProposer");
@@ -214,7 +218,8 @@ contract DeployFutarchyLiquidityManager is Script {
     {
         return FutarchyLiquidityManagerFactory.CreationCodes({
             proposalSource: vm.getCode(PROPOSAL_SOURCE_ARTIFACT),
-            adapter: vm.getCode(ADAPTER_ARTIFACT),
+            spotAdapter: vm.getCode(SPOT_ADAPTER_ARTIFACT),
+            conditionalAdapter: vm.getCode(CONDITIONAL_ADAPTER_ARTIFACT),
             manager: vm.getCode(MANAGER_ARTIFACT)
         });
     }
@@ -238,7 +243,8 @@ contract DeployFutarchyLiquidityManager is Script {
             cfg.tickLower,
             cfg.tickUpper,
             keccak256(codes.proposalSource),
-            keccak256(codes.adapter),
+            keccak256(codes.spotAdapter),
+            keccak256(codes.conditionalAdapter),
             keccak256(codes.manager)
         );
     }
@@ -268,7 +274,12 @@ contract DeployFutarchyLiquidityManager is Script {
             "factory proposalSource code"
         );
         require(
-            factory.ADAPTER_CREATION_CODE_HASH() == keccak256(codes.adapter), "factory adapter code"
+            factory.SPOT_ADAPTER_CREATION_CODE_HASH() == keccak256(codes.spotAdapter),
+            "factory spot adapter code"
+        );
+        require(
+            factory.CONDITIONAL_ADAPTER_CREATION_CODE_HASH() == keccak256(codes.conditionalAdapter),
+            "factory conditional adapter code"
         );
         require(
             factory.MANAGER_CREATION_CODE_HASH() == keccak256(codes.manager), "factory manager code"
@@ -278,7 +289,7 @@ contract DeployFutarchyLiquidityManager is Script {
     function _encodeInitialValidationConfig(
         FutarchyOfficialProposalSource.ProposalValidationConfig memory config
     ) internal pure returns (bytes memory) {
-        if (!config.enabled) return "";
+        require(config.enabled, "proposal validation must be enabled");
         return abi.encode(config);
     }
 
@@ -331,7 +342,10 @@ contract DeployFutarchyLiquidityManager is Script {
     ) internal returns (string memory) {
         vm.serializeBytes32(key, "factoryCodeHash", deployed.factory.codehash);
         vm.serializeBytes32(key, "proposalSourceCreationCodeHash", keccak256(codes.proposalSource));
-        vm.serializeBytes32(key, "adapterCreationCodeHash", keccak256(codes.adapter));
+        vm.serializeBytes32(key, "spotAdapterCreationCodeHash", keccak256(codes.spotAdapter));
+        vm.serializeBytes32(
+            key, "conditionalAdapterCreationCodeHash", keccak256(codes.conditionalAdapter)
+        );
         vm.serializeBytes32(key, "managerCreationCodeHash", keccak256(codes.manager));
         vm.serializeBytes32(key, "proposalSourceCodeHash", deployed.proposalSource.codehash);
         vm.serializeBytes32(key, "deadlineProxyCodeHash", deployed.deadlineProxy.codehash);

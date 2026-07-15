@@ -3,13 +3,20 @@ pragma solidity ^0.8.20;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import {
+    SwaprAlgebraDirectConditionalAdapter
+} from "../adapters/SwaprAlgebraDirectConditionalAdapter.sol";
 import {SwaprAlgebraLiquidityAdapter} from "../adapters/SwaprAlgebraLiquidityAdapter.sol";
 import {FutarchyLiquidityManager, IWrappedNative} from "../core/FutarchyLiquidityManager.sol";
 import {IAlgebraFactoryLike} from "../interfaces/IAlgebraFactoryLike.sol";
 import {IFutarchyConditionalRouter} from "../interfaces/IFutarchyConditionalRouter.sol";
 import {IPoolStabilityGuard} from "../interfaces/IPoolStabilityGuard.sol";
 import {ISwaprAlgebraPositionManager} from "../interfaces/ISwaprAlgebraPositionManager.sol";
+import {FutarchyOfficialProposalSource} from "../sources/FutarchyOfficialProposalSource.sol";
 
+interface IAlgebraFactoryBoundGuard {
+    function FACTORY() external view returns (address);
+}
 /// @title FutarchyLiquidityManagerFactory
 /// @notice Permissionless deployment factory for the default per-organization FLM bundle.
 /// @dev Callers supply the pinned bare creation code to keep this factory below EIP-170. The
@@ -32,7 +39,8 @@ contract FutarchyLiquidityManagerFactory {
 
     struct CreationCodes {
         bytes proposalSource;
-        bytes adapter;
+        bytes spotAdapter;
+        bytes conditionalAdapter;
         bytes manager;
     }
 
@@ -51,10 +59,13 @@ contract FutarchyLiquidityManagerFactory {
     int24 public immutable DEFAULT_TICK_LOWER;
     int24 public immutable DEFAULT_TICK_UPPER;
     bytes32 public immutable PROPOSAL_SOURCE_CREATION_CODE_HASH;
-    bytes32 public immutable ADAPTER_CREATION_CODE_HASH;
+    bytes32 public immutable SPOT_ADAPTER_CREATION_CODE_HASH;
+    bytes32 public immutable CONDITIONAL_ADAPTER_CREATION_CODE_HASH;
     bytes32 public immutable MANAGER_CREATION_CODE_HASH;
 
     error ZeroAddress();
+    error InvalidLifecycleCoordinator();
+    error InvalidAmmWiring();
     error ZeroCreationCodeHash();
     error InvalidTickRange();
     error CreationCodeHashMismatch(bytes32 expected, bytes32 actual);
@@ -80,7 +91,8 @@ contract FutarchyLiquidityManagerFactory {
         int24 defaultTickLower,
         int24 defaultTickUpper,
         bytes32 proposalSourceCreationCodeHash,
-        bytes32 adapterCreationCodeHash,
+        bytes32 spotAdapterCreationCodeHash,
+        bytes32 conditionalAdapterCreationCodeHash,
         bytes32 managerCreationCodeHash
     ) {
         if (
@@ -90,9 +102,18 @@ contract FutarchyLiquidityManagerFactory {
         ) {
             revert ZeroAddress();
         }
+        if (
+            positionManager.factory() != address(algebraFactory)
+                || IAlgebraFactoryBoundGuard(address(poolStabilityGuard)).FACTORY()
+                    != address(algebraFactory)
+        ) {
+            revert InvalidAmmWiring();
+        }
         if (defaultTickLower >= defaultTickUpper) revert InvalidTickRange();
         if (
-            proposalSourceCreationCodeHash == bytes32(0) || adapterCreationCodeHash == bytes32(0)
+            proposalSourceCreationCodeHash == bytes32(0)
+                || spotAdapterCreationCodeHash == bytes32(0)
+                || conditionalAdapterCreationCodeHash == bytes32(0)
                 || managerCreationCodeHash == bytes32(0)
         ) {
             revert ZeroCreationCodeHash();
@@ -106,7 +127,8 @@ contract FutarchyLiquidityManagerFactory {
         DEFAULT_TICK_LOWER = defaultTickLower;
         DEFAULT_TICK_UPPER = defaultTickUpper;
         PROPOSAL_SOURCE_CREATION_CODE_HASH = proposalSourceCreationCodeHash;
-        ADAPTER_CREATION_CODE_HASH = adapterCreationCodeHash;
+        SPOT_ADAPTER_CREATION_CODE_HASH = spotAdapterCreationCodeHash;
+        CONDITIONAL_ADAPTER_CREATION_CODE_HASH = conditionalAdapterCreationCodeHash;
         MANAGER_CREATION_CODE_HASH = managerCreationCodeHash;
     }
 
@@ -116,7 +138,8 @@ contract FutarchyLiquidityManagerFactory {
     {
         _validateCreateParams(params);
         _validateCreationCode(codes.proposalSource, PROPOSAL_SOURCE_CREATION_CODE_HASH);
-        _validateCreationCode(codes.adapter, ADAPTER_CREATION_CODE_HASH);
+        _validateCreationCode(codes.spotAdapter, SPOT_ADAPTER_CREATION_CODE_HASH);
+        _validateCreationCode(codes.conditionalAdapter, CONDITIONAL_ADAPTER_CREATION_CODE_HASH);
         _validateCreationCode(codes.manager, MANAGER_CREATION_CODE_HASH);
 
         deployed.proposalSource = _deploy(
@@ -130,15 +153,18 @@ contract FutarchyLiquidityManagerFactory {
             )
         );
 
-        bytes memory adapterConstructorArgs =
+        bytes memory spotAdapterConstructorArgs =
             abi.encode(POSITION_MANAGER, DEFAULT_TICK_LOWER, DEFAULT_TICK_UPPER);
-        deployed.spotAdapter = _deploy(codes.adapter, adapterConstructorArgs);
-        deployed.conditionalAdapter = _deploy(codes.adapter, adapterConstructorArgs);
+        deployed.spotAdapter = _deploy(codes.spotAdapter, spotAdapterConstructorArgs);
+        deployed.conditionalAdapter = _deploy(codes.conditionalAdapter, abi.encode(ALGEBRA_FACTORY));
 
         deployed.manager = _deploy(codes.manager, _managerConstructorArgs(params, deployed));
 
         SwaprAlgebraLiquidityAdapter(deployed.spotAdapter).bindManager(deployed.manager);
-        SwaprAlgebraLiquidityAdapter(deployed.conditionalAdapter).bindManager(deployed.manager);
+        SwaprAlgebraDirectConditionalAdapter(deployed.conditionalAdapter)
+            .bindManager(deployed.manager);
+        FutarchyOfficialProposalSource(deployed.proposalSource)
+            .bindActivationTarget(deployed.manager);
 
         emit LiquidityManagerCreated(
             params.organization,
@@ -151,7 +177,7 @@ contract FutarchyLiquidityManagerFactory {
         );
     }
 
-    function _validateCreateParams(CreateParams calldata params) internal pure {
+    function _validateCreateParams(CreateParams calldata params) internal view {
         if (
             params.owner == address(0) || params.proposalManager == address(0)
                 || params.bootstrapRecipient == address(0)
@@ -160,6 +186,7 @@ contract FutarchyLiquidityManagerFactory {
         ) {
             revert ZeroAddress();
         }
+        if (params.proposalManager.code.length == 0) revert InvalidLifecycleCoordinator();
     }
 
     function _managerConstructorArgs(
@@ -170,7 +197,6 @@ contract FutarchyLiquidityManagerFactory {
             params.bootstrapRecipient,
             params.companyToken,
             WRAPPED_NATIVE,
-            params.officialProposer,
             deployed.proposalSource,
             deployed.spotAdapter,
             deployed.conditionalAdapter,

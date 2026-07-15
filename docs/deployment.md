@@ -1,5 +1,9 @@
 # Deployment
 
+> **No-funds prototype:** do not broadcast or fund the current Swapr Algebra bundle. Permissionless
+> pool precreation, mutable Algebra liquidity cooldown, and near-block-limit activation remain
+> unresolved. The commands below are retained for deterministic simulation and artifact review.
+
 Deployments are configured from JSON so addresses and bounds are reviewable before broadcasting.
 Do not edit addresses directly inside scripts for a real deployment.
 

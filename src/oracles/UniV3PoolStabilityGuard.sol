@@ -36,6 +36,18 @@ contract UniV3PoolStabilityGuard is IPoolStabilityGuard {
         _assertStable(pool);
     }
 
+    function assertStablePairAndGetSqrtPrice(address tokenA, address tokenB)
+        external
+        view
+        returns (uint160 sqrtPriceX96)
+    {
+        address pool = FACTORY.getPool(tokenA, tokenB, FEE);
+        if (pool == address(0)) revert PoolNotFound(tokenA, tokenB);
+        _assertStable(pool);
+        (sqrtPriceX96,,,,,,) = IUniswapV3PoolLike(pool).slot0();
+        if (sqrtPriceX96 == 0) revert InvalidPoolState(pool);
+    }
+
     function _assertStable(address pool) internal view {
         if (pool == address(0)) revert ZeroAddress();
 

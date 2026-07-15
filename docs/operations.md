@@ -1,5 +1,9 @@
 # Operation Batches
 
+Do not sign or fund batches for the current Swapr Algebra prototype. Its mutable pool cooldown lets
+third-party position mints block burns, so the AMM cannot yet support the promised unconditional
+redemption path.
+
 `script/BuildLiquidityOperationBatch.s.sol` generates Safe transaction-builder JSON from
 `config/safe-batch.example.json` style files. The script emits exactly one logical operation per
 batch so reviewers can audit calldata and values independently.
@@ -53,7 +57,9 @@ Start from the closest operation-specific template instead of editing the generi
 - `config/batches/sync.example.json` for both spot-to-conditional migration and settlement
   return-to-spot.
 - `config/batches/redeem.example.json` for LP share redemption.
-- `config/batches/set-proposal-validation.example.json` before admitting a real proposal.
+- `config/batches/set-proposal-validation.example.json` only for a separately deployed, still
+  unbound source. Factory-created bundles freeze constructor validation immediately and cannot use
+  this post-deployment operation.
 - `config/batches/set-official-proposal.example.json` after proposal validation is configured.
 - `config/batches/arm-emergency-exit.example.json` to start the emergency delay.
 - `config/batches/disarm-emergency-exit.example.json` to cancel an armed emergency exit.

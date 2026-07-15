@@ -6,6 +6,9 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {SwaprAlgebraLiquidityAdapter} from "../../src/adapters/SwaprAlgebraLiquidityAdapter.sol";
 import {
+    SwaprAlgebraDirectConditionalAdapter
+} from "../../src/adapters/SwaprAlgebraDirectConditionalAdapter.sol";
+import {
     FutarchyLiquidityManager,
     IWrappedNative
 } from "../../src/core/FutarchyLiquidityManager.sol";
@@ -44,6 +47,7 @@ contract FutarchyLiquidityManagerFactoryForkTest is Test {
             FULL_RANGE_UPPER,
             keccak256(type(FutarchyOfficialProposalSource).creationCode),
             keccak256(type(SwaprAlgebraLiquidityAdapter).creationCode),
+            keccak256(type(SwaprAlgebraDirectConditionalAdapter).creationCode),
             keccak256(type(FutarchyLiquidityManager).creationCode)
         );
 
@@ -62,7 +66,8 @@ contract FutarchyLiquidityManagerFactoryForkTest is Test {
         FutarchyLiquidityManagerFactory.CreationCodes memory codes =
             FutarchyLiquidityManagerFactory.CreationCodes({
                 proposalSource: type(FutarchyOfficialProposalSource).creationCode,
-                adapter: type(SwaprAlgebraLiquidityAdapter).creationCode,
+                spotAdapter: type(SwaprAlgebraLiquidityAdapter).creationCode,
+                conditionalAdapter: type(SwaprAlgebraDirectConditionalAdapter).creationCode,
                 manager: type(FutarchyLiquidityManager).creationCode
             });
 
@@ -83,8 +88,8 @@ contract FutarchyLiquidityManagerFactoryForkTest is Test {
 
         SwaprAlgebraLiquidityAdapter spotAdapter =
             SwaprAlgebraLiquidityAdapter(deployed.spotAdapter);
-        SwaprAlgebraLiquidityAdapter conditionalAdapter =
-            SwaprAlgebraLiquidityAdapter(deployed.conditionalAdapter);
+        SwaprAlgebraDirectConditionalAdapter conditionalAdapter =
+            SwaprAlgebraDirectConditionalAdapter(deployed.conditionalAdapter);
         FutarchyLiquidityManager manager = FutarchyLiquidityManager(payable(deployed.manager));
 
         assertEq(spotAdapter.MANAGER(), deployed.manager);

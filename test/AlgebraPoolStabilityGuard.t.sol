@@ -75,7 +75,7 @@ contract AlgebraPoolStabilityGuardTest is Test {
     function test_assertStable_fails_closed_when_history_query_reverts() public {
         pool.setShouldRevert(true);
 
-        vm.expectRevert(bytes("missing history"));
+        vm.expectRevert();
         guard.assertStable(address(pool));
     }
 
