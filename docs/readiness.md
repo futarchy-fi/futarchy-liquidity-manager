@@ -28,7 +28,9 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   and bounds a live-fee partial removal at 150,000 gas (116,245 measured). The real Uniswap V3
   fixture exercises adapter-owned fresh pool creation, initialization, and first-NFT mint; proves
   that a zero-liquidity pre-collection materializes current fees without changing the position's
-  liquidity or NFT identity; and rejects reuse of the initialized pool after final removal.
+  liquidity or NFT identity; and rejects reuse of the initialized pool after final removal. The
+  deterministic V3 suite also rejects an uninitialized pre-existing pool before custody changes
+  and proves a failed first mint rolls back pool creation, initialization, balances, and approvals.
 - Runtime-size checks retain an EIP-170 margin for the manager.
 
 ## Required before any funded deployment

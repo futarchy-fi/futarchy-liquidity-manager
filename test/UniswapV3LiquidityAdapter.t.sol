@@ -10,6 +10,7 @@ import {
     IUniswapV3NonfungiblePositionManager
 } from "../src/interfaces/IUniswapV3NonfungiblePositionManager.sol";
 import {MockMintableERC20} from "./mocks/MockMintableERC20.sol";
+import {MockUniswapV3FactoryLike} from "./mocks/MockUniswapV3FactoryLike.sol";
 import {
     MockUniswapV3NonfungiblePositionManager
 } from "./mocks/MockUniswapV3NonfungiblePositionManager.sol";
@@ -161,6 +162,54 @@ contract UniswapV3LiquidityAdapterTest is Test {
         adapter.addFreshFullRangeLiquidity(
             address(token0), address(token1), 1 ether, 1 ether, uint160(1) << 96
         );
+    }
+
+    function test_freshAddRejectsUninitializedPoolBeforeCustody() public {
+        address existingPool = address(0xCAFE);
+        MockUniswapV3FactoryLike(positionManager.factory())
+            .setPool(address(token0), address(token1), adapter.FEE(), existingPool);
+        uint256 balance0Before = token0.balanceOf(address(this));
+        uint256 balance1Before = token1.balanceOf(address(this));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                UniswapV3LiquidityAdapter.PoolAlreadyExists.selector, existingPool
+            )
+        );
+        adapter.addFreshFullRangeLiquidity(
+            address(token0), address(token1), 1 ether, 1 ether, uint160(1) << 96
+        );
+
+        assertEq(token0.balanceOf(address(this)), balance0Before);
+        assertEq(token1.balanceOf(address(this)), balance1Before);
+        assertEq(token0.balanceOf(address(adapter)), 0);
+        assertEq(token1.balanceOf(address(adapter)), 0);
+        assertEq(positionManager.poolInitializationCalls(), 0);
+        assertEq(positionManager.mintCalls(), 0);
+        assertEq(adapter.getPositionTokenId(address(token0), address(token1)), 0);
+    }
+
+    function test_freshAddFirstMintFailureRollsBackPoolAndCustody() public {
+        positionManager.setUsageBps(9949);
+        MockUniswapV3FactoryLike factory = MockUniswapV3FactoryLike(positionManager.factory());
+        uint256 balance0Before = token0.balanceOf(address(this));
+        uint256 balance1Before = token1.balanceOf(address(this));
+
+        vm.expectRevert();
+        adapter.addFreshFullRangeLiquidity(
+            address(token0), address(token1), 2 ether, 1 ether, uint160(1) << 96
+        );
+
+        assertEq(factory.getPool(address(token0), address(token1), adapter.FEE()), address(0));
+        assertEq(token0.balanceOf(address(this)), balance0Before);
+        assertEq(token1.balanceOf(address(this)), balance1Before);
+        assertEq(token0.balanceOf(address(adapter)), 0);
+        assertEq(token1.balanceOf(address(adapter)), 0);
+        assertEq(token0.allowance(address(adapter), address(positionManager)), 0);
+        assertEq(token1.allowance(address(adapter), address(positionManager)), 0);
+        assertEq(positionManager.poolInitializationCalls(), 0);
+        assertEq(positionManager.mintCalls(), 0);
+        assertEq(adapter.getPositionTokenId(address(token0), address(token1)), 0);
     }
 
     function test_secondAddIncreasesTheSameNft() public {
