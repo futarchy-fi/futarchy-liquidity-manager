@@ -1,9 +1,9 @@
 # Design
 
-The planned replacement for the current two-transaction activation and full-consolidation
-redemption paths is specified in
-[`atomic-lifecycle-amendment.md`](atomic-lifecycle-amendment.md). The sections below describe the
-contracts at repository head unless they explicitly refer to that amendment.
+The source-atomic activation and proportional-redemption design is specified in
+[`atomic-lifecycle-amendment.md`](atomic-lifecycle-amendment.md) and implemented at repository head.
+The current Swapr Algebra adapter still fails its removal-liveness threat model, so this is a
+no-funds prototype pending the replacement specified in `production-amm-successor.md`.
 
 ## Goal
 
@@ -12,16 +12,18 @@ company token and collateral once, receive FLM shares, and let the manager handl
 
 - spot liquidity while no official proposal is live;
 - migration into YES/NO conditional pools while an official proposal is live;
-- return to spot after proposal settlement;
+- recovery to share-owned base inventory after proposal settlement;
 - pro-rata LP redemption across active liquidity modes.
 
 ## Core Principle
 
 Proposal curation must not imply custody over LP funds.
 
-The owner or proposal manager can mark an official proposal only through
-`FutarchyOfficialProposalSource`. When validation is enabled, `setOfficialProposal` accepts only
-proposals whose on-chain properties match the configured safety policy.
+Only the source's immutable lifecycle coordinator can call `setOfficialProposal`. That call stores
+one validated proposal snapshot and must activate the bound manager before returning, so either the
+registry write and both first positions succeed together or every effect reverts. Source owners and
+the mutable proposal manager may configure pre-binding policy and later metadata, but cannot bypass
+the coordinator-only activation path.
 
 ## Permissionless Deployment
 
@@ -40,25 +42,22 @@ or a signed endorsement belongs in the consuming UI; event discovery alone is no
 
 ## Public Vault Accounting
 
-Deposits are permissionless only while the manager is in spot mode. Before any deposit or
-redemption, the manager removes every active position in full. Principal, accrued AMM fees, and
-tracked idle balances then form one observable asset vector, avoiding a price oracle or per-holder
-fee index.
+Deposits are permissionless only while the manager is in spot mode. Before a deposit, the manager
+fully consolidates the spot position so principal, accrued AMM fees, donations, and idle balances
+form one observable two-asset vector. This prevents a new depositor from diluting earlier value
+without a price oracle or per-holder fee index.
 
 A spot deposit supplies maximum amounts of both base assets. Shares are the smaller of the two
 proportional contributions, rounded down; the accepted asset amounts are rounded up and all excess
 is refunded or left unpulled. A redemption receives the same fraction of each consolidated asset,
 with the final redeemer receiving all rounding dust.
 
-In conditional mode, the vector also contains YES/NO company and collateral tokens. The manager
-merges only the withdrawing slice's matched complete sets and transfers unmatched outcomes in kind.
-If the merge call reverts, the complete sets are transferred in kind too, so router availability
-cannot block withdrawal. Remaining assets are re-added with fixed adapter defaults. A failed re-add
-does not revert redemption: assets stay in the manager and `restoreLiquidity()` is a permissionless
-retry. Restoration first requires the exact spot or conditional pair to pass the shared stability
-guard. Once stable, ratio-fit inventory is re-added and asymmetric fee inventory remains idle and
-share-owned. A new conditional pool without 30 minutes of history therefore defers restoration but
-never blocks the withdrawal that triggered it.
+Redemption does not consolidate or restore survivor positions. It snapshots the six possible idle
+balances, removes only the caller's floor-rounded share of each active position, adds proportional
+fees, and leaves every remainder share-owned. In conditional mode it merges only the withdrawing
+slice's matched complete sets and transfers unmatched outcomes in kind. If either merge reverts,
+that underlying's complete sets are transferred in kind too, so router availability cannot block
+withdrawal. The final holder receives all rounding residue.
 
 Emergency execution follows the same custody rule. It unwinds positions into the manager but never
 transfers pooled assets or burns shares. Owner sweeping is disabled until total share supply is zero.
@@ -69,7 +68,6 @@ The proposal source can reject:
 
 - wrong company/collateral pair;
 - missing or duplicate wrapped outcome tokens;
-- missing YES/NO conditional pools;
 - wrong CTF oracle or condition id;
 - non-binary CTF conditions;
 - missing Reality question;
@@ -77,21 +75,23 @@ The proposal source can reject:
 - opening time too far in the future;
 - timeout below or above configured bounds;
 - minimum bond above the configured maximum.
+- an answered, arbitrating, already-open, or too-short-lived Reality question.
 
 These checks are intended to prevent a weak proposal manager from freezing LP funds by selecting
 an arbitrary or never-settling conditional market.
 
 ## Migration Price Guard
 
-Before either permissionless migration direction removes liquidity, the manager asks its immutable
+Before source-atomic conditional activation removes spot liquidity, the manager asks its immutable
 shared `AlgebraPoolStabilityGuard` to compare the established spot pool's current tick with its
-30-minute time-weighted average. More than 50 ticks of deviation, missing history, a missing pool,
-or an uninitialized pool reverts before state changes.
+30-minute time-weighted average and return the guarded price. More than 50 ticks of deviation,
+missing history, a missing pool, or an uninitialized pool reverts the complete source write.
 
 The guard deliberately does not require history from newly created YES/NO pools. On entry, the
 manager instead requires each conditional add to consume both sides of the inventory split from the
-TWAP-anchored spot position within a symmetric 50-bps leftover bound. On return, the same spot guard
-runs before the settled winner inventory is recovered and ratio-fit back into spot.
+TWAP-anchored spot position within a symmetric 50-bps leftover bound. Settlement removes and
+resolves the stored conditional assets without consulting the spot pool; recovered base inventory
+stays idle and redeemable until a separately proven fair join exists.
 
 The proposed zero-fee constant-product round-trip invariant is derived in
 [`constant-product-roundtrip.md`](constant-product-roundtrip.md). It shows how an

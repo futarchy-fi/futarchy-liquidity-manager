@@ -2,14 +2,18 @@
 
 Audit-oriented smart contract package for generic futarchy liquidity management.
 
-The core idea is that LPs deposit a company token and collateral once, receive FLM shares,
-and the manager handles spot liquidity, conditional YES/NO migration during an official
-proposal, and return to spot after settlement.
+The core idea is that LPs deposit a company token and collateral once, receive FLM shares, and the
+manager handles spot liquidity, source-atomic conditional YES/NO activation during an official
+proposal, and CTF settlement back to share-owned base inventory.
 
 Public deposits are accepted only in spot mode and in the vault's existing two-asset proportion.
-Redemption is always available, including conditional and emergency modes. Share changes fully
-unwind active positions first so principal, fees, and idle balances remain pro-rata; callers supply
-no adapter ticks, slippage, deadlines, or initialization prices.
+Redemption is always available, including conditional and emergency modes. A redemption removes
+only its proportional liquidity, principal, fee, and idle slices; it never redeploys survivor
+assets. Callers supply no adapter ticks, slippage, deadlines, or initialization prices.
+
+The current Swapr Algebra path is a no-funds prototype because permissionless pool precreation and
+a mutable burn cooldown violate the production threat model. See
+[`docs/readiness.md`](docs/readiness.md).
 
 ## Layout
 
@@ -31,9 +35,8 @@ Primary audit scope:
 - `src/oracles/DeadlineBoundedRealityProxy.sol`
 - `src/interfaces/*.sol`
 
-Adapter audit scope:
-
-- `src/adapters/SwaprAlgebraLiquidityAdapter.sol`
+Adapter and deployment audit scope also includes `src/adapters/`, `src/routers/`, and
+`src/factories/`. None of the current Algebra deployment artifacts are approved for funding.
 
 Out of scope for this package:
 

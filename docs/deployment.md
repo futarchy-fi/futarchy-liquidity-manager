@@ -23,8 +23,9 @@ Required organization-specific fields:
 - `factory`: reviewed canonical `FutarchyLiquidityManagerFactory` for this dependency set and
   contract version.
 - `owner`: owner of the proposal source and liquidity manager emergency controls, ideally a Safe.
-- `proposalManager`: operator allowed to update proposal-source metadata, validation, and manual
-  settlement without owning emergency controls.
+- `proposalManager`: deployed lifecycle-coordinator contract and initial mutable proposal manager.
+  It is the immutable sole caller of `setOfficialProposal`; later changing the mutable proposal
+  manager does not change that coordinator.
 - `bootstrapRecipient`: account allowed to call `initializeFromBootstrap`; for FAO this should be
   the integration contract or Safe that initially funds liquidity.
 - `companyToken`: the token paired against the configured collateral token.
@@ -168,12 +169,12 @@ bootstrap recipient, or official proposer.
    <deploy-output> --batch <batch-config> ... --proposal <final-proposal> --run-fork-tests` and
    keep the output with the audit materials.
 5. Verify deployed bytecode and constructor arguments.
-6. Configure proposal validation if it was not configured during deployment.
+6. Confirm the constructor-set proposal validation is frozen and matches the reviewed config.
 7. Generate and audit the bootstrap liquidity Safe batch.
-8. Execute with limited funds first.
+8. Execute only in disposable simulation; the current Algebra path is not fundable.
 9. Confirm spot position token id and balances and wait until the spot pool has usable 30-minute
    observation history.
-10. Only then set an official proposal and generate sync batches.
+10. Only then have the lifecycle coordinator atomically set and activate an official proposal.
 
 ## No Docker Requirement
 

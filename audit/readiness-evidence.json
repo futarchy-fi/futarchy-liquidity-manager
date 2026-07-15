@@ -64,7 +64,7 @@
       "status": "ready-to-audit",
       "evidence": [
         {
-          "description": "Core manager tests cover proportional principal/fee/idle accounting, sequential six-token conservation and survivor-favoring rounding, deposit dilution, conditional in-kind fallback, and non-custodial emergency exit.",
+          "description": "Core manager tests cover proportional principal/fee/idle accounting, sequential six-token conservation and survivor-favoring rounding, single-leg donation-resistant deposit pricing, conditional in-kind fallback, and non-custodial emergency exit.",
           "path": "test/FutarchyLiquidityManager.t.sol"
         },
         {

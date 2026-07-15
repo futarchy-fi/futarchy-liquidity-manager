@@ -364,6 +364,30 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(manager.spotLiquidity(), 150 ether);
     }
 
+    function test_single_leg_donation_before_first_public_deposit_cannot_inflate_shares() public {
+        _bootstrap();
+        company.mint(address(manager), 100 ether);
+
+        vm.prank(depositor);
+        uint256 sharesMinted = manager.depositToSpot{value: 100 ether}(100 ether);
+
+        assertEq(sharesMinted, 50 ether);
+        assertEq(manager.balanceOf(depositor), 50 ether);
+        assertEq(manager.totalSupply(), 150 ether);
+
+        vm.prank(depositor);
+        (uint256 depositorCompany, uint256 depositorCollateral) =
+            manager.redeem(sharesMinted, depositor, false);
+        assertEq(depositorCompany, 100 ether);
+        assertEq(depositorCollateral, 50 ether);
+
+        vm.prank(bootstrapRecipient);
+        (uint256 incumbentCompany, uint256 incumbentCollateral) =
+            manager.redeem(100 ether, bootstrapRecipient, false);
+        assertEq(incumbentCompany, 200 ether);
+        assertEq(incumbentCollateral, 100 ether);
+    }
+
     function test_bootstrap_deposit_and_redeem_with_erc20_collateral() public {
         MockMintableERC20 collateral = new MockMintableERC20("Savings DAI", "sDAI");
         MockFutarchyLiquidityAdapter localSpotAdapter = new MockFutarchyLiquidityAdapter();

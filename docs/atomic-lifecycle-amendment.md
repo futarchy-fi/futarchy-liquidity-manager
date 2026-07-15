@@ -7,9 +7,11 @@ this adapter must not be funded.
 
 ## Status
 
-This document specifies the next FLM contract version. It replaces the current two-transaction
-official-proposal flow and the current full-consolidation redemption flow. It is not a description
-of the contracts at repository head.
+The proposal-source, manager, router, and accounting portions of this document describe the
+contracts at repository head. The production AMM portion remains incomplete: the current Swapr
+Algebra adapter cannot satisfy immutable removal liveness, so the repository remains a no-funds
+prototype. `production-amm-successor.md` and `production-amm-candidate-evaluation.md` define that
+remaining replacement gate.
 
 The amendment has two independent safety goals:
 

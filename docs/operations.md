@@ -54,8 +54,7 @@ Start from the closest operation-specific template instead of editing the generi
 
 - `config/batches/bootstrap.example.json` for `initializeFromBootstrap`.
 - `config/batches/deposit-to-spot.example.json` for later spot liquidity additions.
-- `config/batches/sync.example.json` for both spot-to-conditional migration and settlement
-  return-to-spot.
+- `config/batches/sync.example.json` for permissionless settlement of an already active condition.
 - `config/batches/redeem.example.json` for LP share redemption.
 - `config/batches/set-proposal-validation.example.json` only for a separately deployed, still
   unbound source. Factory-created bundles freeze constructor validation immediately and cannot use
@@ -82,20 +81,20 @@ slippage parameters therefore cannot be selected by a depositor, redeemer, or em
     not pull the excess.
 - `sync`
   - Transaction: `manager.sync`.
-  - Takes no execution parameters. Slippage bounds, deadlines, and full-range ticks are enforced by
-    the manager and its bound adapters. Before either migration direction removes liquidity, the
-    immutable shared guard requires the established spot pool's current tick to be within 50 ticks
-    of its 30-minute TWAP; missing history fails closed.
+  - Takes no execution parameters and can only settle the condition captured during activation.
+    It cannot activate a proposal. Settlement does not consult the mutable source or spot guard and
+    leaves recovered base assets idle and share-owned.
 - `redeem`
   - Transaction: `manager.redeem`.
   - Uses `shares`, `recipient`, and `unwrapNative`.
-  - Removes all active positions to account for principal, fees, and idle balances, pays the
-    withdrawing fraction, then tries to restore the remaining positions. In conditional mode it
+  - Snapshots idle balances, removes only the withdrawing fraction of active liquidity, pays its
+    proportional principal and fees, and never redeploys survivor assets. In conditional mode it
     merges only the withdrawing slice's matched complete sets; if the router rejects a merge, that
     slice is transferred in kind. Unmatched outcome tokens are always transferred in kind.
 - `setOfficialProposal`
   - Transaction: `proposalSource.setOfficialProposal`.
-  - Must be submitted by the owner or proposal manager.
+  - Must be submitted by the immutable lifecycle coordinator. The source write, manager
+    activation, CTF split, both fresh pool initializations, and both first positions are atomic.
   - Uses `proposalId`, `proposal`, and `creator`.
 - `setProposalValidationConfig`
   - Transaction: `proposalSource.setProposalValidationConfig`.
@@ -111,14 +110,10 @@ slippage parameters therefore cannot be selected by a depositor, redeemer, or em
 
 ## Fixed Execution Policy
 
-The manager passes empty adapter calldata for bootstrap, deposits, redemptions, restoration,
-emergency unwind, and `sync`. The bound adapter therefore uses immutable ticks, the current block as
-deadline, existing pools, and no caller-selected initialization price. Lifecycle `sync` additionally
-enforces the manager's TWAP guard and symmetric 50-bps inventory-use bound. Restoration requires
-each exact spot/YES/NO pair to pass the shared stability guard, then permits asymmetric fee inventory
-to remain idle and share-owned. A failed best-effort post-redemption restore leaves all remaining
-assets idle and emits `LiquidityRestoreDeferred`; anyone may retry `restoreLiquidity()` after the
-pool has sufficient stable history.
+The manager passes no caller-selected adapter execution policy. Bootstrap and spot deposits use the
+bound spot adapter's immutable ticks and deadline policy. Source-only activation derives each fresh
+conditional price from the guarded spot price and enforces the symmetric 50-bps inventory-use bound.
+Redemption only calls detailed removal; there is no post-redemption add or restoration path.
 
 For ERC20 collateral such as sDAI, set `collateralToken` to the deployed collateral token,
 `collateralAmount` to the amount being supplied, `nativeValue` to zero, and `unwrapNative` to false.

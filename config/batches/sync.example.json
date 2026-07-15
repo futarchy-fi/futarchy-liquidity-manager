@@ -1,6 +1,6 @@
 {
   "chainId": 100,
-  "name": "FLM sync migrate or settle",
+  "name": "FLM settle captured proposal",
   "createdFromSafeAddress": "0x0000000000000000000000000000000000000000",
   "createdFromOwnerAddress": "0x0000000000000000000000000000000000000000",
   "operation": "sync",
