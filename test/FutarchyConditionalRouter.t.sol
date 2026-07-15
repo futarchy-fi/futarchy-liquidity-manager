@@ -378,6 +378,15 @@ contract FutarchyConditionalRouterTest is Test {
         _assertNoRouterDust();
     }
 
+    function test_exact_ctf_split_receipt_is_enforced() public {
+        conditionalTokens.setSplitShortfallCollateral(address(company));
+        vm.expectRevert();
+        vm.prank(user);
+        router.splitPosition(address(company), CONDITION_ID, wrappers[0], wrappers[1], AMOUNT);
+        assertEq(company.balanceOf(user), 100 ether);
+        _assertNoRouterDust();
+    }
+
     function test_unsolicited_single_and_batch_underlying_transfers_are_rejected() public {
         _split(address(company));
         uint256 yesTokenId = _tokenId(address(company), 1);

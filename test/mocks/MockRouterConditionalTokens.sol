@@ -15,6 +15,7 @@ contract MockRouterConditionalTokens is ERC1155, IFutarchyConditionalTokens {
     mapping(bytes32 => uint256) private _outcomeSlotCount;
     mapping(bytes32 => uint256) public override payoutDenominator;
     mapping(bytes32 => mapping(uint256 => uint256)) public override payoutNumerators;
+    address public splitShortfallCollateral;
 
     constructor() ERC1155("") {}
 
@@ -30,6 +31,10 @@ contract MockRouterConditionalTokens is ERC1155, IFutarchyConditionalTokens {
 
     function mintPosition(address to, uint256 tokenId, uint256 amount) external {
         _mint(to, tokenId, amount, "");
+    }
+
+    function setSplitShortfallCollateral(address collateralToken) external {
+        splitShortfallCollateral = collateralToken;
     }
 
     function getOutcomeSlotCount(bytes32 conditionId) external view returns (uint256) {
@@ -64,9 +69,10 @@ contract MockRouterConditionalTokens is ERC1155, IFutarchyConditionalTokens {
         uint256[] memory tokenIds = new uint256[](2);
         tokenIds[0] = _tokenId(collateralToken, conditionId, partition[0]);
         tokenIds[1] = _tokenId(collateralToken, conditionId, partition[1]);
+        uint256 mintAmount = collateralToken == splitShortfallCollateral ? amount - 1 : amount;
         uint256[] memory amounts = new uint256[](2);
-        amounts[0] = amount;
-        amounts[1] = amount;
+        amounts[0] = mintAmount;
+        amounts[1] = mintAmount;
         _mintBatch(msg.sender, tokenIds, amounts, "");
     }
 

@@ -64,8 +64,16 @@
       "status": "ready-to-audit",
       "evidence": [
         {
-          "description": "Core manager tests cover proportional principal/fee/idle accounting, sequential six-token conservation and survivor-favoring rounding, single-leg donation-resistant deposit pricing, post-exit fee/donation ownership, second-leg and full-outer activation rollback, conditional underpayment fallback, exact-delta merge/winner/loser CTF settlement rollback, and non-custodial emergency exit.",
+          "description": "Core manager tests cover proportional principal/fee/idle accounting, sequential six-token conservation and survivor-favoring rounding, donation-resistant deposit pricing, post-exit fee/donation ownership, second-pool activation rollback, conditional underpayment fallback, exact-delta merge/winner/loser settlement rollback, and non-custodial emergency exit.",
           "path": "test/FutarchyLiquidityManager.t.sol"
+        },
+        {
+          "description": "The production router test proves exact CTF split receipts and exact wrapper mint deltas.",
+          "path": "test/FutarchyConditionalRouter.t.sol"
+        },
+        {
+          "description": "The real source-manager-router binding test proves second-CTF-split and post-activation outer-coordinator rollback across the registry, spot position, manager binding, wrappers, and fresh pools.",
+          "path": "test/FutarchyProposalBinding.t.sol"
         },
         {
           "description": "Adapter over-pull safety test.",

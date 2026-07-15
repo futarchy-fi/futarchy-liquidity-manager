@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {FutarchyLiquidityManager, IWrappedNative} from "../src/core/FutarchyLiquidityManager.sol";
 import {IAlgebraFactoryLike} from "../src/interfaces/IAlgebraFactoryLike.sol";
@@ -194,6 +195,21 @@ contract FutarchyProposalBindingTest is Test {
         company.approve(address(manager), AMOUNT);
         collateral.approve(address(manager), AMOUNT);
         manager.initializeFromBootstrap(AMOUNT, AMOUNT);
+
+        ctf.setSplitShortfallCollateral(address(collateral));
+        vm.expectRevert();
+        coordinator.setOfficial(source, 1, address(proposal), address(this));
+        ctf.setSplitShortfallCollateral(address(0));
+
+        assertFalse(source.currentOfficialProposal().exists);
+        assertFalse(manager.inConditionalMode());
+        assertEq(manager.spotLiquidity(), AMOUNT);
+        assertEq(spot.removeDetailedCalls(), 0);
+        assertEq(conditional.addFreshCalls(), 0);
+        assertEq(company.balanceOf(address(ctf)), 0);
+        for (uint256 i; i < sourceWrappers.length; ++i) {
+            assertEq(IERC20(sourceWrappers[i]).balanceOf(address(conditional)), 0);
+        }
 
         vm.expectRevert(BindingLifecycleCoordinator.PostActivationFailure.selector);
         coordinator.setOfficialThenRevert(source, 1, address(proposal), address(this));
