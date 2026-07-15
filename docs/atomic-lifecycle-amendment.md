@@ -333,6 +333,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | Replayed activation or second live proposal | Reverts without changing positions or binding. |
 | Adapter reports removal assets it did not transfer | The entire operation reverts before survivor-owned idle balances can fund the discrepancy. |
 | Adapter preserves receipt totals but swaps principal/fee field labels | The manager ignores labels and classifies exact deltas by the zero-liquidity and nonzero phases. |
+| Adapter's zero-liquidity call removes principal or leaves realized fees owed | The adapter violates the audited phase contract; deterministic and real-fork fixtures must prove unchanged liquidity and an immediately fee-free principal phase for the pinned bytecode. |
 | One redeemer manipulates or removes TWAP history | Redemption still succeeds; no guard is consulted. |
 | First partial redeemer attempts to take all NFT fees | Pre-collect/decrease/post-collect separation limits payout to its share. |
 | Fees or donations arrive after a partial redemption | Only the then-current share supply owns the new value; exited holders gain no retroactive claim. |

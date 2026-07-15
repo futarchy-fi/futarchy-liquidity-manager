@@ -34,7 +34,7 @@
       "status": "ready-to-audit",
       "evidence": [
         {
-          "description": "Swapr Algebra NFPM smoke test plus real full-unwind spot and source-activated fresh-pool conditional public-vault gas checks.",
+          "description": "Swapr Algebra NFPM smoke test proves real zero-liquidity fee materialization preserves position liquidity and NFT identity, drains fees before principal removal, and also covers full-unwind spot and source-activated fresh-pool conditional public-vault gas checks.",
           "path": "test/fork/SwaprAlgebraLiquidityAdapterFork.t.sol"
         },
         {

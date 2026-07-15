@@ -23,6 +23,16 @@ import {MockPoolStabilityGuard} from "../mocks/MockPoolStabilityGuard.sol";
 import {IAlgebraFactoryLike} from "../../src/interfaces/IAlgebraFactoryLike.sol";
 import {IAlgebraPoolLike} from "../../src/interfaces/IAlgebraPoolLike.sol";
 
+interface IAlgebraSwapPool {
+    function swap(
+        address recipient,
+        bool zeroToOne,
+        int256 amountRequired,
+        uint160 limitSqrtPrice,
+        bytes calldata data
+    ) external returns (int256 amount0, int256 amount1);
+}
+
 contract SwaprAlgebraLiquidityAdapterForkTest is Test {
     address internal constant GNOSIS_GNO = 0x9C58BAcC331c9aa871AFD802DB6379a98e80CEdb;
     address internal constant GNOSIS_WXDAI = 0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d;
@@ -31,6 +41,7 @@ contract SwaprAlgebraLiquidityAdapterForkTest is Test {
 
     int24 internal constant FULL_RANGE_LOWER = -887_220;
     int24 internal constant FULL_RANGE_UPPER = 887_220;
+    uint160 internal constant MIN_SQRT_PRICE = 4_295_128_740;
 
     receive() external payable {}
 
@@ -80,11 +91,33 @@ contract SwaprAlgebraLiquidityAdapterForkTest is Test {
             ISwaprAlgebraPositionManager(SWAPR_POSITION_MANAGER).positions(tokenId);
         assertEq(currentLiquidity, liquidityMinted);
 
+        address pool = IAlgebraFactoryLike(ALGEBRA_FACTORY).poolByPair(GNOSIS_GNO, GNOSIS_WXDAI);
+        IAlgebraSwapPool(pool)
+            .swap(
+                address(this),
+                true,
+                int256(0.01 ether),
+                MIN_SQRT_PRICE,
+                abi.encode(GNOSIS_GNO, GNOSIS_WXDAI)
+            );
+
+        IFutarchyLiquidityAdapter.Removal memory fees =
+            adapter.removeLiquidityDetailed(GNOSIS_GNO, GNOSIS_WXDAI, 0);
+        assertEq(fees.principal0, 0);
+        assertEq(fees.principal1, 0);
+        assertGt(fees.fees0 + fees.fees1, 0);
+        (,,,,,, uint128 liquidityAfterFeeCollection,,,,) =
+            ISwaprAlgebraPositionManager(SWAPR_POSITION_MANAGER).positions(tokenId);
+        assertEq(liquidityAfterFeeCollection, currentLiquidity);
+        assertEq(adapter.getPositionTokenId(GNOSIS_GNO, GNOSIS_WXDAI), tokenId);
+
         IFutarchyLiquidityAdapter.Removal memory removed =
             adapter.removeLiquidityDetailed(GNOSIS_GNO, GNOSIS_WXDAI, currentLiquidity);
         uint256 amount0Out = removed.principal0 + removed.fees0;
         uint256 amount1Out = removed.principal1 + removed.fees1;
 
+        assertEq(removed.fees0, 0);
+        assertEq(removed.fees1, 0);
         assertGt(amount0Out + amount1Out, 0);
         assertEq(adapter.getPositionTokenId(GNOSIS_GNO, GNOSIS_WXDAI), 0);
 
@@ -137,6 +170,19 @@ contract SwaprAlgebraLiquidityAdapterForkTest is Test {
 
         assertEq(amount0Out, 0);
         assertEq(amount1Out, 0);
+    }
+
+    function algebraSwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data)
+        external
+    {
+        (address token0, address token1) = abi.decode(data, (address, address));
+        require(msg.sender == IAlgebraFactoryLike(ALGEBRA_FACTORY).poolByPair(token0, token1));
+        if (amount0Delta > 0) {
+            require(IERC20(token0).transfer(msg.sender, uint256(amount0Delta)));
+        }
+        if (amount1Delta > 0) {
+            require(IERC20(token1).transfer(msg.sender, uint256(amount1Delta)));
+        }
     }
 
     function testFork_publicVaultFullUnwindDepositAndRedeemFitsGnosisGas() public {
