@@ -19,7 +19,8 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   revert or dishonest returned address restores the source registry, both CTF splits, spot
   position, pool creation, and wrapper custody; a failure on the second fresh position and an
   explicit external resolver-binding failure after activation restore the same envelope, including
-  coordinator state. After successful activation, both an exact replay and a different proposal ID
+  coordinator state, CTF collateral, wrapper total supply and custody, base custody, and manager
+  router allowances. After successful activation, both an exact replay and a different proposal ID
   revert without changing the registry, captured binding, pools, or liquidity.
 - The manager stores the CTF condition and wrapper binding used for settlement rather than rereading
   mutable proposal state.

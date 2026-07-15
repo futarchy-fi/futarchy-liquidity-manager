@@ -327,6 +327,23 @@ contract FutarchyProposalBindingTest is Test {
         assertEq(conditional.addFreshCalls(), 0);
         assertEq(poolFactory.poolByPair(sourceWrappers[0], sourceWrappers[2]), address(0));
         assertEq(poolFactory.poolByPair(sourceWrappers[1], sourceWrappers[3]), address(0));
+        assertEq(company.balanceOf(address(manager)), 0);
+        assertEq(collateral.balanceOf(address(manager)), 0);
+        assertEq(company.balanceOf(address(spot)), AMOUNT);
+        assertEq(collateral.balanceOf(address(spot)), AMOUNT);
+        assertEq(company.balanceOf(address(ctf)), 0);
+        assertEq(collateral.balanceOf(address(ctf)), 0);
+        assertEq(company.balanceOf(address(router)), 0);
+        assertEq(collateral.balanceOf(address(router)), 0);
+        assertEq(company.allowance(address(manager), address(router)), 0);
+        assertEq(collateral.allowance(address(manager), address(router)), 0);
+        for (uint256 i; i < sourceWrappers.length; ++i) {
+            IERC20 wrapper = IERC20(sourceWrappers[i]);
+            assertEq(wrapper.totalSupply(), 0);
+            assertEq(wrapper.balanceOf(address(manager)), 0);
+            assertEq(wrapper.balanceOf(address(conditional)), 0);
+            assertEq(wrapper.balanceOf(address(router)), 0);
+        }
 
         coordinator.setOfficial(source, 1, address(proposal), address(this));
 

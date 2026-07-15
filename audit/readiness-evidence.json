@@ -88,7 +88,7 @@
           "path": "test/DeadlineBoundedRealityProxy.t.sol"
         },
         {
-          "description": "The real source-manager-router binding test proves already-resolved-condition, first-conditional-add, canonical fresh-pool identity, first- and second-CTF-split, second-fresh-position, and external post-activation resolver-binding rollback across coordinator state, registry, spot position, manager binding, wrappers, and fresh pools; and exact-replay or second-live-proposal rejection without changing active positions or binding.",
+          "description": "The real source-manager-router binding test proves already-resolved-condition, first-conditional-add, canonical fresh-pool identity, first- and second-CTF-split, second-fresh-position, and external post-activation resolver-binding rollback across coordinator state, registry, spot position, manager binding, CTF collateral, wrapper total supply and custody, base custody, router allowances, and fresh pools; and exact-replay or second-live-proposal rejection without changing active positions or binding.",
           "path": "test/FutarchyProposalBinding.t.sol"
         },
         {
