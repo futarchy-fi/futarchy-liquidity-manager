@@ -35,8 +35,9 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   per-share claim on those balances; handles divergent YES/NO liquidity and post-swap principal
   composition; falls back to exact in-kind outcomes when a merge approval fails, the router
   reverts, partially consumes wrappers, or underpays; assigns fees and six-token donations arriving
-  after a conditional exit only to the remaining shares; settles after randomized one-to-four
-  partial exits; and gives final rounding residue to the last holder. The stateful manager invariant
+  after a conditional exit only to the remaining shares; and proves a failure for one underlying
+  does not prevent the other underlying from merging. It settles after randomized one-to-four
+  partial exits and gives final rounding residue to the last holder. The stateful manager invariant
   campaign also interleaves
   deposits, activation, fees, donations, redemptions, and settlement; every successful deposit and
   redemption checks survivor-favoring liquidity and six-token balance ratios, all six tokens remain
