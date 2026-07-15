@@ -46,10 +46,10 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
 - Deposits are accepted only in spot mode and only in the vault's existing two-asset proportion.
 - Conditional redemption touches only the withdrawing fraction. Matched complete sets are merged
   when possible; router failure and unmatched balances fall back to in-kind outcome tokens.
-- Stateful fee and donation sequences cannot dilute a survivor: every successful redemption must
-  preserve or increase each remaining liquidity and six-token balance claim per share. All issued
-  test assets remain in modeled manager, adapter, router, or holder custody, and zero share supply
-  leaves no balance under manager or adapter control.
+- Stateful fee and donation sequences cannot dilute an existing holder: every successful deposit
+  and redemption must preserve or increase each remaining liquidity and six-token balance claim
+  per share. All issued test assets remain in modeled manager, adapter, router, or holder custody,
+  and zero share supply leaves no balance under manager or adapter control.
 - Proposal manager cannot select arbitrary unsafe proposals once validation is enabled.
 - The proposal source completes an official write only if the activation target reports an exact
   capture of every source-validated proposal field; any mismatch rolls back both contracts.
