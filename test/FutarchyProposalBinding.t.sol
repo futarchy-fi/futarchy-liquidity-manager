@@ -297,7 +297,7 @@ contract FutarchyProposalBindingTest is Test {
             assertEq(manager.conditionalNoLiquidity(), 80 ether);
             assertEq(manager.activeYesPool(), yesPoolBefore);
             assertEq(manager.activeNoPool(), noPoolBefore);
-            assertEq(spot.removeDetailedCalls(), 1);
+            assertEq(spot.removeDetailedCalls(), 2);
             assertEq(conditional.addFreshCalls(), 2);
         }
 

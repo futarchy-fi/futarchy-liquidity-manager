@@ -780,15 +780,31 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         address token1,
         uint128 liquidity
     ) internal returns (IFutarchyLiquidityAdapter.Removal memory removed) {
+        (removed.fees0, removed.fees1) = _removeLiquidityReceiptExact(adapter, token0, token1, 0);
+        if (liquidity == 0) return removed;
+
+        (removed.principal0, removed.principal1) =
+            _removeLiquidityReceiptExact(adapter, token0, token1, liquidity);
+    }
+
+    function _removeLiquidityReceiptExact(
+        IFutarchyLiquidityAdapter adapter,
+        address token0,
+        address token1,
+        uint128 liquidity
+    ) internal returns (uint256 amount0, uint256 amount1) {
         uint256 balance0Before = IERC20(token0).balanceOf(address(this));
         uint256 balance1Before = IERC20(token1).balanceOf(address(this));
-        removed = adapter.removeLiquidityDetailed(token0, token1, liquidity);
+        IFutarchyLiquidityAdapter.Removal memory removed =
+            adapter.removeLiquidityDetailed(token0, token1, liquidity);
+        amount0 = removed.principal0 + removed.fees0;
+        amount1 = removed.principal1 + removed.fees1;
         uint256 balance0After = IERC20(token0).balanceOf(address(this));
         uint256 balance1After = IERC20(token1).balanceOf(address(this));
         if (
             balance0After < balance0Before || balance1After < balance1Before
-                || balance0After - balance0Before != removed.principal0 + removed.fees0
-                || balance1After - balance1Before != removed.principal1 + removed.fees1
+                || balance0After - balance0Before != amount0
+                || balance1After - balance1Before != amount1
         ) revert InvalidAssetTransfer();
     }
 

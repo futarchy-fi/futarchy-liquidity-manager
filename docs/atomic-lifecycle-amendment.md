@@ -230,12 +230,13 @@ function removeLiquidityDetailed(
 ) external returns (Removal memory removed);
 ```
 
-It first executes the AMM-specific fee-growth realization sequence and collects all accrued fees,
-then decreases only the requested amount and collects the newly owed principal. The first phase
-must leave no pre-existing owed amount. The second collection must equal the position manager's
-reported principal, and every returned amount must equal the manager's observed balance delta. This
-order separates fees from principal without a persistent fee index; it does not assume that a bare
-`collect` call realizes fees on every supported AMM.
+The manager first invokes it with zero liquidity, classifies that call's entire exact balance delta
+as fees, then invokes it with the requested liquidity and classifies the second call's entire exact
+delta as principal. Returned field labels are deliberately summed and ignored. The adapter's first
+phase must execute the AMM-specific fee-growth realization sequence, collect all accrued fees, and
+leave no pre-existing owed amount. The second collection must equal the position manager's reported
+principal. This order separates fees from principal without a persistent fee index and does not
+assume that a bare `collect` call realizes fees on every supported AMM.
 
 For `liquidity == 0`, the adapter performs only the fee collection: it does not decrease or burn
 the position and reports zero principal. A real fork test must prove that each supported position
@@ -331,6 +332,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | Source cleared or replaced after activation | Stored proposal and condition still settle normally. |
 | Replayed activation or second live proposal | Reverts without changing positions or binding. |
 | Adapter reports removal assets it did not transfer | The entire operation reverts before survivor-owned idle balances can fund the discrepancy. |
+| Adapter preserves receipt totals but swaps principal/fee field labels | The manager ignores labels and classifies exact deltas by the zero-liquidity and nonzero phases. |
 | One redeemer manipulates or removes TWAP history | Redemption still succeeds; no guard is consulted. |
 | First partial redeemer attempts to take all NFT fees | Pre-collect/decrease/post-collect separation limits payout to its share. |
 | Fees or donations arrive after a partial redemption | Only the then-current share supply owns the new value; exited holders gain no retroactive claim. |

@@ -28,6 +28,7 @@ contract MockFutarchyLiquidityAdapter is IFutarchyLiquidityAdapter {
     uint256 public removeDetailedCalls;
     bool public zeroRemoveOutput;
     bool public misreportRemoveOutput;
+    bool public misclassifyRemoveOutput;
     bool public addReverts;
     bool public misreportPrefundedPool;
 
@@ -48,6 +49,10 @@ contract MockFutarchyLiquidityAdapter is IFutarchyLiquidityAdapter {
 
     function setMisreportRemoveOutput(bool value) external {
         misreportRemoveOutput = value;
+    }
+
+    function setMisclassifyRemoveOutput(bool value) external {
+        misclassifyRemoveOutput = value;
     }
 
     function setAddReverts(bool value) external {
@@ -233,6 +238,22 @@ contract MockFutarchyLiquidityAdapter is IFutarchyLiquidityAdapter {
         }
         if (amount1Out > 0) {
             IERC20(token1).safeTransfer(msg.sender, amount1Out);
+        }
+        if (misclassifyRemoveOutput) {
+            if (removed.fees0 > 0) {
+                removed.principal0 = removed.fees0;
+                removed.fees0 = 0;
+            } else if (removed.principal0 > 0) {
+                removed.fees0 = removed.principal0;
+                removed.principal0 = 0;
+            }
+            if (removed.fees1 > 0) {
+                removed.principal1 = removed.fees1;
+                removed.fees1 = 0;
+            } else if (removed.principal1 > 0) {
+                removed.fees1 = removed.principal1;
+                removed.principal1 = 0;
+            }
         }
         if (misreportRemoveOutput) removed.principal0 += 1;
     }

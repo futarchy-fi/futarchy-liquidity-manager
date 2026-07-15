@@ -28,7 +28,10 @@ interface IFutarchyLiquidityAdapter {
         bytes calldata data
     ) external returns (uint128 liquidityMinted, uint256 amount0Used, uint256 amount1Used);
 
-    /// @dev For each token, principal plus fees must equal the caller's balance increase.
+    /// @dev A zero-liquidity call must collect fees without removing principal. The immediately
+    /// following nonzero call removes principal after those fees are cleared. For each token,
+    /// principal plus fees must equal the caller's balance increase; callers need not trust how
+    /// the adapter classifies that increase between the two returned fields.
     function removeLiquidityDetailed(address token0, address token1, uint128 liquidity)
         external
         returns (Removal memory removed);

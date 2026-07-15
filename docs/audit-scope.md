@@ -101,8 +101,10 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
 
 - The selected liquidity adapter is in audit scope. The manager checks that add-liquidity calls do
   not report more input used than provided and that every removal receipt equals the exact assets
-  received. Adapter principal/fee classification, custody, and protocol interactions still require
-  adapter review.
+  received. It classifies the entire exact delta from a zero-liquidity call as fees and the exact
+  delta from the immediately following nonzero call as principal, so it does not trust the
+  adapter's returned field labels. Adapter zero-liquidity semantics, custody, and protocol
+  interactions still require adapter review.
 - Deposits require exact ERC20 balance deltas; fee-on-transfer assets are rejected. Rebasing assets
   are not a supported company-token or collateral configuration.
 - The immutable conditional router verifies canonical wrapper identity and exact split/settlement

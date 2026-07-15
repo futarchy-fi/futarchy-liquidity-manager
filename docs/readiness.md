@@ -25,7 +25,9 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   winner redemption, and losing-token consumption; router failure, partial consumption, or
   underpayment rolls back positions and binding.
 - Every spot and conditional adapter removal receipt must equal the manager's exact token balance
-  deltas. An overreport cannot consume survivor-owned idle balances; the complete operation reverts.
+  deltas. The manager derives fee/principal classification from separate zero/nonzero removal
+  phases rather than trusting returned labels. Misclassification cannot change payouts, and an
+  overreport cannot consume survivor-owned idle balances; the complete operation reverts.
 - Partial redemption removes proportional spot, YES, and NO liquidity; accounts for principal,
   fees, and six idle token balances; never restores liquidity; cannot reduce any survivor's
   per-share claim on those balances; handles divergent YES/NO liquidity and post-swap principal

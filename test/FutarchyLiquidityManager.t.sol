@@ -334,6 +334,7 @@ contract FutarchyLiquidityManagerTest is Test {
         vm.prank(depositor);
         manager.depositToSpot{value: 100 ether}(100 ether);
         _accruePairFees(spotAdapter, company, wrappedNative, 20 ether, 40 ether);
+        spotAdapter.setMisclassifyRemoveOutput(true);
         company.mint(address(manager), 10 ether);
         wrappedNative.mint(address(manager), 30 ether);
         stabilityGuard.setPairFailure(manager.TOKEN0(), manager.TOKEN1(), true);
@@ -401,6 +402,7 @@ contract FutarchyLiquidityManagerTest is Test {
 
         _accruePairFees(conditionalAdapter, yesCompany, yesCurrency, 4 ether, 8 ether);
         _accruePairFees(conditionalAdapter, noCompany, noCurrency, 12 ether, 16 ether);
+        conditionalAdapter.setMisclassifyRemoveOutput(true);
         yesCompany.mint(address(manager), 10 ether);
         yesCurrency.mint(address(manager), 20 ether);
         noCompany.mint(address(manager), 30 ether);
