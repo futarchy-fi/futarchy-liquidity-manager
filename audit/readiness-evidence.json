@@ -92,7 +92,7 @@
           "path": "test/FutarchyLiquidityManagerAdapterSafety.t.sol"
         },
         {
-          "description": "Deterministic Uniswap V3 adapter tests separate fee-only, partial-principal, and final-principal removal fields exactly; cover fresh create-initialize-first-mint ownership; reject an uninitialized pre-existing pool before custody changes; and prove first-mint failure rolls back pool creation, initialization, balances, and approvals.",
+          "description": "Deterministic Uniswap V3 adapter tests separate fee-only, partial-principal, and final-principal removal fields exactly; cover fresh create-initialize-first-mint ownership; reject uninitialized and initialized guarded/manipulated-price pre-existing pools before custody changes; and prove first-mint failure rolls back pool creation, initialization, balances, and approvals.",
           "path": "test/UniswapV3LiquidityAdapter.t.sol"
         },
         {

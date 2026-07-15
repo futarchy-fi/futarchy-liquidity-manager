@@ -42,6 +42,7 @@ contract MockUniswapV3NonfungiblePositionManager is IUniswapV3NonfungiblePositio
     uint256 public collectCalls;
     uint256 public burnCalls;
     uint256 public poolInitializationCalls;
+    uint160 public lastPoolSqrtPriceX96;
 
     uint24 public lastFee;
     uint256 public lastAmount0Min;
@@ -216,13 +217,14 @@ contract MockUniswapV3NonfungiblePositionManager is IUniswapV3NonfungiblePositio
         position.tokensOwed1 += uint128(amount1);
     }
 
-    /// @dev Exists only so tests can prove the adapter never invokes pool initialization.
-    function createAndInitializePoolIfNecessary(address token0, address token1, uint24 fee, uint160)
-        external
-        payable
-        returns (address)
-    {
+    function createAndInitializePoolIfNecessary(
+        address token0,
+        address token1,
+        uint24 fee,
+        uint160 sqrtPriceX96
+    ) external payable returns (address) {
         poolInitializationCalls++;
+        lastPoolSqrtPriceX96 = sqrtPriceX96;
         address pool = address(0xBEEF);
         MockUniswapV3FactoryLike(factory).setPool(token0, token1, fee, pool);
         return pool;

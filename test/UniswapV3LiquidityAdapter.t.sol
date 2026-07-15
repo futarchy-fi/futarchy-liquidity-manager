@@ -32,6 +32,7 @@ contract AdapterFeeOnTransferToken is ERC20 {
 contract UniswapV3LiquidityAdapterTest is Test {
     int24 internal constant TICK_LOWER = -887_270;
     int24 internal constant TICK_UPPER = 887_270;
+    uint160 internal constant Q96 = uint160(1) << 96;
 
     MockUniswapV3NonfungiblePositionManager internal positionManager;
     UniswapV3LiquidityAdapter internal adapter;
@@ -185,6 +186,39 @@ contract UniswapV3LiquidityAdapterTest is Test {
         assertEq(token0.balanceOf(address(adapter)), 0);
         assertEq(token1.balanceOf(address(adapter)), 0);
         assertEq(positionManager.poolInitializationCalls(), 0);
+        assertEq(positionManager.mintCalls(), 0);
+        assertEq(adapter.getPositionTokenId(address(token0), address(token1)), 0);
+    }
+
+    function test_freshAddRejectsInitializedPoolsAtAnyPriceBeforeCustody() public {
+        MockUniswapV3FactoryLike factory = MockUniswapV3FactoryLike(positionManager.factory());
+        uint160[2] memory prices = [Q96, Q96 * 2];
+        uint256 balance0Before = token0.balanceOf(address(this));
+        uint256 balance1Before = token1.balanceOf(address(this));
+
+        for (uint256 i; i < prices.length; ++i) {
+            factory.setPool(address(token0), address(token1), adapter.FEE(), address(0));
+            address existingPool = positionManager.createAndInitializePoolIfNecessary(
+                address(token0), address(token1), adapter.FEE(), prices[i]
+            );
+            assertEq(positionManager.lastPoolSqrtPriceX96(), prices[i]);
+            uint256 initializationCalls = positionManager.poolInitializationCalls();
+
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    UniswapV3LiquidityAdapter.PoolAlreadyExists.selector, existingPool
+                )
+            );
+            adapter.addFreshFullRangeLiquidity(
+                address(token0), address(token1), 1 ether, 1 ether, Q96
+            );
+
+            assertEq(positionManager.poolInitializationCalls(), initializationCalls);
+            assertEq(token0.balanceOf(address(this)), balance0Before);
+            assertEq(token1.balanceOf(address(this)), balance1Before);
+            assertEq(token0.balanceOf(address(adapter)), 0);
+            assertEq(token1.balanceOf(address(adapter)), 0);
+        }
         assertEq(positionManager.mintCalls(), 0);
         assertEq(adapter.getPositionTokenId(address(token0), address(token1)), 0);
     }
