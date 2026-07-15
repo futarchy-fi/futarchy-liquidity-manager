@@ -12,6 +12,9 @@ import {MockUniswapV3FactoryLike} from "./MockUniswapV3FactoryLike.sol";
 contract MockUniswapV3NonfungiblePositionManager is IUniswapV3NonfungiblePositionManager {
     using SafeERC20 for IERC20;
 
+    error PoolCreationFailed();
+    error PoolInitializationFailed();
+
     uint256 internal constant BPS_DENOMINATOR = 10_000;
     address public immutable factory;
 
@@ -43,6 +46,7 @@ contract MockUniswapV3NonfungiblePositionManager is IUniswapV3NonfungiblePositio
     uint256 public burnCalls;
     uint256 public poolInitializationCalls;
     uint160 public lastPoolSqrtPriceX96;
+    uint8 public poolLifecycleFailure;
 
     uint24 public lastFee;
     uint256 public lastAmount0Min;
@@ -53,6 +57,11 @@ contract MockUniswapV3NonfungiblePositionManager is IUniswapV3NonfungiblePositio
     function setUsageBps(uint16 value) external {
         require(value <= BPS_DENOMINATOR, "usage bps");
         usageBps = value;
+    }
+
+    function setPoolLifecycleFailure(uint8 value) external {
+        require(value <= 2, "pool failure");
+        poolLifecycleFailure = value;
     }
 
     function mint(MintParams calldata params)
@@ -223,10 +232,12 @@ contract MockUniswapV3NonfungiblePositionManager is IUniswapV3NonfungiblePositio
         uint24 fee,
         uint160 sqrtPriceX96
     ) external payable returns (address) {
-        poolInitializationCalls++;
-        lastPoolSqrtPriceX96 = sqrtPriceX96;
+        if (poolLifecycleFailure == 1) revert PoolCreationFailed();
         address pool = address(0xBEEF);
         MockUniswapV3FactoryLike(factory).setPool(token0, token1, fee, pool);
+        if (poolLifecycleFailure == 2) revert PoolInitializationFailed();
+        poolInitializationCalls++;
+        lastPoolSqrtPriceX96 = sqrtPriceX96;
         return pool;
     }
 

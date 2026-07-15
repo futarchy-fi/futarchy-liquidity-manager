@@ -223,6 +223,36 @@ contract UniswapV3LiquidityAdapterTest is Test {
         assertEq(adapter.getPositionTokenId(address(token0), address(token1)), 0);
     }
 
+    function test_freshAddPoolCreateAndInitializeFailuresRollBack() public {
+        MockUniswapV3FactoryLike factory = MockUniswapV3FactoryLike(positionManager.factory());
+        bytes4[2] memory errors = [
+            MockUniswapV3NonfungiblePositionManager.PoolCreationFailed.selector,
+            MockUniswapV3NonfungiblePositionManager.PoolInitializationFailed.selector
+        ];
+        uint256 balance0Before = token0.balanceOf(address(this));
+        uint256 balance1Before = token1.balanceOf(address(this));
+
+        for (uint8 phase = 1; phase <= errors.length; ++phase) {
+            positionManager.setPoolLifecycleFailure(phase);
+            vm.expectRevert(errors[phase - 1]);
+            adapter.addFreshFullRangeLiquidity(
+                address(token0), address(token1), 1 ether, 1 ether, Q96
+            );
+
+            assertEq(factory.getPool(address(token0), address(token1), adapter.FEE()), address(0));
+            assertEq(token0.balanceOf(address(this)), balance0Before);
+            assertEq(token1.balanceOf(address(this)), balance1Before);
+            assertEq(token0.balanceOf(address(adapter)), 0);
+            assertEq(token1.balanceOf(address(adapter)), 0);
+        }
+        assertEq(token0.allowance(address(adapter), address(positionManager)), 0);
+        assertEq(token1.allowance(address(adapter), address(positionManager)), 0);
+        assertEq(positionManager.poolInitializationCalls(), 0);
+        assertEq(positionManager.lastPoolSqrtPriceX96(), 0);
+        assertEq(positionManager.mintCalls(), 0);
+        assertEq(adapter.getPositionTokenId(address(token0), address(token1)), 0);
+    }
+
     function test_freshAddFirstMintFailureRollsBackPoolAndCustody() public {
         positionManager.setUsageBps(9949);
         MockUniswapV3FactoryLike factory = MockUniswapV3FactoryLike(positionManager.factory());

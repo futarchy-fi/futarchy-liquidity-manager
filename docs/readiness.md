@@ -46,7 +46,8 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   mint; proves the same zero-liquidity, fee-drain, and position-identity properties; and rejects
   reuse of the initialized pool after final removal. The deterministic V3 suite also rejects an
   uninitialized pool and initialized pools at guarded or manipulated prices before custody changes,
-  and proves a failed first mint rolls back pool creation, initialization, balances, and approvals.
+  injects distinct pool-creation and initialization failures, and proves each failure plus a failed
+  first mint rolls back pool creation, initialization, balances, and approvals.
 - Runtime-size checks retain an EIP-170 margin for the manager.
 
 ## Required before any funded deployment
