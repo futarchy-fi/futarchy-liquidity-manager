@@ -64,8 +64,6 @@ contract UniswapV3SepoliaForkTest is Test {
         MockMintableERC20 tokenB = new MockMintableERC20("Fork token B", "FTB");
         (MockMintableERC20 token0, MockMintableERC20 token1) =
             address(tokenA) < address(tokenB) ? (tokenA, tokenB) : (tokenB, tokenA);
-        address pool =
-            npm.createAndInitializePoolIfNecessary(address(token0), address(token1), FEE, Q96);
 
         UniswapV3LiquidityAdapter adapter =
             new UniswapV3LiquidityAdapter(npm, FULL_RANGE_LOWER, FULL_RANGE_UPPER);
@@ -77,8 +75,10 @@ contract UniswapV3SepoliaForkTest is Test {
         uint256 balance0Before = token0.balanceOf(address(this));
         uint256 balance1Before = token1.balanceOf(address(this));
 
-        (uint128 firstLiquidity,,) =
-            adapter.addFullRangeLiquidity(address(token0), address(token1), 10 ether, 10 ether, "");
+        (address pool, uint128 firstLiquidity,,) = adapter.addFreshFullRangeLiquidity(
+            address(token0), address(token1), 10 ether, 10 ether, Q96
+        );
+        assertGt(pool.code.length, 0);
         uint256 tokenId = adapter.getPositionTokenId(address(token0), address(token1));
         assertGt(tokenId, 0);
         assertEq(npm.ownerOf(tokenId), address(adapter));
@@ -121,6 +121,11 @@ contract UniswapV3SepoliaForkTest is Test {
         assertEq(adapter.getPositionTokenId(address(token0), address(token1)), 0);
         vm.expectRevert();
         npm.ownerOf(tokenId);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(UniswapV3LiquidityAdapter.PoolAlreadyExists.selector, pool)
+        );
+        adapter.addFreshFullRangeLiquidity(address(token0), address(token1), 1 ether, 1 ether, Q96);
 
         assertApproxEqAbs(token0.balanceOf(address(this)), balance0Before, 10);
         assertApproxEqAbs(token1.balanceOf(address(this)), balance1Before, 10);

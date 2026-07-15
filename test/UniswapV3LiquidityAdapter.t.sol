@@ -141,6 +141,28 @@ contract UniswapV3LiquidityAdapterTest is Test {
         assertEq(adapter.getPositionTokenId(address(token0), address(token1)), 1);
     }
 
+    function test_freshAddCreatesPoolAndOwnsFirstNft() public {
+        (address pool, uint128 liquidity, uint256 amount0Used, uint256 amount1Used) = adapter.addFreshFullRangeLiquidity(
+            address(token0), address(token1), 2 ether, 1 ether, uint160(1) << 96
+        );
+
+        assertEq(pool, address(0xBEEF));
+        assertEq(liquidity, 1 ether);
+        assertEq(amount0Used, 2 ether);
+        assertEq(amount1Used, 1 ether);
+        assertEq(positionManager.poolInitializationCalls(), 1);
+        assertEq(positionManager.mintCalls(), 1);
+        assertEq(positionManager.lastRecipient(), address(adapter));
+        assertEq(adapter.getPositionTokenId(address(token0), address(token1)), 1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(UniswapV3LiquidityAdapter.PositionAlreadyExists.selector)
+        );
+        adapter.addFreshFullRangeLiquidity(
+            address(token0), address(token1), 1 ether, 1 ether, uint160(1) << 96
+        );
+    }
+
     function test_secondAddIncreasesTheSameNft() public {
         (uint128 firstLiquidity,,) = _add(2 ether, 2 ether);
         uint256 tokenId = adapter.getPositionTokenId(address(token0), address(token1));
@@ -197,11 +219,23 @@ contract UniswapV3LiquidityAdapterTest is Test {
         token1.approve(address(positionManager), type(uint256).max);
         positionManager.accrueFees(tokenId, 1 ether, 2 ether);
 
-        vm.warp(7_654_321);
         IFutarchyLiquidityAdapter.Removal memory removed =
-            adapter.removeLiquidityDetailed(address(token0), address(token1), 4 ether);
-        assertEq(removed.principal0 + removed.fees0, 5 ether);
-        assertEq(removed.principal1 + removed.fees1, 6 ether);
+            adapter.removeLiquidityDetailed(address(token0), address(token1), 0);
+        assertEq(removed.principal0, 0);
+        assertEq(removed.principal1, 0);
+        assertEq(removed.fees0, 1 ether);
+        assertEq(removed.fees1, 2 ether);
+        assertEq(_positionLiquidity(tokenId), liquidity);
+        assertEq(adapter.getPositionTokenId(address(token0), address(token1)), tokenId);
+
+        positionManager.accrueFees(tokenId, 3 ether, 4 ether);
+
+        vm.warp(7_654_321);
+        removed = adapter.removeLiquidityDetailed(address(token0), address(token1), 4 ether);
+        assertEq(removed.principal0, 4 ether);
+        assertEq(removed.principal1, 4 ether);
+        assertEq(removed.fees0, 3 ether);
+        assertEq(removed.fees1, 4 ether);
         assertEq(_positionLiquidity(tokenId), liquidity - 4 ether);
         assertEq(adapter.getPositionTokenId(address(token0), address(token1)), tokenId);
         assertEq(positionManager.lastAmount0Min(), 0);
@@ -212,8 +246,10 @@ contract UniswapV3LiquidityAdapterTest is Test {
 
         removed =
             adapter.removeLiquidityDetailed(address(token0), address(token1), liquidity - 4 ether);
-        assertEq(removed.principal0 + removed.fees0, 6 ether);
-        assertEq(removed.principal1 + removed.fees1, 6 ether);
+        assertEq(removed.principal0, 6 ether);
+        assertEq(removed.principal1, 6 ether);
+        assertEq(removed.fees0, 0);
+        assertEq(removed.fees1, 0);
         assertEq(adapter.getPositionTokenId(address(token0), address(token1)), 0);
         assertEq(positionManager.burnCalls(), 1);
     }

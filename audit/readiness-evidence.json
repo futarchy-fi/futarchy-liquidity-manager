@@ -42,7 +42,7 @@
           "path": "test/fork/SwaprAlgebraDirectConditionalAdapterFork.t.sol"
         },
         {
-          "description": "Real Uniswap V3 position-manager removal proves that zero-liquidity pre-collection materializes live swap fees without changing liquidity or NFT identity before partial and final principal removal.",
+          "description": "Real Uniswap V3 integration exercises adapter-owned fresh pool creation, initialization, and first-NFT mint; proves zero-liquidity live-fee materialization without changing liquidity or NFT identity before partial and final principal removal; and rejects reuse of the initialized pool.",
           "path": "test/fork/UniswapV3SepoliaFork.t.sol"
         },
         {
@@ -86,6 +86,10 @@
         {
           "description": "Adapter over-pull safety test.",
           "path": "test/FutarchyLiquidityManagerAdapterSafety.t.sol"
+        },
+        {
+          "description": "Deterministic Uniswap V3 adapter tests separate fee-only, partial-principal, and final-principal removal fields exactly and cover fresh create-initialize-first-mint ownership.",
+          "path": "test/UniswapV3LiquidityAdapter.t.sol"
         },
         {
           "description": "Algebra guard tests cover inclusive 50-tick boundaries, signed TWAP rounding, and fail-closed history reads.",

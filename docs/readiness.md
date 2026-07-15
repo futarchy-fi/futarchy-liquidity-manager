@@ -25,8 +25,9 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 - Unit, fuzz, invariant, API-freeze, scope, configuration, batch-template, and fork fixtures are
   machine checked in CI. The real Algebra fork suite also captures the cooldown liveness failure
   and bounds a live-fee partial removal at 150,000 gas (116,245 measured). The real Uniswap V3
-  fixture proves that a zero-liquidity pre-collection materializes current fees without changing
-  the position's liquidity or NFT identity.
+  fixture exercises adapter-owned fresh pool creation, initialization, and first-NFT mint; proves
+  that a zero-liquidity pre-collection materializes current fees without changing the position's
+  liquidity or NFT identity; and rejects reuse of the initialized pool after final removal.
 - Runtime-size checks retain an EIP-170 margin for the manager.
 
 ## Required before any funded deployment
