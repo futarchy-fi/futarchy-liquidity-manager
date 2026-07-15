@@ -636,7 +636,7 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(yesCompany.allowance(address(manager), address(router)), 0);
     }
 
-    function test_final_unresolved_redeem_does_not_block_later_settlement() public {
+    function test_final_unresolved_redeem_does_not_block_losing_residue_settlement() public {
         _bootstrap();
         _activateProposal(true);
 
@@ -652,6 +652,10 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(manager.conditionalYesLiquidity(), 0);
         assertEq(manager.conditionalNoLiquidity(), 0);
 
+        uint256 routerNoCompanyBefore = noCompany.balanceOf(address(router));
+        uint256 routerNoCurrencyBefore = noCurrency.balanceOf(address(router));
+        noCompany.mint(address(manager), 3 ether);
+        noCurrency.mint(address(manager), 5 ether);
         router.setPayouts(1, 1, 0);
         FutarchyLiquidityManager.SyncAction action = manager.sync();
 
@@ -659,6 +663,10 @@ contract FutarchyLiquidityManagerTest is Test {
         assertFalse(manager.inConditionalMode());
         assertEq(manager.activeProposal(), address(0));
         assertEq(manager.activeConditionId(), bytes32(0));
+        assertEq(noCompany.balanceOf(address(manager)), 0);
+        assertEq(noCurrency.balanceOf(address(manager)), 0);
+        assertEq(noCompany.balanceOf(address(router)), routerNoCompanyBefore + 3 ether);
+        assertEq(noCurrency.balanceOf(address(router)), routerNoCurrencyBefore + 5 ether);
     }
 
     function testFuzz_settlement_after_partial_redemptions_preserves_remaining_claim(
