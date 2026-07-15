@@ -464,6 +464,46 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(manager.activeConditionId(), bytes32(0));
     }
 
+    function testFuzz_settlement_after_partial_redemptions_preserves_remaining_claim(
+        uint256 seed,
+        bool winnerIsYes
+    ) public {
+        _bootstrap();
+        _activateProposal(winnerIsYes);
+
+        uint256 paidOut;
+        uint256 partialCount = _fuzzValue(seed, 0, 1, 4);
+        for (uint256 i; i < partialCount; i++) {
+            uint256 balance = manager.balanceOf(bootstrapRecipient);
+            uint256 shares = _fuzzValue(seed, i + 1, balance / 10, balance / 3);
+            vm.prank(bootstrapRecipient);
+            (uint256 companyOut, uint256 collateralOut) =
+                manager.redeem(shares, bootstrapRecipient, false);
+            assertEq(companyOut, collateralOut);
+            paidOut += companyOut;
+        }
+
+        router.setPayouts(1, winnerIsYes ? 1 : 0, winnerIsYes ? 0 : 1);
+        manager.sync();
+
+        uint256 remainingAssets = 100 ether - paidOut;
+        assertFalse(manager.inConditionalMode());
+        assertEq(_managedBalance(address(company)), remainingAssets);
+        assertEq(_managedBalance(address(wrappedNative)), remainingAssets);
+        assertEq(_managedBalance(address(yesCompany)), 0);
+        assertEq(_managedBalance(address(noCompany)), 0);
+        assertEq(_managedBalance(address(yesCurrency)), 0);
+        assertEq(_managedBalance(address(noCurrency)), 0);
+
+        uint256 remainingShares = manager.balanceOf(bootstrapRecipient);
+        vm.prank(bootstrapRecipient);
+        (uint256 finalCompany, uint256 finalCollateral) =
+            manager.redeem(remainingShares, bootstrapRecipient, false);
+        assertEq(finalCompany, remainingAssets);
+        assertEq(finalCollateral, remainingAssets);
+        assertEq(manager.totalSupply(), 0);
+    }
+
     function test_deposit_mints_proportional_shares() public {
         _bootstrap();
 
