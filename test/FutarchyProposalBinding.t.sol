@@ -280,6 +280,27 @@ contract FutarchyProposalBindingTest is Test {
         assertEq(manager.activeYesCurrencyToken(), sourceWrappers[2]);
         assertEq(manager.activeNoCurrencyToken(), sourceWrappers[3]);
 
+        bytes32 capturedBefore = keccak256(abi.encode(manager.capturedOfficialProposal()));
+        address yesPoolBefore = manager.activeYesPool();
+        address noPoolBefore = manager.activeNoPool();
+        for (uint256 proposalId = 1; proposalId <= 2; ++proposalId) {
+            vm.expectRevert(FutarchyOfficialProposalSource.ActivationUnavailable.selector);
+            coordinator.setOfficial(source, proposalId, address(proposal), address(this));
+
+            FutarchyOfficialProposalSource.OfficialProposal memory official =
+                source.currentOfficialProposal();
+            assertEq(official.id, 1);
+            assertEq(official.proposal, address(proposal));
+            assertEq(keccak256(abi.encode(manager.capturedOfficialProposal())), capturedBefore);
+            assertEq(manager.spotLiquidity(), 20 ether);
+            assertEq(manager.conditionalYesLiquidity(), 80 ether);
+            assertEq(manager.conditionalNoLiquidity(), 80 ether);
+            assertEq(manager.activeYesPool(), yesPoolBefore);
+            assertEq(manager.activeNoPool(), noPoolBefore);
+            assertEq(spot.removeDetailedCalls(), 1);
+            assertEq(conditional.addFreshCalls(), 2);
+        }
+
         source.clearOfficialProposal();
         ctf.setPayout(sourceCondition, 1, 1, 0);
         FutarchyLiquidityManager.SyncAction action = manager.sync();

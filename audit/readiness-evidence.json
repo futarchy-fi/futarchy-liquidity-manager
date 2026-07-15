@@ -84,7 +84,7 @@
           "path": "test/FutarchyOfficialProposalSource.t.sol"
         },
         {
-          "description": "The real source-manager-router binding test proves canonical fresh-pool identity verification plus second-CTF-split, second-fresh-position, and post-activation outer-coordinator rollback across the registry, spot position, manager binding, wrappers, and fresh pools.",
+          "description": "The real source-manager-router binding test proves canonical fresh-pool identity verification; second-CTF-split, second-fresh-position, and post-activation outer-coordinator rollback across the registry, spot position, manager binding, wrappers, and fresh pools; and exact-replay or second-live-proposal rejection without changing active positions or binding.",
           "path": "test/FutarchyProposalBinding.t.sol"
         },
         {
