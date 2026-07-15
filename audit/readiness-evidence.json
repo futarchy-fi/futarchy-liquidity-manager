@@ -108,6 +108,10 @@
           "path": "test/invariant/FutarchyLiquidityManagerInvariant.t.sol"
         },
         {
+          "description": "Independent integer properties prove that deposit floor/ceiling rounding cannot dilute either base asset and that partial liquidity, idle, and fee floor rounding favors survivors.",
+          "path": "test/VaultShareRoundingMath.t.sol"
+        },
+        {
           "description": "Deeper invariant pass command is documented for pre-deploy review.",
           "path": "docs/readiness.md"
         }

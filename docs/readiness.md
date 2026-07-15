@@ -55,6 +55,9 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   deposits, activation, fees, donations, redemptions, and settlement; every successful deposit and
   redemption checks survivor-favoring liquidity and six-token balance ratios, all six tokens remain
   in known custody, and zero share supply leaves no managed asset balance.
+- Independent executable rounding properties prove that floor-rounded share minting plus
+  ceil-rounded accepted deposits cannot dilute either base asset, while floor-rounded liquidity,
+  idle, and fee payouts cannot reduce the corresponding survivor claim per share.
 - Unit, fuzz, invariant, API-freeze, scope, configuration, batch-template, and fork fixtures are
   machine checked in CI. The real Algebra fork suite also captures the cooldown liveness failure
   and bounds a live-fee partial removal at 150,000 gas (116,245 measured). Both the public-vault and

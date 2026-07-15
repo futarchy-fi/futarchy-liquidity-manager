@@ -242,6 +242,26 @@ For `liquidity == 0`, the adapter performs only the fee collection: it does not 
 the position and reports zero principal. A real fork test must prove that each supported position
 manager actually materializes current fees on that pre-collection path.
 
+## Spot deposit rounding contract
+
+Let `S` be the existing share supply, `B[T] > 0` each consolidated base-asset balance, and `x[T]`
+the caller's offered amounts. The manager mints
+
+$$
+m=\min_T\left\lfloor\frac{x[T]S}{B[T]}\right\rfloor
+$$
+
+and accepts `a[T] = ceil(m B[T] / S)` of each asset. Therefore `a[T]S >= mB[T]`, which is exactly
+
+$$
+\frac{B[T]+a[T]}{S+m}\geq\frac{B[T]}{S}.
+$$
+
+The floor chooses a mint amount supported by both offered assets; the ceiling charges enough of
+each asset to prevent dilution. Exact transfer-delta checks reject taxed input, and excess input is
+never pulled or is refunded. `VaultShareRoundingMath.t.sol` checks both assets independently over
+the integer implementation.
+
 ## Proportional redemption contract
 
 Let `S` be total FLM share supply before redemption and `s` the shares being burned. For each
@@ -383,6 +403,8 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 ### Math and bytecode
 
 - keep the fee-bound executable property test aligned with the proof document;
+- keep the executable deposit and redemption floor/ceiling properties aligned with the vault
+  equations;
 - add exact AMM-specific quote/execution tests before enabling a fair join;
 - retain the manager runtime-size gate below EIP-170; and
 - remove superseded entry and restoration code instead of carrying two safety models.
