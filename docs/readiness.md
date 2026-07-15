@@ -19,8 +19,9 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   underpayment rolls back positions and binding.
 - Partial redemption removes proportional spot, YES, and NO liquidity; accounts for principal,
   fees, and six idle token balances; never restores liquidity; cannot reduce any survivor's
-  per-share claim on those balances; settles after randomized one-to-four partial exits; and gives
-  final rounding residue to the last holder.
+  per-share claim on those balances; handles divergent YES/NO liquidity and post-swap principal
+  composition; settles after randomized one-to-four partial exits; and gives final rounding residue
+  to the last holder.
 - Unit, fuzz, invariant, API-freeze, scope, configuration, batch-template, and fork fixtures are
   machine checked in CI. The real Algebra fork suite also captures the cooldown liveness failure.
 - Runtime-size checks retain an EIP-170 margin for the manager.

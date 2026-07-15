@@ -5,6 +5,9 @@ import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {SwaprAlgebraLiquidityAdapter} from "../../src/adapters/SwaprAlgebraLiquidityAdapter.sol";
+import {
+    SwaprAlgebraDirectConditionalAdapter
+} from "../../src/adapters/SwaprAlgebraDirectConditionalAdapter.sol";
 import {ISwaprAlgebraPositionManager} from "../../src/interfaces/ISwaprAlgebraPositionManager.sol";
 import {IFutarchyLiquidityAdapter} from "../../src/interfaces/IFutarchyLiquidityAdapter.sol";
 import {
@@ -189,10 +192,6 @@ contract SwaprAlgebraLiquidityAdapterForkTest is Test {
         MockMintableERC20 noCompany = new MockMintableERC20("NO GNO", "NO-GNO");
         MockMintableERC20 yesCurrency = new MockMintableERC20("YES xDAI", "YES-xDAI");
         MockMintableERC20 noCurrency = new MockMintableERC20("NO xDAI", "NO-xDAI");
-        uint160 spotPrice = _spotPrice();
-        address yesPool =
-            _initializeOutcomePool(address(yesCompany), address(yesCurrency), spotPrice);
-        address noPool = _initializeOutcomePool(address(noCompany), address(noCurrency), spotPrice);
 
         MockFutarchyProposalLike proposal = new MockFutarchyProposalLike(
             GNOSIS_GNO,
@@ -202,6 +201,7 @@ contract SwaprAlgebraLiquidityAdapterForkTest is Test {
             address(yesCurrency),
             address(noCurrency)
         );
+        proposal.setQuestionAndCondition(bytes32(uint256(1)), bytes32(uint256(0xC0DE)));
         MockConditionalRouter router = new MockConditionalRouter();
         router.setOutcomeConfig(
             address(proposal), GNOSIS_GNO, address(yesCompany), address(noCompany), true
@@ -219,12 +219,15 @@ contract SwaprAlgebraLiquidityAdapterForkTest is Test {
             address(noCompany),
             address(yesCurrency),
             address(noCurrency),
-            yesPool,
-            noPool
+            address(0),
+            address(0)
         );
 
         SwaprAlgebraLiquidityAdapter spotAdapter = _newAdapter();
-        SwaprAlgebraLiquidityAdapter conditionalAdapter = _newAdapter();
+        SwaprAlgebraDirectConditionalAdapter conditionalAdapter =
+            new SwaprAlgebraDirectConditionalAdapter(IAlgebraFactoryLike(ALGEBRA_FACTORY));
+        MockPoolStabilityGuard guard = new MockPoolStabilityGuard();
+        guard.setSqrtPriceX96(_spotPrice());
         FutarchyLiquidityManager manager = new FutarchyLiquidityManager(
             address(this),
             IERC20(GNOSIS_GNO),
@@ -233,25 +236,32 @@ contract SwaprAlgebraLiquidityAdapterForkTest is Test {
             spotAdapter,
             conditionalAdapter,
             router,
-            new MockPoolStabilityGuard(),
+            guard,
             address(this),
             FutarchyLiquidityManager.LpTokenMetadata({name: "Fork FLM", symbol: "fFLM"})
         );
         spotAdapter.bindManager(address(manager));
         conditionalAdapter.bindManager(address(manager));
+        source.setPoolLookup(address(conditionalAdapter));
 
         deal(GNOSIS_GNO, address(this), 1 ether);
         vm.deal(address(this), 10 ether);
         IERC20(GNOSIS_GNO).approve(address(manager), type(uint256).max);
         manager.initializeFromBootstrap{value: 2 ether}(0.02 ether);
-        manager.sync();
+        source.activate(address(manager));
+
+        assertTrue(manager.inConditionalMode());
+        assertGt(manager.conditionalYesLiquidity(), 0);
+        assertGt(manager.conditionalNoLiquidity(), 0);
+        assertGt(manager.activeYesPool().code.length, 0);
+        assertGt(manager.activeNoPool().code.length, 0);
 
         uint256 shares = manager.totalSupply() / 10;
         uint256 gasBefore = gasleft();
         manager.redeem(shares, address(this), false);
         uint256 redeemGas = gasBefore - gasleft();
 
-        emit log_named_uint("conditional full-unwind redeem gas", redeemGas);
+        emit log_named_uint("conditional partial redeem gas", redeemGas);
         assertLt(redeemGas + 750_000, 17_000_000, "conditional redeem exceeds Gnosis block gas");
     }
 
@@ -264,18 +274,5 @@ contract SwaprAlgebraLiquidityAdapterForkTest is Test {
     function _spotPrice() internal view returns (uint160 sqrtPriceX96) {
         address pool = IAlgebraFactoryLike(ALGEBRA_FACTORY).poolByPair(GNOSIS_GNO, GNOSIS_WXDAI);
         (sqrtPriceX96,,,,,,) = IAlgebraPoolLike(pool).globalState();
-    }
-
-    function _initializeOutcomePool(address company, address currency, uint160 spotPrice)
-        internal
-        returns (address pool)
-    {
-        uint160 price = company < currency
-            ? spotPrice
-            : uint160((uint256(1) << 192) / uint256(spotPrice));
-        address token0 = company < currency ? company : currency;
-        address token1 = company < currency ? currency : company;
-        pool = ISwaprAlgebraPositionManager(SWAPR_POSITION_MANAGER)
-            .createAndInitializePoolIfNecessary(token0, token1, price);
     }
 }

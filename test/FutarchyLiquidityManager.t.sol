@@ -389,6 +389,28 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(conditionalAdapter.addCalls(), conditionalAddsBefore);
     }
 
+    function test_conditional_redeem_handles_divergent_composition_and_liquidity() public {
+        _bootstrap();
+        conditionalAdapter.setNextAddUsageBps(9951);
+        _activateProposal(true);
+
+        assertEq(manager.conditionalYesLiquidity(), 79.608 ether);
+        assertEq(manager.conditionalNoLiquidity(), 80 ether);
+        _rebalancePair(yesCompany, yesCurrency, 100 ether, 50 ether);
+        _rebalancePair(noCompany, noCurrency, 40 ether, 110 ether);
+
+        vm.prank(bootstrapRecipient);
+        (uint256 companyOut, uint256 collateralOut) =
+            manager.redeem(10 ether, bootstrapRecipient, false);
+
+        assertEq(companyOut, 6 ether);
+        assertEq(collateralOut, 7.0392 ether);
+        assertEq(yesCompany.balanceOf(bootstrapRecipient), 6.0392 ether);
+        assertEq(noCompany.balanceOf(bootstrapRecipient), 0);
+        assertEq(yesCurrency.balanceOf(bootstrapRecipient), 0);
+        assertEq(noCurrency.balanceOf(bootstrapRecipient), 5.9608 ether);
+    }
+
     function test_nonfinal_redeem_reverts_when_every_liquidity_slice_rounds_to_zero() public {
         _bootstrap();
         _activateProposal(true);
@@ -917,6 +939,32 @@ contract FutarchyLiquidityManagerTest is Test {
         vm.deal(account, amount);
         vm.prank(account);
         token.approve(address(target), type(uint256).max);
+    }
+
+    function _rebalancePair(
+        MockMintableERC20 tokenA,
+        MockMintableERC20 tokenB,
+        uint256 newAmountA,
+        uint256 newAmountB
+    ) internal {
+        (
+            MockMintableERC20 token0,
+            MockMintableERC20 token1,
+            uint256 newAmount0,
+            uint256 newAmount1
+        ) = address(tokenA) < address(tokenB)
+            ? (tokenA, tokenB, newAmountA, newAmountB)
+            : (tokenB, tokenA, newAmountB, newAmountA);
+        bytes32 key = _pairKey(address(token0), address(token1));
+        uint256 oldAmount0 = conditionalAdapter.principal0ByPair(key);
+        uint256 oldAmount1 = conditionalAdapter.principal1ByPair(key);
+        if (newAmount0 > oldAmount0) token0.mint(address(this), newAmount0 - oldAmount0);
+        if (newAmount1 > oldAmount1) token1.mint(address(this), newAmount1 - oldAmount1);
+        token0.approve(address(conditionalAdapter), type(uint256).max);
+        token1.approve(address(conditionalAdapter), type(uint256).max);
+        conditionalAdapter.rebalancePrincipal(
+            address(token0), address(token1), newAmount0, newAmount1
+        );
     }
 
     function _fuzzValue(uint256 seed, uint256 salt, uint256 minValue, uint256 maxValue)

@@ -61,6 +61,31 @@ contract MockFutarchyLiquidityAdapter is IFutarchyLiquidityAdapter {
         fee1ByPair[pairKey] += amount1;
     }
 
+    function rebalancePrincipal(
+        address token0,
+        address token1,
+        uint256 newPrincipal0,
+        uint256 newPrincipal1
+    ) external {
+        bytes32 pairKey = keccak256(abi.encode(token0, token1));
+        uint256 oldPrincipal0 = principal0ByPair[pairKey];
+        uint256 oldPrincipal1 = principal1ByPair[pairKey];
+        if (newPrincipal0 > oldPrincipal0) {
+            IERC20(token0)
+                .safeTransferFrom(msg.sender, address(this), newPrincipal0 - oldPrincipal0);
+        } else if (newPrincipal0 < oldPrincipal0) {
+            IERC20(token0).safeTransfer(msg.sender, oldPrincipal0 - newPrincipal0);
+        }
+        if (newPrincipal1 > oldPrincipal1) {
+            IERC20(token1)
+                .safeTransferFrom(msg.sender, address(this), newPrincipal1 - oldPrincipal1);
+        } else if (newPrincipal1 < oldPrincipal1) {
+            IERC20(token1).safeTransfer(msg.sender, oldPrincipal1 - newPrincipal1);
+        }
+        principal0ByPair[pairKey] = newPrincipal0;
+        principal1ByPair[pairKey] = newPrincipal1;
+    }
+
     function addFreshFullRangeLiquidity(
         address token0,
         address token1,
