@@ -217,7 +217,11 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         _transferOwnership(initialOwner);
     }
 
-    receive() external payable {}
+    /// @dev Native collateral enters through payable deposit functions and is wrapped immediately.
+    /// Only the immutable wrapper may send native currency back during an unwrap.
+    receive() external payable {
+        if (msg.sender != address(WRAPPED_NATIVE)) revert InvalidAssetTransfer();
+    }
 
     function activeProposalId() external view returns (uint256) {
         return inConditionalMode ? uint256(_capturedProposalId) : 0;

@@ -110,6 +110,10 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   interactions still require adapter review.
 - Deposits require exact ERC20 balance deltas; fee-on-transfer assets are rejected. Rebasing assets
   are not a supported company-token or collateral configuration.
+- Native collateral is wrapped during payable deposits. The manager rejects direct native
+  transfers and accepts unwrap proceeds only from its immutable wrapped-collateral contract.
+  Unavoidable forced native currency is outside the six-token accounting model and remains
+  unsweepable while shares exist.
 - The immutable conditional router verifies canonical wrapper identity and exact split/settlement
   deltas. The manager independently requires exact merge, winner-redemption, and losing-consumption
   deltas during settlement; a failed redemption-time merge falls back to transferring that exact

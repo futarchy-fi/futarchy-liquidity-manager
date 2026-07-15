@@ -63,6 +63,11 @@ the withdrawing slice's matched complete sets and transfers unmatched outcomes i
 merge reverts, that underlying's complete sets are transferred in kind too, so router availability
 cannot block withdrawal. The final holder receives all rounding residue.
 
+Native collateral enters only through payable deposit functions and is wrapped immediately; the
+manager's receive path accepts native currency only from its immutable wrapper during an unwrap.
+Unavoidable forced native currency is outside the six-token accounting model and cannot be swept
+until share supply is zero.
+
 Emergency execution follows the same custody rule. It unwinds positions into the manager but never
 transfers pooled assets or burns shares. The owner controls arm/disarm authorization; after the
 delay, execution is permissionless. Settlement of an existing captured CTF condition remains

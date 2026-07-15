@@ -945,6 +945,18 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(bootstrapRecipient.balance, nativeBefore + 4 ether);
     }
 
+    function test_direct_native_transfer_is_rejected() public {
+        _bootstrap();
+
+        (bool sent,) = address(manager).call{value: 1 ether}("");
+
+        assertFalse(sent);
+        assertEq(address(manager).balance, 0);
+        vm.prank(bootstrapRecipient);
+        (, uint256 collateralOut) = manager.redeem(100 ether, bootstrapRecipient, true);
+        assertEq(collateralOut, 100 ether);
+    }
+
     function test_lifecycle_requires_bootstrap() public {
         _registerProposal(true);
 

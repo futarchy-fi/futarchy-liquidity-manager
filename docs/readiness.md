@@ -41,6 +41,8 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   deltas. The manager derives fee/principal classification from separate zero/nonzero removal
   phases rather than trusting returned labels. Misclassification cannot change payouts, and an
   overreport cannot consume survivor-owned idle balances; the complete operation reverts.
+- The native receive boundary rejects direct transfers and accepts only immutable-wrapper unwrap
+  proceeds, preventing ordinary native transfers from bypassing the six-token redemption model.
 - Partial redemption removes proportional spot, YES, and NO liquidity; accounts for principal,
   fees, and six idle token balances; never restores liquidity; cannot reduce any survivor's
   per-share claim on those balances; handles divergent YES/NO liquidity and post-swap principal
