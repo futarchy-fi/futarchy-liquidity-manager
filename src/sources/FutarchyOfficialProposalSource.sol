@@ -330,20 +330,24 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         _official.exists = true;
         _official.manualSettled = false;
 
-        IOfficialProposalActivationTarget(target)
-            .activateOfficialProposal(
-                IFutarchyOfficialProposalSource.ProposalActivationData({
-                    proposalId: proposalId,
-                    proposal: proposal,
-                    conditionId: snapshot.conditionId,
-                    proposalToken: snapshot.proposalToken,
-                    collateralToken: snapshot.collateralToken,
-                    yesCompanyToken: snapshot.yesCompanyToken,
-                    noCompanyToken: snapshot.noCompanyToken,
-                    yesCurrencyToken: snapshot.yesCurrencyToken,
-                    noCurrencyToken: snapshot.noCurrencyToken
-                })
-            );
+        IFutarchyOfficialProposalSource.ProposalActivationData memory activation =
+            IFutarchyOfficialProposalSource.ProposalActivationData({
+                proposalId: proposalId,
+                proposal: proposal,
+                conditionId: snapshot.conditionId,
+                proposalToken: snapshot.proposalToken,
+                collateralToken: snapshot.collateralToken,
+                yesCompanyToken: snapshot.yesCompanyToken,
+                noCompanyToken: snapshot.noCompanyToken,
+                yesCurrencyToken: snapshot.yesCurrencyToken,
+                noCurrencyToken: snapshot.noCurrencyToken
+            });
+        IOfficialProposalActivationTarget targetLike = IOfficialProposalActivationTarget(target);
+        targetLike.activateOfficialProposal(activation);
+        if (
+            keccak256(abi.encode(targetLike.capturedOfficialProposal()))
+                != keccak256(abi.encode(activation))
+        ) revert CapturedProposalMismatch();
         emit OfficialProposalSet(proposalId, proposal, creator);
     }
 

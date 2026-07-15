@@ -80,6 +80,10 @@
           "path": "test/FutarchyConditionalRouter.t.sol"
         },
         {
+          "description": "The official proposal source test proves that every captured activation field must match the validated snapshot and that a corrupt capture rolls back both source and target state.",
+          "path": "test/FutarchyOfficialProposalSource.t.sol"
+        },
+        {
           "description": "The real source-manager-router binding test proves canonical fresh-pool identity verification plus second-CTF-split, second-fresh-position, and post-activation outer-coordinator rollback across the registry, spot position, manager binding, wrappers, and fresh pools.",
           "path": "test/FutarchyProposalBinding.t.sol"
         },

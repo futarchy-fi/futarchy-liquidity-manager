@@ -46,6 +46,7 @@ contract MockOfficialProposalActivationTarget {
     bool public canActivate = true;
     bool public revertActivation;
     bool public reenterActivation;
+    bool public corruptCapture;
     bool public reentryBlocked;
     bool public observedStoredProposal;
     uint256 public activationCalls;
@@ -87,6 +88,10 @@ contract MockOfficialProposalActivationTarget {
         reenterActivation = value;
     }
 
+    function setCorruptCapture(bool value) external {
+        corruptCapture = value;
+    }
+
     function activateOfficialProposal(
         IFutarchyOfficialProposalSource.ProposalActivationData calldata proposal
     ) external {
@@ -100,6 +105,7 @@ contract MockOfficialProposalActivationTarget {
         if (revertActivation) revert MockActivationReverted();
 
         _captured = proposal;
+        if (corruptCapture) _captured.conditionId = bytes32(uint256(proposal.conditionId) ^ 1);
 
         if (reenterActivation) {
             try COORDINATOR.setOfficialProposal(
@@ -428,6 +434,19 @@ contract FutarchyOfficialProposalSourceTest is Test {
         assertEq(stored.id, 1);
         assertEq(stored.proposal, address(p1));
         assertEq(activationTarget.activationCalls(), 1);
+    }
+
+    function test_corrupt_capture_rolls_back_source_write_and_target_state() public {
+        MockFutarchyProposalLike proposal = _proposal();
+        activationTarget.setCorruptCapture(true);
+
+        vm.expectRevert(FutarchyOfficialProposalSource.CapturedProposalMismatch.selector);
+        _setOfficialProposal(1, address(proposal), officialProposer);
+
+        assertFalse(source.currentOfficialProposal().exists);
+        assertEq(activationTarget.activationCalls(), 0);
+        assertEq(activationTarget.lastProposal(), address(0));
+        assertEq(activationTarget.capturedOfficialProposal().proposal, address(0));
     }
 
     function test_reentrant_activation_is_blocked() public {

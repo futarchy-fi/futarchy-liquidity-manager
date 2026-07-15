@@ -51,6 +51,8 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   test assets remain in modeled manager, adapter, router, or holder custody, and zero share supply
   leaves no balance under manager or adapter control.
 - Proposal manager cannot select arbitrary unsafe proposals once validation is enabled.
+- The proposal source completes an official write only if the activation target reports an exact
+  capture of every source-validated proposal field; any mismatch rolls back both contracts.
 - Validation rejects far-future opening times, excessive min bonds, bad timeout bounds, wrong
   arbitrators, wrong CTF oracle, non-binary conditions, wrong collateral, missing outcomes, and
   non-pristine questions. The manager-bound adapter separately rejects pre-existing conditional

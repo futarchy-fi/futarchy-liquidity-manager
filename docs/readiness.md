@@ -10,8 +10,10 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 
 - The proposal source validates one proposal snapshot and atomically activates the manager. A
   failure in source storage, CTF splitting, pool creation, initialization, or first mint reverts the
-  complete transition. The manager also requires each returned fresh-pool address to equal the
-  adapter's canonical pair lookup. The real source-manager-router binding fixture proves that a
+  complete transition. Before completing the official write, the source hash-attests the target's
+  entire captured activation snapshot; a corrupt capture rolls back both source and target state.
+  The manager also requires each returned fresh-pool address to equal the adapter's canonical pair
+  lookup. The real source-manager-router binding fixture proves that a
   dishonest returned address restores the source registry, both CTF splits, spot position, and pool
   creation; a failure on the second fresh position and an explicit post-activation coordinator
   revert restore the same envelope.
