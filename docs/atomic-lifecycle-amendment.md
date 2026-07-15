@@ -330,6 +330,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | Failure after only one conditional pool is created | Entire official transition rolls back. |
 | Source cleared or replaced after activation | Stored proposal and condition still settle normally. |
 | Replayed activation or second live proposal | Reverts without changing positions or binding. |
+| Adapter reports removal assets it did not transfer | The entire operation reverts before survivor-owned idle balances can fund the discrepancy. |
 | One redeemer manipulates or removes TWAP history | Redemption still succeeds; no guard is consulted. |
 | First partial redeemer attempts to take all NFT fees | Pre-collect/decrease/post-collect separation limits payout to its share. |
 | Fees or donations arrive after a partial redemption | Only the then-current share supply owns the new value; exited holders gain no retroactive claim. |

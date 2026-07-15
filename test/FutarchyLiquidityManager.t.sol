@@ -352,6 +352,47 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(spotAdapter.addCalls(), addCallsBefore);
     }
 
+    function test_adapter_removal_overreport_rolls_back_spot_and_conditional_redemption() public {
+        _bootstrap();
+        company.mint(address(manager), 1 ether);
+        wrappedNative.mint(address(manager), 1 ether);
+        spotAdapter.setMisreportRemoveOutput(true);
+
+        vm.prank(bootstrapRecipient);
+        vm.expectRevert(FutarchyLiquidityManager.InvalidAssetTransfer.selector);
+        manager.redeem(50 ether, bootstrapRecipient, false);
+
+        assertEq(manager.totalSupply(), 100 ether);
+        assertEq(manager.spotLiquidity(), 100 ether);
+        assertEq(spotAdapter.totalLiquidity(), 100 ether);
+        assertEq(company.balanceOf(address(manager)), 1 ether);
+        assertEq(wrappedNative.balanceOf(address(manager)), 1 ether);
+
+        spotAdapter.setMisreportRemoveOutput(false);
+        _activateProposal(true);
+        yesCompany.mint(address(manager), 1 ether);
+        noCompany.mint(address(manager), 1 ether);
+        yesCurrency.mint(address(manager), 1 ether);
+        noCurrency.mint(address(manager), 1 ether);
+        conditionalAdapter.setMisreportRemoveOutput(true);
+        bytes32 capturedBefore = keccak256(abi.encode(manager.capturedOfficialProposal()));
+
+        vm.prank(bootstrapRecipient);
+        vm.expectRevert(FutarchyLiquidityManager.InvalidAssetTransfer.selector);
+        manager.redeem(50 ether, bootstrapRecipient, false);
+
+        assertEq(manager.totalSupply(), 100 ether);
+        assertEq(manager.spotLiquidity(), 20 ether);
+        assertEq(manager.conditionalYesLiquidity(), 80 ether);
+        assertEq(manager.conditionalNoLiquidity(), 80 ether);
+        assertEq(conditionalAdapter.totalLiquidity(), 160 ether);
+        assertEq(keccak256(abi.encode(manager.capturedOfficialProposal())), capturedBefore);
+        assertEq(yesCompany.balanceOf(address(manager)), 1 ether);
+        assertEq(noCompany.balanceOf(address(manager)), 1 ether);
+        assertEq(yesCurrency.balanceOf(address(manager)), 1 ether);
+        assertEq(noCurrency.balanceOf(address(manager)), 1 ether);
+    }
+
     function test_conditional_redeem_is_proportional_without_add_or_guard() public {
         _bootstrap();
         vm.prank(depositor);

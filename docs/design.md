@@ -54,10 +54,12 @@ with the final redeemer receiving all rounding dust.
 
 Redemption does not consolidate or restore survivor positions. It snapshots the six possible idle
 balances, removes only the caller's floor-rounded share of each active position, adds proportional
-fees, and leaves every remainder share-owned. In conditional mode it merges only the withdrawing
-slice's matched complete sets and transfers unmatched outcomes in kind. If either merge reverts,
-that underlying's complete sets are transferred in kind too, so router availability cannot block
-withdrawal. The final holder receives all rounding residue.
+fees, and leaves every remainder share-owned. Every adapter removal receipt must exactly match the
+manager's two token balance deltas, so an overreported output cannot spend survivor-owned idle
+inventory. In conditional mode it merges only the withdrawing slice's matched complete sets and
+transfers unmatched outcomes in kind. If either merge reverts, that underlying's complete sets are
+transferred in kind too, so router availability cannot block withdrawal. The final holder receives
+all rounding residue.
 
 Emergency execution follows the same custody rule. It unwinds positions into the manager but never
 transfers pooled assets or burns shares. Owner sweeping is disabled until total share supply is zero.

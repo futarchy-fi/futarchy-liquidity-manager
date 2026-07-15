@@ -761,7 +761,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         returns (uint256 companyOut, uint256 collateralOut)
     {
         IFutarchyLiquidityAdapter.Removal memory removed =
-            SPOT_ADAPTER.removeLiquidityDetailed(TOKEN0, TOKEN1, liquidity);
+            _removeLiquidityExact(SPOT_ADAPTER, TOKEN0, TOKEN1, liquidity);
         spotLiquidity -= liquidity;
         (companyOut, collateralOut) = _fromTokenOrder(removed.principal0, removed.principal1);
     }
@@ -771,7 +771,25 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     {
         if (liquidity == 0) return;
         (address token0, address token1) = _sortPair(tokenA, tokenB);
-        CONDITIONAL_ADAPTER.removeLiquidityDetailed(token0, token1, liquidity);
+        _removeLiquidityExact(CONDITIONAL_ADAPTER, token0, token1, liquidity);
+    }
+
+    function _removeLiquidityExact(
+        IFutarchyLiquidityAdapter adapter,
+        address token0,
+        address token1,
+        uint128 liquidity
+    ) internal returns (IFutarchyLiquidityAdapter.Removal memory removed) {
+        uint256 balance0Before = IERC20(token0).balanceOf(address(this));
+        uint256 balance1Before = IERC20(token1).balanceOf(address(this));
+        removed = adapter.removeLiquidityDetailed(token0, token1, liquidity);
+        uint256 balance0After = IERC20(token0).balanceOf(address(this));
+        uint256 balance1After = IERC20(token1).balanceOf(address(this));
+        if (
+            balance0After < balance0Before || balance1After < balance1Before
+                || balance0After - balance0Before != removed.principal0 + removed.fees0
+                || balance1After - balance1Before != removed.principal1 + removed.fees1
+        ) revert InvalidAssetTransfer();
     }
 
     /// @dev Full consolidation makes every fee and idle balance part of one observable vault
@@ -832,7 +850,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     ) internal {
         if (spotLiquidity > 0) {
             IFutarchyLiquidityAdapter.Removal memory removed =
-                SPOT_ADAPTER.removeLiquidityDetailed(TOKEN0, TOKEN1, plan.spot);
+                _removeLiquidityExact(SPOT_ADAPTER, TOKEN0, TOKEN1, plan.spot);
             spotLiquidity -= plan.spot;
             (uint256 companyPrincipal, uint256 collateralPrincipal) =
                 _fromTokenOrder(removed.principal0, removed.principal1);
@@ -869,7 +887,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     ) internal returns (uint256 companyOut, uint256 currencyOut) {
         (address token0, address token1) = _sortPair(companyOutcome, currencyOutcome);
         IFutarchyLiquidityAdapter.Removal memory removed =
-            CONDITIONAL_ADAPTER.removeLiquidityDetailed(token0, token1, liquidity);
+            _removeLiquidityExact(CONDITIONAL_ADAPTER, token0, token1, liquidity);
         uint256 amount0 = removed.principal0 + _shareOf(removed.fees0, shares, supply);
         uint256 amount1 = removed.principal1 + _shareOf(removed.fees1, shares, supply);
         return companyOutcome < currencyOutcome ? (amount0, amount1) : (amount1, amount0);

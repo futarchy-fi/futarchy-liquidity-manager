@@ -24,6 +24,8 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 - Settlement requires exact collateral and outcome-token balance deltas from complete-set merges,
   winner redemption, and losing-token consumption; router failure, partial consumption, or
   underpayment rolls back positions and binding.
+- Every spot and conditional adapter removal receipt must equal the manager's exact token balance
+  deltas. An overreport cannot consume survivor-owned idle balances; the complete operation reverts.
 - Partial redemption removes proportional spot, YES, and NO liquidity; accounts for principal,
   fees, and six idle token balances; never restores liquidity; cannot reduce any survivor's
   per-share claim on those balances; handles divergent YES/NO liquidity and post-swap principal
