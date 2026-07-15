@@ -327,6 +327,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | Arbitrary CTF event or proposal log | Ignored; only the bound source callback can activate. |
 | Activation target captures any field differently from the source-validated snapshot | The entire source write and target activation revert. |
 | Existing or attacker-created conditional pool | Activation reverts with no persistent spot-liquidity movement. |
+| First conditional adapter add reverts after both CTF splits | Activation reverts and restores the source write, both splits, spot position, pool lookup, and wrapper custody. |
 | Adapter returns a pool other than its canonical pair lookup | Activation reverts and restores the source write, CTF splits, spot position, and created pool. |
 | Failure after only one conditional pool is created | Entire official transition rolls back. |
 | Source cleared or replaced after activation | Stored proposal and condition still settle normally. |

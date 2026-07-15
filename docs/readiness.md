@@ -13,12 +13,12 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   complete transition. Before completing the official write, the source hash-attests the target's
   entire captured activation snapshot; a corrupt capture rolls back both source and target state.
   The manager also requires each returned fresh-pool address to equal the adapter's canonical pair
-  lookup. The real source-manager-router binding fixture proves that a
-  dishonest returned address restores the source registry, both CTF splits, spot position, and pool
-  creation; a failure on the second fresh position and an explicit post-activation coordinator
-  revert restore the same envelope. After successful activation, both an exact replay and a
-  different proposal ID revert without changing the registry, captured binding, pools, or
-  liquidity.
+  lookup. The real source-manager-router binding fixture proves that a direct first conditional-add
+  revert or dishonest returned address restores the source registry, both CTF splits, spot
+  position, pool creation, and wrapper custody; a failure on the second fresh position and an
+  explicit post-activation coordinator revert restore the same envelope. After successful
+  activation, both an exact replay and a different proposal ID revert without changing the
+  registry, captured binding, pools, or liquidity.
 - The manager stores the CTF condition and wrapper binding used for settlement rather than rereading
   mutable proposal state.
 - Settlement requires exact collateral and outcome-token balance deltas from complete-set merges,
