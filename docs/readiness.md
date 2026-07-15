@@ -9,9 +9,10 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 ## Evidence available now
 
 - The proposal source validates one proposal snapshot and atomically activates the manager. A
-  failure in source storage, CTF splitting, pool creation, initialization, or first mint reverts the
-  complete transition. Before completing the official write, the source hash-attests the target's
-  entire captured activation snapshot; a corrupt capture rolls back both source and target state.
+  failure in source storage, either CTF split, pool creation, initialization, or first mint reverts
+  the complete transition. Before completing the official write, the source hash-attests the
+  target's entire captured activation snapshot; a corrupt capture rolls back both source and target
+  state.
   The manager also requires each returned fresh-pool address to equal the adapter's canonical pair
   lookup. The real source-manager-router binding fixture proves that a direct first conditional-add
   revert or dishonest returned address restores the source registry, both CTF splits, spot

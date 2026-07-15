@@ -269,20 +269,28 @@ contract FutarchyProposalBindingTest is Test {
             assertEq(IERC20(sourceWrappers[i]).balanceOf(address(conditional)), 0);
         }
 
-        ctf.setSplitShortfallCollateral(address(collateral));
-        vm.expectRevert();
-        coordinator.setOfficial(source, 1, address(proposal), address(this));
-        ctf.setSplitShortfallCollateral(address(0));
+        address[2] memory splitShortfallCollaterals = [address(company), address(collateral)];
+        for (uint256 splitLeg; splitLeg < splitShortfallCollaterals.length; ++splitLeg) {
+            ctf.setSplitShortfallCollateral(splitShortfallCollaterals[splitLeg]);
+            vm.expectRevert();
+            coordinator.setOfficial(source, 1, address(proposal), address(this));
 
-        assertFalse(source.currentOfficialProposal().exists);
-        assertFalse(manager.inConditionalMode());
-        assertEq(manager.spotLiquidity(), AMOUNT);
-        assertEq(spot.removeDetailedCalls(), 0);
-        assertEq(conditional.addFreshCalls(), 0);
-        assertEq(company.balanceOf(address(ctf)), 0);
-        for (uint256 i; i < sourceWrappers.length; ++i) {
-            assertEq(IERC20(sourceWrappers[i]).balanceOf(address(conditional)), 0);
+            assertFalse(source.currentOfficialProposal().exists);
+            assertFalse(manager.inConditionalMode());
+            assertEq(manager.spotLiquidity(), AMOUNT);
+            assertEq(spot.removeDetailedCalls(), 0);
+            assertEq(conditional.addFreshCalls(), 0);
+            assertEq(poolFactory.poolByPair(sourceWrappers[0], sourceWrappers[2]), address(0));
+            assertEq(poolFactory.poolByPair(sourceWrappers[1], sourceWrappers[3]), address(0));
+            assertEq(company.balanceOf(address(ctf)), 0);
+            assertEq(collateral.balanceOf(address(ctf)), 0);
+            assertEq(company.allowance(address(manager), address(router)), 0);
+            assertEq(collateral.allowance(address(manager), address(router)), 0);
+            for (uint256 i; i < sourceWrappers.length; ++i) {
+                assertEq(IERC20(sourceWrappers[i]).balanceOf(address(conditional)), 0);
+            }
         }
+        ctf.setSplitShortfallCollateral(address(0));
 
         vm.expectRevert(BindingResolver.BindingFailed.selector);
         coordinator.setOfficialThenBindResolver(
