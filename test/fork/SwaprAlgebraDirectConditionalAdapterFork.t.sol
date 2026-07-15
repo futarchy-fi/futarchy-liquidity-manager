@@ -140,6 +140,7 @@ contract SwaprAlgebraDirectConditionalAdapterForkTest is Test {
         assertGt(feesB.fees0 + feesB.fees1, 0, "pair B must retain its own fees");
         uint128 partialB = pairB.liquidity / 2;
         IFutarchyLiquidityAdapter.Removal memory principalB = _remove(adapter, pairB, partialB);
+        assertEq(principalB.fees0 + principalB.fees1, 0);
         assertGt(principalB.principal0 + principalB.principal1, 0);
         uint128 remainingB = pairB.liquidity - partialB;
         _assertPairUnchanged(adapter, pairB, remainingB);

@@ -110,6 +110,7 @@ contract UniswapV3SepoliaForkTest is Test {
 
         IFutarchyLiquidityAdapter.Removal memory partialRemoval =
             adapter.removeLiquidityDetailed(address(token0), address(token1), currentLiquidity / 3);
+        assertEq(partialRemoval.fees0 + partialRemoval.fees1, 0);
         assertGt(partialRemoval.principal0 + partialRemoval.fees0, 0);
         assertGt(partialRemoval.principal1 + partialRemoval.fees1, 0);
 

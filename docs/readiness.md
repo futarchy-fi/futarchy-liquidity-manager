@@ -41,12 +41,12 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   machine checked in CI. The real Algebra fork suite also captures the cooldown liveness failure
   and bounds a live-fee partial removal at 150,000 gas (116,245 measured). Both the public-vault and
   direct Algebra fixtures prove zero-liquidity collection materializes real fees without changing
-  position liquidity; the immediately following public-vault removal reports no residual fees. The
+  position liquidity and that an immediately following removal reports no residual fees. The
   real Uniswap V3 fixture exercises adapter-owned fresh pool creation, initialization, and first-NFT
-  mint; proves the same zero-liquidity and position-identity properties; and rejects reuse of the
-  initialized pool after final removal. The deterministic V3 suite also rejects an uninitialized
-  pre-existing pool before custody changes and proves a failed first mint rolls back pool creation,
-  initialization, balances, and approvals.
+  mint; proves the same zero-liquidity, fee-drain, and position-identity properties; and rejects
+  reuse of the initialized pool after final removal. The deterministic V3 suite also rejects an
+  uninitialized pre-existing pool before custody changes and proves a failed first mint rolls back
+  pool creation, initialization, balances, and approvals.
 - Runtime-size checks retain an EIP-170 margin for the manager.
 
 ## Required before any funded deployment

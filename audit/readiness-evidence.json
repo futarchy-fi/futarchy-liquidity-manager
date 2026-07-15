@@ -38,11 +38,11 @@
           "path": "test/fork/SwaprAlgebraLiquidityAdapterFork.t.sol"
         },
         {
-          "description": "Real direct-Algebra removal proves zero-liquidity fee realization, fee-bearing partial removal at 116,245 gas under a 150,000-gas bound, final removal, pair isolation, donation accounting, and the mutable-cooldown liveness failure.",
+          "description": "Real direct-Algebra removal proves zero-liquidity fee realization preserves liquidity and drains fees before an immediate principal removal, fee-bearing partial removal at 116,245 gas under a 150,000-gas bound, final removal, pair isolation, donation accounting, and the mutable-cooldown liveness failure.",
           "path": "test/fork/SwaprAlgebraDirectConditionalAdapterFork.t.sol"
         },
         {
-          "description": "Real Uniswap V3 integration exercises adapter-owned fresh pool creation, initialization, and first-NFT mint; proves zero-liquidity live-fee materialization without changing liquidity or NFT identity before partial and final principal removal; and rejects reuse of the initialized pool.",
+          "description": "Real Uniswap V3 integration exercises adapter-owned fresh pool creation, initialization, and first-NFT mint; proves zero-liquidity live-fee materialization preserves liquidity and NFT identity and drains fees before an immediate principal removal; and rejects reuse of the initialized pool.",
           "path": "test/fork/UniswapV3SepoliaFork.t.sol"
         },
         {
