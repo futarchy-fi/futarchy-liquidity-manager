@@ -38,6 +38,14 @@
           "path": "test/fork/SwaprAlgebraLiquidityAdapterFork.t.sol"
         },
         {
+          "description": "Real direct-Algebra removal proves zero-liquidity fee realization, fee-bearing partial removal at 116,245 gas under a 150,000-gas bound, final removal, pair isolation, donation accounting, and the mutable-cooldown liveness failure.",
+          "path": "test/fork/SwaprAlgebraDirectConditionalAdapterFork.t.sol"
+        },
+        {
+          "description": "Real Uniswap V3 position-manager removal proves that zero-liquidity pre-collection materializes live swap fees without changing liquidity or NFT identity before partial and final principal removal.",
+          "path": "test/fork/UniswapV3SepoliaFork.t.sol"
+        },
+        {
           "description": "Real futarchy proposal, Reality question, and CTF condition wiring fork test.",
           "path": "test/fork/FutarchyProposalWiringFork.t.sol"
         },

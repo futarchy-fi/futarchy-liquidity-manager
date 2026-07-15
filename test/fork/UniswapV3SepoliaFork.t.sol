@@ -24,6 +24,16 @@ interface ISepoliaNonfungiblePositionManager is IUniswapV3NonfungiblePositionMan
     function ownerOf(uint256 tokenId) external view returns (address owner);
 }
 
+interface IUniswapV3SwapPool {
+    function swap(
+        address recipient,
+        bool zeroForOne,
+        int256 amountSpecified,
+        uint160 sqrtPriceLimitX96,
+        bytes calldata data
+    ) external returns (int256 amount0, int256 amount1);
+}
+
 contract UniswapV3SepoliaForkTest is Test {
     uint256 private constant FORK_BLOCK = 11_254_684;
     address private constant POSITION_MANAGER = 0x1238536071E1c677A632429e3655c799b22cDA52;
@@ -42,6 +52,7 @@ contract UniswapV3SepoliaForkTest is Test {
     int24 private constant FULL_RANGE_LOWER = -887_270;
     int24 private constant FULL_RANGE_UPPER = 887_270;
     uint160 private constant Q96 = 79_228_162_514_264_337_593_543_950_336;
+    uint160 private constant MIN_SQRT_RATIO_PLUS_ONE = 4_295_128_740;
 
     function testFork_adapterRoundTripsThroughRealPositionManager() public {
         if (!vm.envOr("RUN_SEPOLIA_FORK_TESTS", false)) return;
@@ -53,7 +64,8 @@ contract UniswapV3SepoliaForkTest is Test {
         MockMintableERC20 tokenB = new MockMintableERC20("Fork token B", "FTB");
         (MockMintableERC20 token0, MockMintableERC20 token1) =
             address(tokenA) < address(tokenB) ? (tokenA, tokenB) : (tokenB, tokenA);
-        npm.createAndInitializePoolIfNecessary(address(token0), address(token1), FEE, Q96);
+        address pool =
+            npm.createAndInitializePoolIfNecessary(address(token0), address(token1), FEE, Q96);
 
         UniswapV3LiquidityAdapter adapter =
             new UniswapV3LiquidityAdapter(npm, FULL_RANGE_LOWER, FULL_RANGE_UPPER);
@@ -78,6 +90,24 @@ contract UniswapV3SepoliaForkTest is Test {
 
         (,,,,,,, uint128 currentLiquidity,,,,) = npm.positions(tokenId);
         assertEq(currentLiquidity, firstLiquidity + secondLiquidity);
+        IUniswapV3SwapPool(pool)
+            .swap(
+                address(this),
+                true,
+                1 ether,
+                MIN_SQRT_RATIO_PLUS_ONE,
+                abi.encode(pool, address(token0), address(token1))
+            );
+
+        IFutarchyLiquidityAdapter.Removal memory feeRemoval =
+            adapter.removeLiquidityDetailed(address(token0), address(token1), 0);
+        assertEq(feeRemoval.principal0, 0);
+        assertEq(feeRemoval.principal1, 0);
+        assertGt(feeRemoval.fees0 + feeRemoval.fees1, 0);
+        (,,,,,,, uint128 liquidityAfterFeeCollection,,,,) = npm.positions(tokenId);
+        assertEq(liquidityAfterFeeCollection, currentLiquidity);
+        assertEq(adapter.getPositionTokenId(address(token0), address(token1)), tokenId);
+
         IFutarchyLiquidityAdapter.Removal memory partialRemoval =
             adapter.removeLiquidityDetailed(address(token0), address(token1), currentLiquidity / 3);
         assertGt(partialRemoval.principal0 + partialRemoval.fees0, 0);
@@ -95,6 +125,20 @@ contract UniswapV3SepoliaForkTest is Test {
         assertApproxEqAbs(token0.balanceOf(address(this)), balance0Before, 10);
         assertApproxEqAbs(token1.balanceOf(address(this)), balance1Before, 10);
         _assertAdapterEmpty(adapter, token0, token1);
+    }
+
+    function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data)
+        external
+    {
+        (address pool, address token0, address token1) =
+            abi.decode(data, (address, address, address));
+        require(msg.sender == pool, "pool");
+        if (amount0Delta > 0) {
+            require(IERC20(token0).transfer(pool, uint256(amount0Delta)), "token0");
+        }
+        if (amount1Delta > 0) {
+            require(IERC20(token1).transfer(pool, uint256(amount1Delta)), "token1");
+        }
     }
 
     function testFork_guardAcceptsMaturePoolAndRejectsFreshRealPool() public {

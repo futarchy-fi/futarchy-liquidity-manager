@@ -37,6 +37,7 @@ contract SwaprAlgebraDirectConditionalAdapterForkTest is Test {
     uint160 internal constant MIN_SQRT_PRICE = 4_295_128_740;
     int24 internal constant TICK_LOWER = -887_220;
     int24 internal constant TICK_UPPER = 887_220;
+    uint256 internal constant MAX_FEE_BEARING_PARTIAL_REMOVAL_GAS = 150_000;
 
     struct Pair {
         address token0;
@@ -115,8 +116,14 @@ contract SwaprAlgebraDirectConditionalAdapterForkTest is Test {
         assertEq(_tracked(adapter, pairA), pairA.liquidity);
         _assertPairUnchanged(adapter, pairB, pairB.liquidity);
 
+        _swap(pairA);
         uint128 partialA = pairA.liquidity / 3;
+        uint256 gasBefore = gasleft();
         IFutarchyLiquidityAdapter.Removal memory principalA = _remove(adapter, pairA, partialA);
+        uint256 gasUsed = gasBefore - gasleft();
+        emit log_named_uint("fee-bearing partial removal gas", gasUsed);
+        assertLt(gasUsed, MAX_FEE_BEARING_PARTIAL_REMOVAL_GAS);
+        assertGt(principalA.fees0 + principalA.fees1, 0);
         assertGt(principalA.principal0 + principalA.principal1, 0);
         uint128 remainingA = pairA.liquidity - partialA;
         _assertPairUnchanged(adapter, pairA, remainingA);
