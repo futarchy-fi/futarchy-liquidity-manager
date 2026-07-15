@@ -278,6 +278,25 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(conditionalAdapter.removeDetailedCalls(), 0);
     }
 
+    function test_settlement_merge_underconsumption_rolls_back_positions_and_binding() public {
+        _bootstrap();
+        _activateProposal(true);
+        router.setPayouts(1, 1, 0);
+        router.setMergeUnderconsumes(true);
+
+        vm.expectRevert(FutarchyLiquidityManager.IncompleteOutcomeRecovery.selector);
+        manager.sync();
+
+        assertTrue(manager.inConditionalMode());
+        assertEq(manager.conditionalYesLiquidity(), 80 ether);
+        assertEq(manager.conditionalNoLiquidity(), 80 ether);
+        assertEq(manager.activeProposal(), address(proposal));
+        assertEq(manager.activeConditionId(), CONDITION_ID);
+        assertEq(conditionalAdapter.removeDetailedCalls(), 0);
+        assertEq(yesCompany.allowance(address(manager), address(router)), 0);
+        assertEq(noCompany.allowance(address(manager), address(router)), 0);
+    }
+
     function test_settlement_winner_underpayment_rolls_back_positions_and_binding() public {
         _bootstrap();
         _activateProposal(true);
