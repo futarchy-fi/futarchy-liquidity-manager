@@ -78,12 +78,33 @@ behavior are fixed by upstream
 and
 [`Hooks`](https://github.com/Uniswap/v4-core/blob/46c6834698c48bc4a463a86d8420f4eb1d7f3b75/src/libraries/Hooks.sol).
 
+## Deployment and license evidence
+
+The release blockers were rechecked against the current official and onchain sources at Ethereum
+block 25,540,151 (`2026-07-15T19:29:23Z`):
+
+- The [official v4 deployment list](https://developers.uniswap.org/docs/protocols/v4/deployments)
+  still has no Gnosis (chain ID 100) entry.
+- The `v4deployments.uniswap.eth` resolver also returned an empty `text(node, "100")` value. This
+  independently confirms that governance has not registered an official Gnosis deployment.
+- `v4-core-license-date.uniswap.eth` had no ENS resolver, so it has not shortened the static
+  2027-06-15 change date in the core license.
+- The executed
+  [v4 licensing-process proposal](https://vote.uniswapfoundation.org/proposals/85) grants the
+  Uniswap Foundation deployment rights for DAO-selected chains. It does not grant Futarchy a
+  general right to self-deploy or fork v4 core.
+
+The shortest pre-change-date path is therefore to request a DAO-approved Gnosis deployment through
+the established Uniswap process and consume the resulting official contracts. A Futarchy-operated
+PoolManager deployment remains out of scope unless Futarchy receives its own applicable grant and
+independent legal clearance.
+
 ## Release blockers
 
 1. The [official v4 deployment list](https://developers.uniswap.org/docs/protocols/v4/deployments)
    did not list Gnosis on 2026-07-15. Select an official Gnosis deployment with verified code and
-   governance, or obtain explicit approval for a byte-identical deployment; an arbitrary fork is
-   not an equivalent dependency.
+   governance through the established Uniswap deployment process; an arbitrary or merely
+   byte-identical fork is not an equivalent dependency.
 2. V4 core is currently under its
    [Business Source License](https://github.com/Uniswap/v4-core/blob/46c6834698c48bc4a463a86d8420f4eb1d7f3b75/licenses/BUSL_LICENSE),
    with an MIT change date no later than 2027-06-15. Production deployment before that date needs
