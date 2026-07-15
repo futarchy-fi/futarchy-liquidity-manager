@@ -3,7 +3,8 @@
 This repository is ready for continued review and adversarial testing, not for funding. The
 current Swapr Algebra implementation is a no-funds prototype because the factory owner can enable
 a mutable liquidity cooldown and third-party dust mints can then block position burns indefinitely.
-See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`, and `operations.md`.
+See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
+`production-amm-candidate-evaluation.md`, and `operations.md`.
 
 ## Evidence available now
 

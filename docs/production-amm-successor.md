@@ -4,6 +4,9 @@ The Swapr Algebra implementation is a no-funds prototype. A production successor
 atomic proposal and proportional-redemption model without inheriting its pool-precreation veto,
 mutable burn cooldown, or narrow gas margin.
 
+The current candidate disposition and release blockers are recorded in
+`production-amm-candidate-evaluation.md`.
+
 ## Required properties
 
 - Only the authenticated FLM activation may initialize a conditional pool and create its first
