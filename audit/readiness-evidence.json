@@ -80,7 +80,7 @@
           "path": "test/FutarchyConditionalRouter.t.sol"
         },
         {
-          "description": "The real source-manager-router binding test proves second-CTF-split and post-activation outer-coordinator rollback across the registry, spot position, manager binding, wrappers, and fresh pools.",
+          "description": "The real source-manager-router binding test proves second-CTF-split, second-fresh-position, and post-activation outer-coordinator rollback across the registry, spot position, manager binding, wrappers, and fresh pools.",
           "path": "test/FutarchyProposalBinding.t.sol"
         },
         {
