@@ -64,7 +64,8 @@ merge reverts, that underlying's complete sets are transferred in kind too, so r
 cannot block withdrawal. The final holder receives all rounding residue.
 
 Emergency execution follows the same custody rule. It unwinds positions into the manager but never
-transfers pooled assets or burns shares. Owner sweeping is disabled until total share supply is zero.
+transfers pooled assets or burns shares. The owner controls arm/disarm authorization; after the
+delay, execution is permissionless. Owner sweeping is disabled until total share supply is zero.
 
 ## Bad Proposal Checks
 

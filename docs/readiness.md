@@ -31,6 +31,8 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 - Settlement remains permissionless after the final unresolved redemption reduces share supply and
   all liquidity to zero; any subsequently donated losing wrappers are consumed before binding is
   cleared.
+- Once the owner arms the delayed emergency path, any account can execute its non-custodial unwind;
+  active positions move into the manager while every share remains redeemable.
 - Every spot and conditional adapter removal receipt must equal the manager's exact token balance
   deltas. The manager derives fee/principal classification from separate zero/nonzero removal
   phases rather than trusting returned labels. Misclassification cannot change payouts, and an

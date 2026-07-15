@@ -343,6 +343,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | Merge router is unavailable or maliciously reverts | Withdrawing outcome slice is paid in kind. |
 | Settlement router reverts, partially consumes, or underpays | The whole settlement reverts; active positions and the captured binding remain intact. |
 | Rounding across sequential redemptions | No overpayment; survivor ratio never falls; final holder receives dust. |
+| Owner becomes unavailable after arming emergency exit | After the fixed delay, any account can unwind positions into the manager; no caller receives shareholder assets. |
 | Bad fair-join quote or changed spot state | Entire join reverts or leaves inventory idle; no donation. |
 | Conditional pool precreation used only for griefing | Funds remain in spot; liveness may fail but custody does not. |
 

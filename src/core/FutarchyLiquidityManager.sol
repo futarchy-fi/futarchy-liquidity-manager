@@ -557,7 +557,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     }
 
     /// @notice Arms emergency mode. Deposits and sync are blocked until disarmed; redemptions stay
-    /// open. The owner may unwind positions after the delay but can never take shareholder assets.
+    /// open. After the delay anyone may unwind positions, but can never take shareholder assets.
     function armEmergencyExit() external {
         _checkOwner();
         if (emergencyExitExecuted) revert EmergencyExitAlreadyExecuted();
@@ -598,9 +598,8 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     }
 
     /// @notice Removes all active liquidity into the vault so shareholders can redeem in kind.
-    /// @dev Owner-only, delayed, executable once, and transfers no shareholder assets.
+    /// @dev Permissionless after owner authorization and delay, executable once, and non-custodial.
     function executeEmergencyExit() external nonReentrant {
-        _checkOwner();
         if (emergencyExitExecuted) revert EmergencyExitAlreadyExecuted();
         if (emergencyExitArmedAt == 0) revert EmergencyExitNotArmed();
         if (!emergencyExitReady()) revert EmergencyExitDelayActive();

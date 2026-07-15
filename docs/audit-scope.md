@@ -59,7 +59,8 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   pools during atomic activation.
 - Deadline proxy gives new FLM-grade proposals a bounded liveness path.
 - Emergency exit only unwinds positions into the manager. It neither burns shares nor transfers
-  shareholder assets, and redemption remains available while emergency mode is armed or executed.
+  shareholder assets, redemption remains available while emergency mode is armed or executed, and
+  anyone may execute the unwind after the owner-authorized delay.
 - Adapters cannot over-pull tokens from the manager.
 - Source-atomic conditional activation fails closed before persistent state changes if the shared
   spot-pool guard cannot read valid history or detects more than 50 ticks of deviation.
@@ -76,7 +77,6 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
 
 - `FutarchyLiquidityManager.owner`
   - can arm/disarm emergency exit;
-  - can unwind all positions only after `EMERGENCY_EXIT_DELAY`;
   - can sweep residual assets to `BOOTSTRAP_RECIPIENT` only when total share supply is zero.
 - `BOOTSTRAP_RECIPIENT`
   - is the only account allowed to call `initializeFromBootstrap`;
@@ -95,7 +95,8 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
 - Any account
   - can deposit to spot;
   - can redeem its own FLM shares;
-  - can call `sync` to settle a captured condition when CTF reports an exact binary payout.
+  - can call `sync` to settle a captured condition when CTF reports an exact binary payout;
+  - can execute an owner-armed emergency unwind after `EMERGENCY_EXIT_DELAY`.
 
 ## Trust Assumptions
 

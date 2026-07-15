@@ -101,10 +101,12 @@ slippage parameters therefore cannot be selected by a depositor, redeemer, or em
   - Must be submitted by the owner or proposal manager.
   - Uses `validation`.
 - `armEmergencyExit`
+  - Owner-only authorization control.
 - `disarmEmergencyExit`
+  - Owner-only authorization control.
 - `executeEmergencyExit`
-  - After the delay, removes active positions into the manager without transferring shareholder
-    assets. Redemption remains open.
+  - Permissionless after the owner arms the exit and the delay elapses. Removes active positions
+    into the manager without transferring shareholder assets. Redemption remains open.
 - `sweepIdleToBootstrapRecipient`
   - Uses `unwrapNative` and reverts while any FLM share exists.
 

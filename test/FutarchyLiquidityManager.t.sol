@@ -863,10 +863,12 @@ contract FutarchyLiquidityManagerTest is Test {
         _bootstrap();
         _activateProposal(true);
         manager.armEmergencyExit();
+        vm.prank(depositor);
         vm.expectRevert(FutarchyLiquidityManager.EmergencyExitDelayActive.selector);
         manager.executeEmergencyExit();
 
         vm.warp(block.timestamp + manager.EMERGENCY_EXIT_DELAY());
+        vm.prank(depositor);
         manager.executeEmergencyExit();
 
         assertEq(manager.spotLiquidity(), 0);
@@ -881,16 +883,17 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(collateralOut, 100 ether);
     }
 
-    function test_emergency_controls_are_owner_only() public {
+    function test_emergency_authorization_controls_are_owner_only() public {
         _bootstrap();
+        manager.armEmergencyExit();
 
         vm.startPrank(depositor);
         vm.expectRevert();
         manager.armEmergencyExit();
         vm.expectRevert();
-        manager.sweepIdleToBootstrapRecipient(true);
+        manager.disarmEmergencyExit();
         vm.expectRevert();
-        manager.executeEmergencyExit();
+        manager.sweepIdleToBootstrapRecipient(true);
         vm.stopPrank();
     }
 
