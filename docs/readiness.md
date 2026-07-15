@@ -26,7 +26,8 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 - Settlement requires exact collateral and outcome-token balance deltas from complete-set merges,
   winner redemption, and losing-token consumption. A merge or winner redemption that pays exact
   collateral while consuming too few wrappers rolls back positions and binding, as do router
-  failure and underpayment.
+  failure and underpayment. A fault on the second underlying also rolls back the first underlying's
+  completed merge and losing-wrapper consumption.
 - Every spot and conditional adapter removal receipt must equal the manager's exact token balance
   deltas. The manager derives fee/principal classification from separate zero/nonzero removal
   phases rather than trusting returned labels. Misclassification cannot change payouts, and an
