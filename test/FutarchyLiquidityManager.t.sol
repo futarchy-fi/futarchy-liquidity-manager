@@ -145,6 +145,27 @@ contract FutarchyLiquidityManagerTest is Test {
         _assertActivationRolledBack();
     }
 
+    function test_activation_rolls_back_first_pool_when_second_pool_is_precreated() public {
+        _bootstrap();
+        _registerProposal(true);
+        conditionalAdapter.setFreshPool(address(noCompany), address(noCurrency), address(0xBEEF));
+
+        vm.expectRevert();
+        proposalSource.activate(address(manager));
+
+        _assertActivationRolledBack();
+        assertEq(
+            conditionalAdapter.freshPoolByPair(_pairKey(address(yesCompany), address(yesCurrency))),
+            address(0),
+            "first pool creation must roll back"
+        );
+        assertEq(
+            conditionalAdapter.freshPoolByPair(_pairKey(address(noCompany), address(noCurrency))),
+            address(0xBEEF),
+            "pre-existing second pool must remain"
+        );
+    }
+
     function test_activation_rejects_resolved_condition_before_removing_spot() public {
         _bootstrap();
         _registerProposal(true);
@@ -386,6 +407,29 @@ contract FutarchyLiquidityManagerTest is Test {
             manager.redeem(100 ether, bootstrapRecipient, false);
         assertEq(incumbentCompany, 200 ether);
         assertEq(incumbentCollateral, 100 ether);
+    }
+
+    function test_fees_and_donations_after_partial_redemption_belong_to_survivors() public {
+        _bootstrap();
+        vm.prank(depositor);
+        manager.depositToSpot{value: 100 ether}(100 ether);
+
+        vm.prank(bootstrapRecipient);
+        (uint256 firstCompany, uint256 firstCollateral) =
+            manager.redeem(100 ether, bootstrapRecipient, false);
+        assertEq(firstCompany, 100 ether);
+        assertEq(firstCollateral, 100 ether);
+
+        _accruePairFees(spotAdapter, company, wrappedNative, 20 ether, 40 ether);
+        company.mint(address(manager), 50 ether);
+        wrappedNative.mint(address(manager), 25 ether);
+
+        vm.prank(depositor);
+        (uint256 survivorCompany, uint256 survivorCollateral) =
+            manager.redeem(100 ether, depositor, false);
+        assertEq(survivorCompany, 170 ether);
+        assertEq(survivorCollateral, 165 ether);
+        assertEq(manager.totalSupply(), 0);
     }
 
     function test_bootstrap_deposit_and_redeem_with_erc20_collateral() public {

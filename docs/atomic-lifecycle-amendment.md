@@ -324,6 +324,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | Replayed activation or second live proposal | Reverts without changing positions or binding. |
 | One redeemer manipulates or removes TWAP history | Redemption still succeeds; no guard is consulted. |
 | First partial redeemer attempts to take all NFT fees | Pre-collect/decrease/post-collect separation limits payout to its share. |
+| Fees or donations arrive after a partial redemption | Only the then-current share supply owns the new value; exited holders gain no retroactive claim. |
 | Merge router is unavailable or maliciously reverts | Withdrawing outcome slice is paid in kind. |
 | Rounding across sequential redemptions | No overpayment; survivor ratio never falls; final holder receives dust. |
 | Bad fair-join quote or changed spot state | Entire join reverts or leaves inventory idle; no donation. |

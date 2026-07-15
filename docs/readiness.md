@@ -28,7 +28,8 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 - Re-run the complete unit and invariant suite, then run a deeper invariant pass:
 
   ```sh
-  forge test --match-path 'test/invariant/*' --invariant-runs 256 --invariant-depth 500
+  FOUNDRY_INVARIANT_RUNS=256 FOUNDRY_INVARIANT_DEPTH=500 \
+    forge test --match-path 'test/invariant/*'
   ```
 
 - Add fork tests for the selected production AMM, final proposal registry, CTF/router, token pair,
