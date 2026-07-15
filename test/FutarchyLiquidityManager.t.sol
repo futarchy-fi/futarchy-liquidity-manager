@@ -192,11 +192,15 @@ contract FutarchyLiquidityManagerTest is Test {
         _assertActivationRolledBack();
     }
 
-    function test_fresh_pool_price_orientation_covers_both_ordering_parities() public {
-        _assertFreshPriceOrientation(0, true, true);
-        _assertFreshPriceOrientation(1, true, false);
-        _assertFreshPriceOrientation(2, false, true);
-        _assertFreshPriceOrientation(3, false, false);
+    function test_fresh_pool_price_orientation_covers_all_ordering_parities() public {
+        _assertFreshPriceOrientation(0, true, true, true);
+        _assertFreshPriceOrientation(1, true, true, false);
+        _assertFreshPriceOrientation(2, true, false, true);
+        _assertFreshPriceOrientation(3, true, false, false);
+        _assertFreshPriceOrientation(4, false, true, true);
+        _assertFreshPriceOrientation(5, false, true, false);
+        _assertFreshPriceOrientation(6, false, false, true);
+        _assertFreshPriceOrientation(7, false, false, false);
     }
 
     function test_source_clear_and_spot_guard_failure_do_not_block_settlement() public {
@@ -1128,19 +1132,17 @@ contract FutarchyLiquidityManagerTest is Test {
     function _assertFreshPriceOrientation(
         uint256 caseId,
         bool companyIsToken0,
-        bool outcomeCompanyIsToken0
+        bool yesCompanyIsToken0,
+        bool noCompanyIsToken0
     ) internal {
         uint160 guardedSqrtPriceX96 = (uint160(3) << 95) + 17;
         uint256 base = 0x100000 + (caseId * 0x10000);
         address companyAddress = address(uint160(base + (companyIsToken0 ? 0x100 : 0x200)));
         address wrappedAddress = address(uint160(base + (companyIsToken0 ? 0x200 : 0x100)));
-        address yesCompanyAddress =
-            address(uint160(base + (outcomeCompanyIsToken0 ? 0x300 : 0x400)));
-        address yesCurrencyAddress =
-            address(uint160(base + (outcomeCompanyIsToken0 ? 0x400 : 0x300)));
-        address noCompanyAddress = address(uint160(base + (outcomeCompanyIsToken0 ? 0x500 : 0x600)));
-        address noCurrencyAddress =
-            address(uint160(base + (outcomeCompanyIsToken0 ? 0x600 : 0x500)));
+        address yesCompanyAddress = address(uint160(base + (yesCompanyIsToken0 ? 0x300 : 0x400)));
+        address yesCurrencyAddress = address(uint160(base + (yesCompanyIsToken0 ? 0x400 : 0x300)));
+        address noCompanyAddress = address(uint160(base + (noCompanyIsToken0 ? 0x500 : 0x600)));
+        address noCurrencyAddress = address(uint160(base + (noCompanyIsToken0 ? 0x600 : 0x500)));
 
         vm.etch(companyAddress, address(company).code);
         vm.etch(wrappedAddress, address(wrappedNative).code);
@@ -1203,20 +1205,23 @@ contract FutarchyLiquidityManagerTest is Test {
         );
         localSource.activate(address(localManager));
 
-        uint160 expected = companyIsToken0 == outcomeCompanyIsToken0
+        uint160 expectedYes = companyIsToken0 == yesCompanyIsToken0
+            ? guardedSqrtPriceX96
+            : uint160(Math.ceilDiv(uint256(1) << 192, guardedSqrtPriceX96));
+        uint160 expectedNo = companyIsToken0 == noCompanyIsToken0
             ? guardedSqrtPriceX96
             : uint160(Math.ceilDiv(uint256(1) << 192, guardedSqrtPriceX96));
         assertEq(
             localConditionalAdapter.freshSqrtPriceX96ByPair(
                 _pairKey(yesCompanyAddress, yesCurrencyAddress)
             ),
-            expected
+            expectedYes
         );
         assertEq(
             localConditionalAdapter.freshSqrtPriceX96ByPair(
                 _pairKey(noCompanyAddress, noCurrencyAddress)
             ),
-            expected
+            expectedNo
         );
     }
 

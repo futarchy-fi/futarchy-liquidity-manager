@@ -337,7 +337,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | One redeemer manipulates or removes TWAP history | Redemption still succeeds; no guard is consulted. |
 | First partial redeemer attempts to take all NFT fees | Pre-collect/decrease/post-collect separation limits payout to its share. |
 | Fees or donations arrive after a partial redemption | Only the then-current share supply owns the new value; exited holders gain no retroactive claim. |
-| Fees, donations, deposits, redemptions, and settlement are repeatedly interleaved | Every successful redemption preserves survivor value per share; issued assets stay in known custody and zero supply leaves no managed residue. |
+| Fees, donations, deposits, redemptions, and settlement are repeatedly interleaved | Every successful deposit and redemption preserves existing-holder value per share; issued assets stay in known custody and zero supply leaves no managed residue. |
 | Merge router is unavailable or maliciously reverts | Withdrawing outcome slice is paid in kind. |
 | Settlement router reverts, partially consumes, or underpays | The whole settlement reverts; active positions and the captured binding remain intact. |
 | Rounding across sequential redemptions | No overpayment; survivor ratio never falls; final holder receives dust. |

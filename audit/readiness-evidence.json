@@ -72,7 +72,7 @@
       "status": "ready-to-audit",
       "evidence": [
         {
-          "description": "Core manager tests cover proportional principal/fee/idle accounting with adversarial receipt-label misclassification, exact two-phase adapter-removal deltas with spot and conditional overreport rollback, divergent YES/NO liquidity and post-swap principal composition, sequential six-token conservation and nondecreasing survivor value per share, exact settlement after randomized one-to-four partial exits, donation-resistant deposit pricing, spot and conditional six-token post-exit fee/donation ownership, second-pool activation rollback, conditional underpayment fallback, exact-delta merge/winner/loser settlement rollback, and non-custodial emergency exit.",
+          "description": "Core manager tests cover every independent base/YES/NO token-ordering parity, proportional principal/fee/idle accounting with adversarial receipt-label misclassification, exact two-phase adapter-removal deltas with spot and conditional overreport rollback, divergent YES/NO liquidity and post-swap principal composition, sequential six-token conservation and nondecreasing survivor value per share, exact settlement after randomized one-to-four partial exits, donation-resistant deposit pricing, spot and conditional six-token post-exit fee/donation ownership, second-pool activation rollback, conditional underpayment fallback, exact-delta merge/winner/loser settlement rollback, and non-custodial emergency exit.",
           "path": "test/FutarchyLiquidityManager.t.sol"
         },
         {
