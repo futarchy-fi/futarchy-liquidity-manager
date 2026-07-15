@@ -17,10 +17,16 @@ import {MockRealityETH} from "./mocks/MockRealityETH.sol";
 import {MockRouterConditionalTokens} from "./mocks/MockRouterConditionalTokens.sol";
 import {MockRouterWrapped1155Factory} from "./mocks/MockRouterWrapped1155Factory.sol";
 
+contract BindingResolver {
+    error BindingFailed();
+
+    function bind() external pure {
+        revert BindingFailed();
+    }
+}
+
 contract BindingLifecycleCoordinator {
     bool public reachedPostActivation;
-
-    error PostActivationFailure();
 
     function setOfficial(
         FutarchyOfficialProposalSource source,
@@ -31,15 +37,16 @@ contract BindingLifecycleCoordinator {
         source.setOfficialProposal(proposalId, proposal, creator);
     }
 
-    function setOfficialThenRevert(
+    function setOfficialThenBindResolver(
         FutarchyOfficialProposalSource source,
         uint256 proposalId,
         address proposal,
-        address creator
+        address creator,
+        BindingResolver resolver
     ) external {
         source.setOfficialProposal(proposalId, proposal, creator);
         reachedPostActivation = true;
-        revert PostActivationFailure();
+        resolver.bind();
     }
 }
 
@@ -135,6 +142,7 @@ contract FutarchyProposalBindingTest is Test {
 
     function test_atomic_activation_uses_captured_source_snapshot() public {
         BindingLifecycleCoordinator coordinator = new BindingLifecycleCoordinator();
+        BindingResolver resolver = new BindingResolver();
         BindingConditionalTokens ctf = new BindingConditionalTokens();
         MockRouterWrapped1155Factory wrapperFactory = new MockRouterWrapped1155Factory();
         FutarchyConditionalRouter router = new FutarchyConditionalRouter(ctf, wrapperFactory);
@@ -276,8 +284,10 @@ contract FutarchyProposalBindingTest is Test {
             assertEq(IERC20(sourceWrappers[i]).balanceOf(address(conditional)), 0);
         }
 
-        vm.expectRevert(BindingLifecycleCoordinator.PostActivationFailure.selector);
-        coordinator.setOfficialThenRevert(source, 1, address(proposal), address(this));
+        vm.expectRevert(BindingResolver.BindingFailed.selector);
+        coordinator.setOfficialThenBindResolver(
+            source, 1, address(proposal), address(this), resolver
+        );
 
         assertFalse(coordinator.reachedPostActivation());
         assertFalse(source.currentOfficialProposal().exists);

@@ -330,6 +330,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | First conditional adapter add reverts after both CTF splits | Activation reverts and restores the source write, both splits, spot position, pool lookup, and wrapper custody. |
 | Adapter returns a pool other than its canonical pair lookup | Activation reverts and restores the source write, CTF splits, spot position, and created pool. |
 | Failure after only one conditional pool is created | Entire official transition rolls back. |
+| Post-activation resolver binding reverts | The enclosing lifecycle transaction restores resolver/coordinator state, source write, CTF splits, positions, pools, and manager binding. |
 | Source cleared or replaced after activation | Stored proposal and condition still settle normally. |
 | Replayed activation or second live proposal | Reverts without changing positions or binding. |
 | Adapter reports removal assets it did not transfer | The entire operation reverts before survivor-owned idle balances can fund the discrepancy. |
