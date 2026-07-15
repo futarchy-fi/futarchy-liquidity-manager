@@ -521,6 +521,91 @@ contract FutarchyLiquidityManagerTest is Test {
         );
     }
 
+    function testFuzz_conditional_sequential_redemptions_conserve_every_token(uint256 seed) public {
+        uint256 baseAmount = _fuzzValue(seed, 0, 1 ether, 200 ether);
+        uint16 spotUsage = uint16(_fuzzValue(seed, 1, 5000, 10_000));
+        uint16 yesUsage = uint16(_fuzzValue(seed, 2, 9951, 9975));
+        uint16 noUsage = uint16(_fuzzValue(seed, 3, 9976, 10_000));
+
+        spotAdapter.setAddUsageBps(spotUsage, spotUsage);
+        vm.prank(bootstrapRecipient);
+        manager.initializeFromBootstrap{value: baseAmount}(baseAmount);
+        conditionalAdapter.setAddUsageBps(noUsage, noUsage);
+        conditionalAdapter.setNextAddUsageBps(yesUsage);
+        _activateProposal(true);
+        router.setMergeReverts(true);
+
+        address[6] memory tokens = [
+            address(company),
+            address(wrappedNative),
+            address(yesCompany),
+            address(noCompany),
+            address(yesCurrency),
+            address(noCurrency)
+        ];
+        for (uint256 i; i < tokens.length; i++) {
+            MockMintableERC20(tokens[i])
+                .mint(address(manager), _fuzzValue(seed, 10 + i, 0, 10 ether));
+        }
+
+        _accruePairFees(
+            spotAdapter,
+            company,
+            wrappedNative,
+            _fuzzValue(seed, 20, 1, 10 ether),
+            _fuzzValue(seed, 21, 1, 10 ether)
+        );
+        _accruePairFees(
+            conditionalAdapter,
+            yesCompany,
+            yesCurrency,
+            _fuzzValue(seed, 22, 1, 10 ether),
+            _fuzzValue(seed, 23, 1, 10 ether)
+        );
+        _accruePairFees(
+            conditionalAdapter,
+            noCompany,
+            noCurrency,
+            _fuzzValue(seed, 24, 1, 10 ether),
+            _fuzzValue(seed, 25, 1, 10 ether)
+        );
+
+        address holder = address(0xA11CE);
+        address[3] memory recipients = [address(0xB0B1), address(0xB0B2), address(0xB0B3)];
+        uint256 holderShares = manager.balanceOf(bootstrapRecipient);
+        vm.prank(bootstrapRecipient);
+        manager.transfer(holder, holderShares);
+
+        uint256[6] memory initial;
+        for (uint256 i; i < tokens.length; i++) {
+            initial[i] = _managedBalance(tokens[i]);
+        }
+
+        uint256 supplyBefore = manager.totalSupply();
+        uint256 shares = _fuzzValue(seed, 30, supplyBefore / 10, supplyBefore / 3);
+        uint256[3] memory liquidityBefore = _activeLiquidity();
+        vm.prank(holder);
+        manager.redeem(shares, recipients[0], false);
+        _assertSurvivorRatios(liquidityBefore, supplyBefore);
+        _assertConserved(tokens, initial, recipients, 1);
+
+        supplyBefore = manager.totalSupply();
+        shares = _fuzzValue(seed, 31, supplyBefore / 10, supplyBefore / 2);
+        liquidityBefore = _activeLiquidity();
+        vm.prank(holder);
+        manager.redeem(shares, recipients[1], false);
+        _assertSurvivorRatios(liquidityBefore, supplyBefore);
+        _assertConserved(tokens, initial, recipients, 2);
+
+        uint256 finalShares = manager.balanceOf(holder);
+        vm.prank(holder);
+        manager.redeem(finalShares, recipients[2], false);
+        _assertConserved(tokens, initial, recipients, 3);
+        for (uint256 i; i < tokens.length; i++) {
+            assertEq(_managedBalance(tokens[i]), 0, "final redeemer must receive rounding dust");
+        }
+    }
+
     function _newManager(
         MockMintableERC20 companyToken,
         IWrappedNative collateralToken,
@@ -629,6 +714,56 @@ contract FutarchyLiquidityManagerTest is Test {
         vm.deal(account, amount);
         vm.prank(account);
         token.approve(address(target), type(uint256).max);
+    }
+
+    function _fuzzValue(uint256 seed, uint256 salt, uint256 minValue, uint256 maxValue)
+        internal
+        pure
+        returns (uint256)
+    {
+        return minValue + (uint256(keccak256(abi.encode(seed, salt))) % (maxValue - minValue + 1));
+    }
+
+    function _managedBalance(address token) internal view returns (uint256) {
+        return IERC20(token).balanceOf(address(manager))
+            + IERC20(token).balanceOf(address(spotAdapter))
+            + IERC20(token).balanceOf(address(conditionalAdapter));
+    }
+
+    function _activeLiquidity() internal view returns (uint256[3] memory liquidity) {
+        liquidity[0] = manager.spotLiquidity();
+        liquidity[1] = manager.conditionalYesLiquidity();
+        liquidity[2] = manager.conditionalNoLiquidity();
+    }
+
+    function _assertSurvivorRatios(uint256[3] memory beforeLiquidity, uint256 supplyBefore)
+        internal
+        view
+    {
+        uint256[3] memory afterLiquidity = _activeLiquidity();
+        uint256 supplyAfter = manager.totalSupply();
+        for (uint256 i; i < beforeLiquidity.length; i++) {
+            assertGe(
+                afterLiquidity[i] * supplyBefore,
+                beforeLiquidity[i] * supplyAfter,
+                "rounding must favor survivors"
+            );
+        }
+    }
+
+    function _assertConserved(
+        address[6] memory tokens,
+        uint256[6] memory initial,
+        address[3] memory recipients,
+        uint256 recipientCount
+    ) internal view {
+        for (uint256 i; i < tokens.length; i++) {
+            uint256 accounted = _managedBalance(tokens[i]);
+            for (uint256 j; j < recipientCount; j++) {
+                accounted += IERC20(tokens[i]).balanceOf(recipients[j]);
+            }
+            assertEq(accounted, initial[i], "token conservation");
+        }
     }
 
     function _assertFreshPriceOrientation(

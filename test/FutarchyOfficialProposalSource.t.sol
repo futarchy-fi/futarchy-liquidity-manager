@@ -26,6 +26,7 @@ contract MockLifecycleCoordinator {
         source.setOfficialProposal(proposalId, proposal, creator);
     }
 }
+
 contract MockConditionalRouterBinding {
     address public immutable CONDITIONAL_TOKENS;
 

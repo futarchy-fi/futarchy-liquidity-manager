@@ -99,7 +99,7 @@ contract FutarchyLiquidityManagerHandler is Test {
             address(0xB0B)
         );
 
-        try manager.sync() {
+        try source.activate(address(manager)) {
             migrations++;
         } catch {}
     }
@@ -123,6 +123,7 @@ contract FutarchyLiquidityManagerHandler is Test {
             address(noCurrency),
             winnerIsYes
         );
+        router.setPayouts(1, winnerIsYes ? 1 : 0, winnerIsYes ? 0 : 1);
         source.setSettled(true);
 
         try manager.sync() {
@@ -149,6 +150,7 @@ contract FutarchyLiquidityManagerInvariantTest is StdInvariant, Test {
     address internal bootstrapRecipient = address(0xB007);
     address internal officialProposer = address(0xC0DE);
     address internal owner = address(this);
+    bytes32 internal constant CONDITION_ID = bytes32(uint256(0xC0DE));
 
     function setUp() public {
         company = new MockMintableERC20("Company", "COMP");
@@ -165,6 +167,7 @@ contract FutarchyLiquidityManagerInvariantTest is StdInvariant, Test {
             address(yesCurrency),
             address(noCurrency)
         );
+        proposal.setQuestionAndCondition(bytes32(uint256(1)), CONDITION_ID);
         source = new MockOfficialProposalSource();
         spotAdapter = new MockFutarchyLiquidityAdapter();
         conditionalAdapter = new MockFutarchyLiquidityAdapter();
@@ -208,7 +211,26 @@ contract FutarchyLiquidityManagerInvariantTest is StdInvariant, Test {
             proposal,
             officialProposer
         );
+
+        company.mint(bootstrapRecipient, 100 ether);
+        vm.deal(bootstrapRecipient, 100 ether);
+        vm.startPrank(bootstrapRecipient);
+        company.approve(address(manager), 100 ether);
+        manager.initializeFromBootstrap{value: 100 ether}(100 ether);
+        manager.transfer(address(handler), manager.balanceOf(bootstrapRecipient));
+        vm.stopPrank();
+
         targetContract(address(handler));
+    }
+
+    function test_handlerReachesAtomicActivationAndSettlement() public {
+        handler.migrateToConditional();
+        assertEq(handler.migrations(), 1);
+        assertTrue(manager.inConditionalMode());
+
+        handler.settleAndReturnToSpot(true);
+        assertEq(handler.settlements(), 1);
+        assertFalse(manager.inConditionalMode());
     }
 
     function invariant_conditionalAccountingIsConsistent() public view {

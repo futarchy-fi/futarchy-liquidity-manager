@@ -17,6 +17,7 @@ import {FutarchyOfficialProposalSource} from "../sources/FutarchyOfficialProposa
 interface IAlgebraFactoryBoundGuard {
     function FACTORY() external view returns (address);
 }
+
 /// @title FutarchyLiquidityManagerFactory
 /// @notice Permissionless deployment factory for the default per-organization FLM bundle.
 /// @dev Callers supply the pinned bare creation code to keep this factory below EIP-170. The
