@@ -96,7 +96,7 @@
           "path": "test/AlgebraPoolStabilityGuard.t.sol"
         },
         {
-          "description": "The initialized invariant harness exercises atomic activation and CTF settlement while checking conditional binding and adapter-liquidity consistency across deposit, redeem, activation, and settlement calls.",
+          "description": "The initialized invariant harness interleaves deposits, activation, fees, donations, redemptions, and CTF settlement; every successful redemption checks survivor-favoring liquidity and six-token balance ratios, while global invariants enforce conditional binding, adapter-liquidity consistency, known custody of all six issued tokens, and zero managed residue at zero share supply.",
           "path": "test/invariant/FutarchyLiquidityManagerInvariant.t.sol"
         },
         {

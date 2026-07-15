@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {StdInvariant} from "forge-std/StdInvariant.sol";
 import {Test} from "forge-std/Test.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {
     FutarchyLiquidityManager,
@@ -27,10 +28,15 @@ contract FutarchyLiquidityManagerHandler is Test {
     MockMintableERC20 public immutable yesCurrency;
     MockMintableERC20 public immutable noCurrency;
     MockFutarchyProposalLike public immutable proposal;
+    MockFutarchyLiquidityAdapter public immutable spotAdapter;
+    MockFutarchyLiquidityAdapter public immutable conditionalAdapter;
     address public immutable officialProposer;
 
     uint256 public migrations;
     uint256 public settlements;
+    uint256 public successfulRedemptions;
+    uint256 public feeAccruals;
+    uint256 public donations;
     bool public winnerIsYes = true;
 
     constructor(
@@ -44,6 +50,8 @@ contract FutarchyLiquidityManagerHandler is Test {
         MockMintableERC20 yesCurrency_,
         MockMintableERC20 noCurrency_,
         MockFutarchyProposalLike proposal_,
+        MockFutarchyLiquidityAdapter spotAdapter_,
+        MockFutarchyLiquidityAdapter conditionalAdapter_,
         address officialProposer_
     ) {
         manager = manager_;
@@ -56,6 +64,8 @@ contract FutarchyLiquidityManagerHandler is Test {
         yesCurrency = yesCurrency_;
         noCurrency = noCurrency_;
         proposal = proposal_;
+        spotAdapter = spotAdapter_;
+        conditionalAdapter = conditionalAdapter_;
         officialProposer = officialProposer_;
     }
 
@@ -79,7 +89,64 @@ contract FutarchyLiquidityManagerHandler is Test {
         if (balance == 0) return;
 
         uint256 shares = bound(uint256(sharesSeed), 1, balance);
-        try manager.redeem(shares, address(this), false) {} catch {}
+        uint256 supplyBefore = manager.totalSupply();
+        uint256[3] memory liquidityBefore = _activeLiquidity();
+        uint256[6] memory balancesBefore = _managedBalances();
+        try manager.redeem(shares, address(this), false) {
+            successfulRedemptions++;
+            uint256 supplyAfter = manager.totalSupply();
+            uint256[3] memory liquidityAfter = _activeLiquidity();
+            uint256[6] memory balancesAfter = _managedBalances();
+            for (uint256 i; i < liquidityBefore.length; ++i) {
+                assertGe(
+                    uint256(liquidityAfter[i]) * supplyBefore,
+                    uint256(liquidityBefore[i]) * supplyAfter,
+                    "redemption diluted survivor liquidity"
+                );
+            }
+            for (uint256 i; i < balancesBefore.length; ++i) {
+                assertGe(
+                    balancesAfter[i] * supplyBefore,
+                    balancesBefore[i] * supplyAfter,
+                    "redemption diluted survivor assets"
+                );
+            }
+        } catch {}
+    }
+
+    function donate(uint8 tokenSeed, uint96 amountSeed) external {
+        if (manager.totalSupply() == 0) return;
+        uint256 tokenIndex = uint256(tokenSeed) % 6;
+        if (!manager.inConditionalMode() && tokenIndex > 1) tokenIndex %= 2;
+        MockMintableERC20 token = _tokens()[tokenIndex];
+        token.mint(address(manager), bound(uint256(amountSeed), 1, 10 ether));
+        donations++;
+    }
+
+    function accrueFees(uint8 pairSeed, uint96 amount0Seed, uint96 amount1Seed) external {
+        if (manager.totalSupply() == 0) return;
+        uint256 pair = uint256(pairSeed) % (manager.inConditionalMode() ? 3 : 1);
+        (
+            MockFutarchyLiquidityAdapter adapter,
+            MockMintableERC20 tokenA,
+            MockMintableERC20 tokenB
+        ) = pair == 0
+            ? (spotAdapter, company, MockMintableERC20(address(wrappedNative)))
+            : pair == 1
+                ? (conditionalAdapter, yesCompany, yesCurrency)
+                : (conditionalAdapter, noCompany, noCurrency);
+        uint256 amountA = bound(uint256(amount0Seed), 1, 10 ether);
+        uint256 amountB = bound(uint256(amount1Seed), 1, 10 ether);
+        tokenA.mint(address(this), amountA);
+        tokenB.mint(address(this), amountB);
+        tokenA.approve(address(adapter), amountA);
+        tokenB.approve(address(adapter), amountB);
+        if (address(tokenA) < address(tokenB)) {
+            adapter.accrueFees(address(tokenA), address(tokenB), amountA, amountB);
+        } else {
+            adapter.accrueFees(address(tokenB), address(tokenA), amountB, amountA);
+        }
+        feeAccruals++;
     }
 
     function migrateToConditional() external {
@@ -129,6 +196,32 @@ contract FutarchyLiquidityManagerHandler is Test {
         try manager.sync() {
             settlements++;
         } catch {}
+    }
+
+    function _tokens() internal view returns (MockMintableERC20[6] memory tokens) {
+        tokens = [
+            company,
+            MockMintableERC20(address(wrappedNative)),
+            yesCompany,
+            noCompany,
+            yesCurrency,
+            noCurrency
+        ];
+    }
+
+    function _managedBalances() internal view returns (uint256[6] memory balances) {
+        MockMintableERC20[6] memory tokens = _tokens();
+        for (uint256 i; i < tokens.length; ++i) {
+            balances[i] = tokens[i].balanceOf(address(manager))
+                + tokens[i].balanceOf(address(spotAdapter))
+                + tokens[i].balanceOf(address(conditionalAdapter));
+        }
+    }
+
+    function _activeLiquidity() internal view returns (uint256[3] memory liquidity) {
+        liquidity[0] = manager.spotLiquidity();
+        liquidity[1] = manager.conditionalYesLiquidity();
+        liquidity[2] = manager.conditionalNoLiquidity();
     }
 }
 
@@ -209,6 +302,8 @@ contract FutarchyLiquidityManagerInvariantTest is StdInvariant, Test {
             yesCurrency,
             noCurrency,
             proposal,
+            spotAdapter,
+            conditionalAdapter,
             officialProposer
         );
 
@@ -227,6 +322,13 @@ contract FutarchyLiquidityManagerInvariantTest is StdInvariant, Test {
         handler.migrateToConditional();
         assertEq(handler.migrations(), 1);
         assertTrue(manager.inConditionalMode());
+
+        handler.donate(5, 1 ether);
+        handler.accrueFees(2, 1 ether, 2 ether);
+        handler.redeem(10 ether);
+        assertEq(handler.donations(), 1);
+        assertEq(handler.feeAccruals(), 1);
+        assertEq(handler.successfulRedemptions(), 1);
 
         handler.settleAndReturnToSpot(true);
         assertEq(handler.settlements(), 1);
@@ -259,6 +361,42 @@ contract FutarchyLiquidityManagerInvariantTest is StdInvariant, Test {
             assertEq(conditionalAdapter.liquidityByPair(yesKey), manager.conditionalYesLiquidity());
             assertEq(conditionalAdapter.liquidityByPair(noKey), manager.conditionalNoLiquidity());
         }
+    }
+
+    function invariant_allSixTokensRemainInKnownCustody() public view {
+        _assertKnownCustody(company);
+        _assertKnownCustody(wrappedNative);
+        _assertKnownCustody(yesCompany);
+        _assertKnownCustody(noCompany);
+        _assertKnownCustody(yesCurrency);
+        _assertKnownCustody(noCurrency);
+    }
+
+    function invariant_zeroSupplyLeavesNoManagedAssets() public view {
+        if (manager.totalSupply() != 0) return;
+        assertEq(manager.spotLiquidity(), 0);
+        assertEq(manager.conditionalYesLiquidity(), 0);
+        assertEq(manager.conditionalNoLiquidity(), 0);
+        _assertZeroManagedBalance(company);
+        _assertZeroManagedBalance(wrappedNative);
+        _assertZeroManagedBalance(yesCompany);
+        _assertZeroManagedBalance(noCompany);
+        _assertZeroManagedBalance(yesCurrency);
+        _assertZeroManagedBalance(noCurrency);
+    }
+
+    function _assertKnownCustody(IERC20 token) internal view {
+        uint256 known = token.balanceOf(address(manager)) + token.balanceOf(address(spotAdapter))
+            + token.balanceOf(address(conditionalAdapter)) + token.balanceOf(address(router))
+            + token.balanceOf(address(handler)) + token.balanceOf(bootstrapRecipient)
+            + token.balanceOf(address(this));
+        assertEq(known, token.totalSupply(), "token escaped modeled custody");
+    }
+
+    function _assertZeroManagedBalance(IERC20 token) internal view {
+        assertEq(token.balanceOf(address(manager)), 0);
+        assertEq(token.balanceOf(address(spotAdapter)), 0);
+        assertEq(token.balanceOf(address(conditionalAdapter)), 0);
     }
 
     function _pairKey(address tokenA, address tokenB) internal pure returns (bytes32) {
