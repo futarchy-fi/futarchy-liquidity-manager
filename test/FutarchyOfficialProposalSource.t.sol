@@ -46,7 +46,7 @@ contract MockOfficialProposalActivationTarget {
     bool public canActivate = true;
     bool public revertActivation;
     bool public reenterActivation;
-    bool public corruptCapture;
+    uint8 public corruptField;
     bool public reentryBlocked;
     bool public observedStoredProposal;
     uint256 public activationCalls;
@@ -88,8 +88,8 @@ contract MockOfficialProposalActivationTarget {
         reenterActivation = value;
     }
 
-    function setCorruptCapture(bool value) external {
-        corruptCapture = value;
+    function setCorruptField(uint8 value) external {
+        corruptField = value;
     }
 
     function activateOfficialProposal(
@@ -105,7 +105,25 @@ contract MockOfficialProposalActivationTarget {
         if (revertActivation) revert MockActivationReverted();
 
         _captured = proposal;
-        if (corruptCapture) _captured.conditionId = bytes32(uint256(proposal.conditionId) ^ 1);
+        if (corruptField == 1) {
+            _captured.proposalId ^= 1;
+        } else if (corruptField == 2) {
+            _captured.proposal = address(uint160(proposal.proposal) ^ 1);
+        } else if (corruptField == 3) {
+            _captured.conditionId ^= bytes32(uint256(1));
+        } else if (corruptField == 4) {
+            _captured.proposalToken = address(uint160(proposal.proposalToken) ^ 1);
+        } else if (corruptField == 5) {
+            _captured.collateralToken = address(uint160(proposal.collateralToken) ^ 1);
+        } else if (corruptField == 6) {
+            _captured.yesCompanyToken = address(uint160(proposal.yesCompanyToken) ^ 1);
+        } else if (corruptField == 7) {
+            _captured.noCompanyToken = address(uint160(proposal.noCompanyToken) ^ 1);
+        } else if (corruptField == 8) {
+            _captured.yesCurrencyToken = address(uint160(proposal.yesCurrencyToken) ^ 1);
+        } else if (corruptField == 9) {
+            _captured.noCurrencyToken = address(uint160(proposal.noCurrencyToken) ^ 1);
+        }
 
         if (reenterActivation) {
             try COORDINATOR.setOfficialProposal(
@@ -436,17 +454,19 @@ contract FutarchyOfficialProposalSourceTest is Test {
         assertEq(activationTarget.activationCalls(), 1);
     }
 
-    function test_corrupt_capture_rolls_back_source_write_and_target_state() public {
+    function test_each_corrupt_capture_field_rolls_back_source_write_and_target_state() public {
         MockFutarchyProposalLike proposal = _proposal();
-        activationTarget.setCorruptCapture(true);
 
-        vm.expectRevert(FutarchyOfficialProposalSource.CapturedProposalMismatch.selector);
-        _setOfficialProposal(1, address(proposal), officialProposer);
+        for (uint8 field = 1; field <= 9; field++) {
+            activationTarget.setCorruptField(field);
+            vm.expectRevert(FutarchyOfficialProposalSource.CapturedProposalMismatch.selector);
+            _setOfficialProposal(1, address(proposal), officialProposer);
 
-        assertFalse(source.currentOfficialProposal().exists);
-        assertEq(activationTarget.activationCalls(), 0);
-        assertEq(activationTarget.lastProposal(), address(0));
-        assertEq(activationTarget.capturedOfficialProposal().proposal, address(0));
+            assertFalse(source.currentOfficialProposal().exists);
+            assertEq(activationTarget.activationCalls(), 0);
+            assertEq(activationTarget.lastProposal(), address(0));
+            assertEq(activationTarget.capturedOfficialProposal().proposal, address(0));
+        }
     }
 
     function test_reentrant_activation_is_blocked() public {
