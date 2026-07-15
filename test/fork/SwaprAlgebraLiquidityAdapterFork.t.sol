@@ -95,6 +95,58 @@ contract SwaprAlgebraLiquidityAdapterForkTest is Test {
         assertGt(gnoAfter + wxdaiAfter, gnoBefore + wxdaiBefore - 2 ether);
     }
 
+    function testFork_oneLiquidityUnitCanRoundTripToZeroFromIntegerRounding() public {
+        if (!vm.envOr("RUN_GNOSIS_FORK_TESTS", false)) return;
+        vm.createSelectFork(vm.rpcUrl("gnosis"));
+
+        MockMintableERC20 first = new MockMintableERC20("Round A", "RA");
+        MockMintableERC20 second = new MockMintableERC20("Round B", "RB");
+        address token0 = address(first) < address(second) ? address(first) : address(second);
+        address token1 = address(first) < address(second) ? address(second) : address(first);
+
+        SwaprAlgebraLiquidityAdapter adapter = _newAdapter();
+        adapter.bindManager(address(this));
+        MockMintableERC20(token0).mint(address(this), 1);
+        MockMintableERC20(token1).mint(address(this), 1);
+        IERC20(token0).approve(address(adapter), 1);
+        IERC20(token1).approve(address(adapter), 1);
+
+        (uint128 liquidity, uint256 amount0Used, uint256 amount1Used) = adapter.addFullRangeLiquidity(
+            token0,
+            token1,
+            1,
+            1,
+            abi.encode(
+                SwaprAlgebraLiquidityAdapter.AddParams({
+                    tickLower: FULL_RANGE_LOWER,
+                    tickUpper: FULL_RANGE_UPPER,
+                    amount0Min: 0,
+                    amount1Min: 0,
+                    deadline: block.timestamp + 20 minutes,
+                    sqrtPriceX96: uint160(1) << 96
+                })
+            )
+        );
+
+        assertEq(liquidity, 1);
+        assertEq(amount0Used, 1);
+        assertEq(amount1Used, 1);
+
+        (uint256 amount0Out, uint256 amount1Out) = adapter.removeLiquidity(
+            token0,
+            token1,
+            liquidity,
+            abi.encode(
+                SwaprAlgebraLiquidityAdapter.ExitParams({
+                    amount0Min: 0, amount1Min: 0, deadline: block.timestamp + 20 minutes
+                })
+            )
+        );
+
+        assertEq(amount0Out, 0);
+        assertEq(amount1Out, 0);
+    }
+
     function testFork_publicVaultFullUnwindDepositAndRedeemFitsGnosisGas() public {
         if (!vm.envOr("RUN_GNOSIS_FORK_TESTS", false)) return;
         vm.createSelectFork(vm.rpcUrl("gnosis"));

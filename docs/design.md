@@ -1,5 +1,10 @@
 # Design
 
+The planned replacement for the current two-transaction activation and full-consolidation
+redemption paths is specified in
+[`atomic-lifecycle-amendment.md`](atomic-lifecycle-amendment.md). The sections below describe the
+contracts at repository head unless they explicitly refer to that amendment.
+
 ## Goal
 
 `FutarchyLiquidityManager` is a generic liquidity vault for futarchy markets. LPs deposit a
@@ -87,6 +92,12 @@ The guard deliberately does not require history from newly created YES/NO pools.
 manager instead requires each conditional add to consume both sides of the inventory split from the
 TWAP-anchored spot position within a symmetric 50-bps leftover bound. On return, the same spot guard
 runs before the settled winner inventory is recovered and ratio-fit back into spot.
+
+The proposed zero-fee constant-product round-trip invariant is derived in
+[`constant-product-roundtrip.md`](constant-product-roundtrip.md). It shows how an
+invariant-growth unbalanced join can preserve the absolute number of original spot LP tokens across
+arbitrarily priced conditional pools. This is a design result, not a property of the current
+adapters or of a raw off-ratio Uniswap V2 mint.
 
 ## Settlement Liveness
 
