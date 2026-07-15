@@ -17,6 +17,10 @@ import {MockRouterConditionalTokens} from "./mocks/MockRouterConditionalTokens.s
 import {MockRouterWrapped1155Factory} from "./mocks/MockRouterWrapped1155Factory.sol";
 
 contract BindingLifecycleCoordinator {
+    bool public reachedPostActivation;
+
+    error PostActivationFailure();
+
     function setOfficial(
         FutarchyOfficialProposalSource source,
         uint256 proposalId,
@@ -24,6 +28,17 @@ contract BindingLifecycleCoordinator {
         address creator
     ) external {
         source.setOfficialProposal(proposalId, proposal, creator);
+    }
+
+    function setOfficialThenRevert(
+        FutarchyOfficialProposalSource source,
+        uint256 proposalId,
+        address proposal,
+        address creator
+    ) external {
+        source.setOfficialProposal(proposalId, proposal, creator);
+        reachedPostActivation = true;
+        revert PostActivationFailure();
     }
 }
 
@@ -117,53 +132,20 @@ contract CallerDependentProposal {
 contract FutarchyProposalBindingTest is Test {
     uint256 private constant AMOUNT = 100 ether;
 
-    function test_callerDependentProposalCannotRedirectCapturedSourceSnapshot() public {
+    function test_atomic_activation_uses_captured_source_snapshot() public {
         BindingLifecycleCoordinator coordinator = new BindingLifecycleCoordinator();
         BindingConditionalTokens ctf = new BindingConditionalTokens();
         MockRouterWrapped1155Factory wrapperFactory = new MockRouterWrapped1155Factory();
         FutarchyConditionalRouter router = new FutarchyConditionalRouter(ctf, wrapperFactory);
         AdapterBackedAlgebraFactory poolFactory = new AdapterBackedAlgebraFactory();
-        MockRealityETH reality = new MockRealityETH();
         MockMintableERC20 company = new MockMintableERC20("Company", "COMP");
         MockMintableERC20 collateral = new MockMintableERC20("Collateral", "COLL");
-        address trustedOracle = address(
-            new DeadlineBoundedRealityProxy(
-                IConditionalTokensCore(address(ctf)), IRealityETHCore(address(reality)), 1 days
-            )
-        );
         bytes32 sourceQuestion = keccak256("policy-approved question");
+        (FutarchyOfficialProposalSource source, bytes32 sourceCondition) =
+            _source(coordinator, ctf, poolFactory, company, collateral, sourceQuestion);
         bytes32 executionQuestion = keccak256("caller-dependent question");
-        bytes32 sourceCondition = ctf.getConditionId(trustedOracle, sourceQuestion, 2);
         bytes32 executionCondition = ctf.getConditionId(address(0xBAD), executionQuestion, 2);
-        ctf.setOutcomeSlotCount(sourceCondition, 2);
         ctf.setOutcomeSlotCount(executionCondition, 2);
-        reality.setQuestion(
-            sourceQuestion,
-            bytes32(uint256(1)),
-            address(0xA11B),
-            uint32(block.timestamp + 1 hours),
-            uint32(1 days),
-            1 ether
-        );
-
-        FutarchyOfficialProposalSource.ProposalValidationConfig memory validation =
-            FutarchyOfficialProposalSource.ProposalValidationConfig({
-                enabled: true,
-                expectedProposalToken: address(company),
-                expectedCollateralToken: address(collateral),
-                conditionalTokens: address(ctf),
-                trustedOracle: trustedOracle,
-                realitio: address(reality),
-                trustedArbitrator: address(0xA11B),
-                maxOpeningDelay: uint32(1 days),
-                minTimeout: uint32(1 hours),
-                maxTimeout: uint32(2 days),
-                minConditionalLifetime: uint32(1 days),
-                maxMinBond: 2 ether
-            });
-        FutarchyOfficialProposalSource source = new FutarchyOfficialProposalSource(
-            address(this), address(coordinator), address(this), poolFactory, abi.encode(validation)
-        );
 
         address[4] memory sourceWrappers;
         sourceWrappers[0] = _wrapper(ctf, wrapperFactory, address(company), sourceCondition, 1);
@@ -213,6 +195,20 @@ contract FutarchyProposalBindingTest is Test {
         collateral.approve(address(manager), AMOUNT);
         manager.initializeFromBootstrap(AMOUNT, AMOUNT);
 
+        vm.expectRevert(BindingLifecycleCoordinator.PostActivationFailure.selector);
+        coordinator.setOfficialThenRevert(source, 1, address(proposal), address(this));
+
+        assertFalse(coordinator.reachedPostActivation());
+        assertFalse(source.currentOfficialProposal().exists);
+        assertFalse(manager.inConditionalMode());
+        assertEq(manager.spotLiquidity(), AMOUNT);
+        assertEq(manager.conditionalYesLiquidity(), 0);
+        assertEq(manager.conditionalNoLiquidity(), 0);
+        assertEq(spot.removeDetailedCalls(), 0);
+        assertEq(conditional.addFreshCalls(), 0);
+        assertEq(poolFactory.poolByPair(sourceWrappers[0], sourceWrappers[2]), address(0));
+        assertEq(poolFactory.poolByPair(sourceWrappers[1], sourceWrappers[3]), address(0));
+
         coordinator.setOfficial(source, 1, address(proposal), address(this));
 
         assertTrue(manager.inConditionalMode());
@@ -230,6 +226,50 @@ contract FutarchyProposalBindingTest is Test {
         assertFalse(manager.inConditionalMode());
         assertEq(company.balanceOf(address(manager)), 80 ether);
         assertEq(collateral.balanceOf(address(manager)), 80 ether);
+    }
+
+    function _source(
+        BindingLifecycleCoordinator coordinator,
+        BindingConditionalTokens ctf,
+        AdapterBackedAlgebraFactory poolFactory,
+        MockMintableERC20 company,
+        MockMintableERC20 collateral,
+        bytes32 question
+    ) private returns (FutarchyOfficialProposalSource source, bytes32 condition) {
+        MockRealityETH reality = new MockRealityETH();
+        address oracle = address(
+            new DeadlineBoundedRealityProxy(
+                IConditionalTokensCore(address(ctf)), IRealityETHCore(address(reality)), 1 days
+            )
+        );
+        condition = ctf.getConditionId(oracle, question, 2);
+        ctf.setOutcomeSlotCount(condition, 2);
+        reality.setQuestion(
+            question,
+            bytes32(uint256(1)),
+            address(0xA11B),
+            uint32(block.timestamp + 1 hours),
+            uint32(1 days),
+            1 ether
+        );
+        FutarchyOfficialProposalSource.ProposalValidationConfig memory validation =
+            FutarchyOfficialProposalSource.ProposalValidationConfig({
+                enabled: true,
+                expectedProposalToken: address(company),
+                expectedCollateralToken: address(collateral),
+                conditionalTokens: address(ctf),
+                trustedOracle: oracle,
+                realitio: address(reality),
+                trustedArbitrator: address(0xA11B),
+                maxOpeningDelay: uint32(1 days),
+                minTimeout: uint32(1 hours),
+                maxTimeout: uint32(2 days),
+                minConditionalLifetime: uint32(1 days),
+                maxMinBond: 2 ether
+            });
+        source = new FutarchyOfficialProposalSource(
+            address(this), address(coordinator), address(this), poolFactory, abi.encode(validation)
+        );
     }
 
     function _wrapper(

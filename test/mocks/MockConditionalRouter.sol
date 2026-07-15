@@ -15,6 +15,7 @@ contract MockConditionalRouter is IFutarchyConditionalRouter {
     bool public redeemUnderpays;
     bool public mergeReverts;
     bool public mergeUnderpays;
+    bool public consumeUnderpays;
     uint256 public payoutDenominator;
     uint256 public yesNumerator;
     uint256 public noNumerator;
@@ -59,6 +60,10 @@ contract MockConditionalRouter is IFutarchyConditionalRouter {
 
     function setMergeUnderpays(bool value) external {
         mergeUnderpays = value;
+    }
+
+    function setConsumeUnderpays(bool value) external {
+        consumeUnderpays = value;
     }
 
     function setPayouts(uint256 denominator, uint256 yesPayout, uint256 noPayout) external {
@@ -173,7 +178,8 @@ contract MockConditionalRouter is IFutarchyConditionalRouter {
     ) external {
         OutcomeConfig memory cfg = _config(collateralToken, yesToken, noToken);
         address losingToken = cfg.winnerIsYes ? cfg.noToken : cfg.yesToken;
-        IERC20(losingToken).safeTransferFrom(msg.sender, address(this), amount);
+        IERC20(losingToken)
+            .safeTransferFrom(msg.sender, address(this), consumeUnderpays ? amount - 1 : amount);
     }
 
     function getPayouts(bytes32)

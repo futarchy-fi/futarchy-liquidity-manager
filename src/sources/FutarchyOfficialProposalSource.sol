@@ -362,8 +362,8 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
     }
 
     /// @notice Returns a compact view of the current official proposal.
-    /// @dev This omits wrapped outcome tokens. The liquidity manager uses
-    /// `officialProposalExtended` instead.
+    /// @dev This omits wrapped outcome tokens. Registry consumers that need the full atomically
+    /// captured manager binding use `officialProposalExtended` instead.
     function officialProposal()
         external
         view

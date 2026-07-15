@@ -10,11 +10,13 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 
 - The proposal source validates one proposal snapshot and atomically activates the manager. A
   failure in source storage, CTF splitting, pool creation, initialization, or first mint reverts the
-  complete transition.
+  complete transition; an explicit post-activation coordinator revert also restores the source,
+  manager, spot position, and both pool creations.
 - The manager stores the CTF condition and wrapper binding used for settlement rather than rereading
   mutable proposal state.
-- Settlement requires exact collateral and outcome-token balance deltas from complete-set merges
-  and winner redemption; router failure or underpayment rolls back positions and binding.
+- Settlement requires exact collateral and outcome-token balance deltas from complete-set merges,
+  winner redemption, and losing-token consumption; router failure, partial consumption, or
+  underpayment rolls back positions and binding.
 - Partial redemption removes proportional spot, YES, and NO liquidity; accounts for principal,
   fees, and six idle token balances; never restores liquidity; and gives final rounding residue to
   the last holder.

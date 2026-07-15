@@ -143,33 +143,41 @@ contract FutarchyLiquidityManagerFactoryTest is Test {
         FutarchyLiquidityManagerFactory.DeployedContracts memory deployed =
             factory.createLiquidityManager(_createParams(abi.encode(validation)), _creationCodes());
 
-        (
-            bool enabled,
-            address expectedProposalToken,
-            address expectedCollateralToken,
-            address conditionalTokens,
-            address trustedOracle,
-            address realitio,
-            address trustedArbitrator,
-            uint32 maxOpeningDelay,
-            uint32 minTimeout,
-            uint32 maxTimeout,
-            uint32 minConditionalLifetime,
-            uint256 maxMinBond
-        ) = FutarchyOfficialProposalSource(deployed.proposalSource).proposalValidationConfig();
+        {
+            (
+                bool enabled,
+                address expectedProposalToken,
+                address expectedCollateralToken,
+                address conditionalTokens,
+                address trustedOracle,
+                address realitio,
+                address trustedArbitrator,,,,,
+            ) = FutarchyOfficialProposalSource(deployed.proposalSource).proposalValidationConfig();
 
-        assertTrue(enabled);
-        assertEq(expectedProposalToken, address(company));
-        assertEq(expectedCollateralToken, address(wrappedNative));
-        assertEq(conditionalTokens, address(0xC0DE));
-        assertEq(trustedOracle, address(0x0A0));
-        assertEq(realitio, address(0));
-        assertEq(trustedArbitrator, address(0));
-        assertEq(maxOpeningDelay, 0);
-        assertEq(minTimeout, 0);
-        assertEq(maxTimeout, 0);
-        assertEq(minConditionalLifetime, 0);
-        assertEq(maxMinBond, 1 ether);
+            assertTrue(enabled);
+            assertEq(expectedProposalToken, address(company));
+            assertEq(expectedCollateralToken, address(wrappedNative));
+            assertEq(conditionalTokens, address(0xC0DE));
+            assertEq(trustedOracle, address(0x0A0));
+            assertEq(realitio, address(0));
+            assertEq(trustedArbitrator, address(0));
+        }
+        {
+            (
+                ,,,,,,,
+                uint32 maxOpeningDelay,
+                uint32 minTimeout,
+                uint32 maxTimeout,
+                uint32 minConditionalLifetime,
+                uint256 maxMinBond
+            ) = FutarchyOfficialProposalSource(deployed.proposalSource).proposalValidationConfig();
+
+            assertEq(maxOpeningDelay, 0);
+            assertEq(minTimeout, 0);
+            assertEq(maxTimeout, 0);
+            assertEq(minConditionalLifetime, 0);
+            assertEq(maxMinBond, 1 ether);
+        }
     }
 
     function test_revertsOnZeroCreateParams() public {

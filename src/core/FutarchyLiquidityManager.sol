@@ -977,11 +977,16 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         uint256 losingAmount = yesWins ? noRemainder : yesRemainder;
         address losingToken = yesWins ? noToken : yesToken;
         if (losingAmount > 0) {
-            _forceApprove(IERC20(losingToken), address(CONDITIONAL_ROUTER), losingAmount);
+            IERC20 loser = IERC20(losingToken);
+            uint256 losingBefore = loser.balanceOf(address(this));
+            _forceApprove(loser, address(CONDITIONAL_ROUTER), losingAmount);
             CONDITIONAL_ROUTER.consumeLosingPositions(
                 collateralToken, _capturedConditionId, yesToken, noToken, losingAmount
             );
-            _forceApprove(IERC20(losingToken), address(CONDITIONAL_ROUTER), 0);
+            _forceApprove(loser, address(CONDITIONAL_ROUTER), 0);
+            if (losingBefore - loser.balanceOf(address(this)) != losingAmount) {
+                revert IncompleteOutcomeRecovery();
+            }
         }
     }
 

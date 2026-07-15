@@ -49,7 +49,8 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
 - Proposal manager cannot select arbitrary unsafe proposals once validation is enabled.
 - Validation rejects far-future opening times, excessive min bonds, bad timeout bounds, wrong
   arbitrators, wrong CTF oracle, non-binary conditions, wrong collateral, missing outcomes, and
-  missing pools.
+  non-pristine questions. The manager-bound adapter separately rejects pre-existing conditional
+  pools during atomic activation.
 - Deadline proxy gives new FLM-grade proposals a bounded liveness path.
 - Emergency exit only unwinds positions into the manager. It neither burns shares nor transfers
   shareholder assets, and redemption remains available while emergency mode is armed or executed.
@@ -97,8 +98,10 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   require adapter review.
 - Deposits require exact ERC20 balance deltas; fee-on-transfer assets are rejected. Rebasing assets
   are not a supported company-token or collateral configuration.
-- The conditional router is trusted to split and settle the expected proposal positions. A failed
-  redemption-time complete-set merge falls back to transferring that exact outcome-token slice.
+- The immutable conditional router verifies canonical wrapper identity and exact split/settlement
+  deltas. The manager independently requires exact merge, winner-redemption, and losing-consumption
+  deltas during settlement; a failed redemption-time merge falls back to transferring that exact
+  outcome-token slice.
 - The immutable stability guard is shared by deployments using the same Algebra factory. Its
   factory, 30-minute window, and 50-tick bound have no owner or runtime setters.
 - The official proposal source owner or proposal manager is trusted to configure validation

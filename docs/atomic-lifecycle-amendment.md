@@ -68,20 +68,21 @@ is removed. The replacement sequence is:
    use of the activation setter is disabled.
 3. The source validates and stores the official proposal. Pool-existence validation is deliberately
    absent: both conditional pools must still be nonexistent.
-4. Before the setter may return, the source calls the bound FLM manager's
-   `activateOfficialProposal(proposalId, proposal)` hook.
-5. The manager rereads the just-stored proposal from its immutable source, requires the id and
-   address to match the callback, validates the base pair, condition, wrappers, and active phase,
-   requires `CTF.payoutDenominator(conditionId) == 0`, and obtains the established spot pool's
-   guarded current price. The current manager checks that require nonzero YES/NO pools are removed.
+4. Before the setter may return, the source passes its single validated proposal snapshot to the
+   bound FLM manager's `activateOfficialProposal(snapshot)` hook.
+5. The manager accepts that callback only from its immutable source, validates the snapshot's base
+   pair, condition, wrappers, and active phase, requires
+   `CTF.payoutDenominator(conditionId) == 0`, and obtains the established spot pool's guarded
+   current price. It does not reread mutable proposal metadata. The current manager checks that
+   require nonzero YES/NO pools are removed.
 6. The manager removes the configured spot-liquidity fraction and splits the recovered base assets
    into complete YES and NO sets.
 7. For each conditional pair, the manager-bound adapter requires that no pool address exists,
    creates and initializes the pool at the correctly oriented guarded spot price, and mints the
    first position to itself from the FLM's split inventory.
-8. The manager rereads the source/factory pool addresses, requires them to equal the adapter-returned
-   pools, and stores the proposal, condition id, wrapper tokens, pools, and position liquidity as
-   one immutable active binding.
+8. Each adapter call must return a fresh code-bearing pool and nonzero liquidity. The manager stores
+   the validated proposal snapshot and position liquidity as one active binding; pool getters are
+   derived from the immutable adapter using those stored wrapper pairs.
 9. The lifecycle coordinator completes resolver binding and observation-cardinality setup before
    outer lifecycle transaction returns.
 
@@ -153,9 +154,10 @@ this source. Setting an official proposal reverts while the target is unbound.
 
 In a bound FLM source, the activation setter is callable only by the reviewed lifecycle
 coordinator, never directly by the owner, proposal manager EOA, or keeper. The setter passes the
-stored id and proposal to the manager, and the manager rereads and cross-checks the full source
-snapshot. Admission of a later proposal follows `canActivateOfficialProposal()` and the manager's
-stored/CTF phase, not a stale manual source settlement flag.
+single validated snapshot to the manager. The manager accepts it only from that immutable source
+and does not reread mutable proposal metadata. Admission of a later proposal follows
+`canActivateOfficialProposal()` and the manager's stored/CTF phase, not a stale manual source
+settlement flag.
 
 The new source removes the `requirePools` admission flag and `MissingPool` result. Every deployment
 config, batch template, script, and test must remove that field. The manager likewise removes its
