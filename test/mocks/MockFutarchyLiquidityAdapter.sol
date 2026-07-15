@@ -28,6 +28,7 @@ contract MockFutarchyLiquidityAdapter is IFutarchyLiquidityAdapter {
     uint256 public removeDetailedCalls;
     bool public zeroRemoveOutput;
     bool public addReverts;
+    bool public misreportPrefundedPool;
 
     function setAddUsageBps(uint16 amount0Bps, uint16 amount1Bps) external {
         require(amount0Bps <= BPS_DENOMINATOR && amount1Bps <= BPS_DENOMINATOR, "invalid bps");
@@ -46,6 +47,10 @@ contract MockFutarchyLiquidityAdapter is IFutarchyLiquidityAdapter {
 
     function setAddReverts(bool value) external {
         addReverts = value;
+    }
+
+    function setMisreportPrefundedPool(bool value) external {
+        misreportPrefundedPool = value;
     }
 
     function setFreshPool(address tokenA, address tokenB, address pool) external {
@@ -122,6 +127,7 @@ contract MockFutarchyLiquidityAdapter is IFutarchyLiquidityAdapter {
         pool = address(new MockFreshPool());
         freshPoolByPair[pairKey] = pool;
         (liquidityMinted, amount0Used, amount1Used) = _add(token0, token1, amount0, amount1, true);
+        if (misreportPrefundedPool) pool = address(this);
     }
 
     function addFullRangeLiquidity(

@@ -125,6 +125,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     error ProposalAlreadyActive();
     error ConditionAlreadyResolved();
     error InvalidSqrtPrice();
+    error InvalidPool();
 
     event InitializedFromBootstrap(
         uint256 companyAmount, uint256 collateralAmount, uint128 spotLiquidityMinted
@@ -731,6 +732,10 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
                 token0, token1, amount0Desired, amount1Desired, sqrtPriceX96
             );
         if (pool.code.length == 0 || liquidityMinted == 0) revert ZeroLiquidityMinted();
+        if (
+            IFutarchyPrefundedLiquidityAdapter(address(CONDITIONAL_ADAPTER))
+                    .poolByPair(token0, token1) != pool
+        ) revert InvalidPool();
         if (amount0Used > amount0Desired || amount1Used > amount1Desired) {
             revert AdapterOverusedInput();
         }

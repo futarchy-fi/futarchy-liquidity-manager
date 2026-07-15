@@ -10,9 +10,11 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 
 - The proposal source validates one proposal snapshot and atomically activates the manager. A
   failure in source storage, CTF splitting, pool creation, initialization, or first mint reverts the
-  complete transition. The real source-manager-router binding fixture proves that a failure on the
-  second fresh position restores the source registry, both CTF splits, the spot position, and both
-  pool creations; an explicit post-activation coordinator revert restores the same envelope.
+  complete transition. The manager also requires each returned fresh-pool address to equal the
+  adapter's canonical pair lookup. The real source-manager-router binding fixture proves that a
+  dishonest returned address restores the source registry, both CTF splits, spot position, and pool
+  creation; a failure on the second fresh position and an explicit post-activation coordinator
+  revert restore the same envelope.
 - The manager stores the CTF condition and wrapper binding used for settlement rather than rereading
   mutable proposal state.
 - Settlement requires exact collateral and outcome-token balance deltas from complete-set merges,

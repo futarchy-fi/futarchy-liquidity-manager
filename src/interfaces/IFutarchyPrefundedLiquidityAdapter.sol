@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 /// @notice Fresh-liquidity entry point for an adapter already holding the exact activation assets.
 interface IFutarchyPrefundedLiquidityAdapter {
+    /// @notice Returns the canonical pool used by this adapter for the ordered pair.
     function poolByPair(address token0, address token1) external view returns (address pool);
 
     function addPrefundedFreshFullRangeLiquidity(

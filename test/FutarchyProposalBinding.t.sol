@@ -196,6 +196,24 @@ contract FutarchyProposalBindingTest is Test {
         collateral.approve(address(manager), AMOUNT);
         manager.initializeFromBootstrap(AMOUNT, AMOUNT);
 
+        conditional.setMisreportPrefundedPool(true);
+        vm.expectRevert(FutarchyLiquidityManager.InvalidPool.selector);
+        coordinator.setOfficial(source, 1, address(proposal), address(this));
+        conditional.setMisreportPrefundedPool(false);
+
+        assertFalse(source.currentOfficialProposal().exists);
+        assertFalse(manager.inConditionalMode());
+        assertEq(manager.spotLiquidity(), AMOUNT);
+        assertEq(spot.removeDetailedCalls(), 0);
+        assertEq(conditional.addFreshCalls(), 0);
+        assertEq(poolFactory.poolByPair(sourceWrappers[0], sourceWrappers[2]), address(0));
+        assertEq(poolFactory.poolByPair(sourceWrappers[1], sourceWrappers[3]), address(0));
+        assertEq(company.balanceOf(address(ctf)), 0);
+        assertEq(collateral.balanceOf(address(ctf)), 0);
+        for (uint256 i; i < sourceWrappers.length; ++i) {
+            assertEq(IERC20(sourceWrappers[i]).balanceOf(address(conditional)), 0);
+        }
+
         conditional.setAddUsageBps(9949, 9949);
         conditional.setNextAddUsageBps(10_000);
         vm.expectRevert(
