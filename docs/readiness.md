@@ -13,6 +13,8 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   complete transition.
 - The manager stores the CTF condition and wrapper binding used for settlement rather than rereading
   mutable proposal state.
+- Settlement requires exact collateral and outcome-token balance deltas from complete-set merges
+  and winner redemption; router failure or underpayment rolls back positions and binding.
 - Partial redemption removes proportional spot, YES, and NO liquidity; accounts for principal,
   fees, and six idle token balances; never restores liquidity; and gives final rounding residue to
   the last holder.

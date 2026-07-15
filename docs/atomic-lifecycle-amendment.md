@@ -112,6 +112,10 @@ Every router call uses the stored proposal and verifies its condition id and can
 still equal the activation snapshot. A proposal-based router lookup may not silently substitute a
 different condition or wrapper address.
 
+Settlement measures the exact collateral received and outcome wrappers consumed by every complete-
+set merge and winning-position redemption. A router revert, partial consumption, or underpayment
+reverts the whole settlement, preserving the active binding and both positions.
+
 After matched sets are merged and winning residue is redeemed, any remaining losing wrappers are
 explicitly unwrapped and redeemed for their immutable zero payout, or equivalently burned through
 a reviewed router primitive. The manager must prove their exact consumption before clearing active
@@ -326,6 +330,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | First partial redeemer attempts to take all NFT fees | Pre-collect/decrease/post-collect separation limits payout to its share. |
 | Fees or donations arrive after a partial redemption | Only the then-current share supply owns the new value; exited holders gain no retroactive claim. |
 | Merge router is unavailable or maliciously reverts | Withdrawing outcome slice is paid in kind. |
+| Settlement router reverts, partially consumes, or underpays | The whole settlement reverts; active positions and the captured binding remain intact. |
 | Rounding across sequential redemptions | No overpayment; survivor ratio never falls; final holder receives dust. |
 | Bad fair-join quote or changed spot state | Entire join reverts or leaves inventory idle; no donation. |
 | Conditional pool precreation used only for griefing | Funds remain in spot; liveness may fail but custody does not. |

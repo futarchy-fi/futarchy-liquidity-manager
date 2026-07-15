@@ -238,6 +238,62 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(manager.conditionalNoLiquidity(), 80 ether);
     }
 
+    function test_settlement_router_failure_rolls_back_positions_and_binding() public {
+        _bootstrap();
+        _activateProposal(true);
+        _accruePairFees(conditionalAdapter, yesCompany, yesCurrency, 3 ether, 5 ether);
+        router.setPayouts(1, 1, 0);
+        router.setRedeemReverts(true);
+
+        vm.expectRevert();
+        manager.sync();
+
+        assertTrue(manager.inConditionalMode());
+        assertEq(manager.spotLiquidity(), 20 ether);
+        assertEq(manager.conditionalYesLiquidity(), 80 ether);
+        assertEq(manager.conditionalNoLiquidity(), 80 ether);
+        assertEq(manager.activeProposal(), address(proposal));
+        assertEq(manager.activeConditionId(), CONDITION_ID);
+        assertEq(conditionalAdapter.removeDetailedCalls(), 0);
+    }
+
+    function test_settlement_merge_underpayment_rolls_back_positions_and_binding() public {
+        _bootstrap();
+        _activateProposal(true);
+        router.setPayouts(1, 1, 0);
+        router.setMergeUnderpays(true);
+
+        vm.expectRevert(FutarchyLiquidityManager.IncompleteOutcomeRecovery.selector);
+        manager.sync();
+
+        assertTrue(manager.inConditionalMode());
+        assertEq(manager.conditionalYesLiquidity(), 80 ether);
+        assertEq(manager.conditionalNoLiquidity(), 80 ether);
+        assertEq(manager.activeProposal(), address(proposal));
+        assertEq(manager.activeConditionId(), CONDITION_ID);
+        assertEq(conditionalAdapter.removeDetailedCalls(), 0);
+    }
+
+    function test_settlement_winner_underpayment_rolls_back_positions_and_binding() public {
+        _bootstrap();
+        _activateProposal(true);
+        _accruePairFees(conditionalAdapter, yesCompany, yesCurrency, 3 ether, 5 ether);
+        company.mint(address(router), 3 ether);
+        wrappedNative.mint(address(router), 5 ether);
+        router.setPayouts(1, 1, 0);
+        router.setRedeemUnderpays(true);
+
+        vm.expectRevert(FutarchyLiquidityManager.IncompleteOutcomeRecovery.selector);
+        manager.sync();
+
+        assertTrue(manager.inConditionalMode());
+        assertEq(manager.conditionalYesLiquidity(), 80 ether);
+        assertEq(manager.conditionalNoLiquidity(), 80 ether);
+        assertEq(manager.activeProposal(), address(proposal));
+        assertEq(manager.activeConditionId(), CONDITION_ID);
+        assertEq(conditionalAdapter.removeDetailedCalls(), 0);
+    }
+
     function test_settlement_consumes_unmatched_losing_residue() public {
         _bootstrap();
         _activateProposal(true);
@@ -335,6 +391,23 @@ contract FutarchyLiquidityManagerTest is Test {
         _bootstrap();
         _activateProposal(true);
         router.setMergeReverts(true);
+
+        vm.prank(bootstrapRecipient);
+        (uint256 companyOut, uint256 collateralOut) =
+            manager.redeem(10 ether, bootstrapRecipient, false);
+
+        assertEq(companyOut, 2 ether);
+        assertEq(collateralOut, 2 ether);
+        assertEq(yesCompany.balanceOf(bootstrapRecipient), 8 ether);
+        assertEq(noCompany.balanceOf(bootstrapRecipient), 8 ether);
+        assertEq(yesCurrency.balanceOf(bootstrapRecipient), 8 ether);
+        assertEq(noCurrency.balanceOf(bootstrapRecipient), 8 ether);
+    }
+
+    function test_conditional_redeem_falls_back_to_in_kind_when_merge_underpays() public {
+        _bootstrap();
+        _activateProposal(true);
+        router.setMergeUnderpays(true);
 
         vm.prank(bootstrapRecipient);
         (uint256 companyOut, uint256 collateralOut) =

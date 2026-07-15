@@ -12,6 +12,7 @@ contract MockConditionalRouter is IFutarchyConditionalRouter {
 
     bool public winnerIsYes;
     bool public redeemReverts;
+    bool public redeemUnderpays;
     bool public mergeReverts;
     bool public mergeUnderpays;
     uint256 public payoutDenominator;
@@ -46,6 +47,10 @@ contract MockConditionalRouter is IFutarchyConditionalRouter {
 
     function setRedeemReverts(bool value) external {
         redeemReverts = value;
+    }
+
+    function setRedeemUnderpays(bool value) external {
+        redeemUnderpays = value;
     }
 
     function setMergeReverts(bool value) external {
@@ -155,7 +160,8 @@ contract MockConditionalRouter is IFutarchyConditionalRouter {
         if (redeemAmount == 0) return;
 
         IERC20(winningToken).safeTransferFrom(msg.sender, address(this), redeemAmount);
-        IERC20(collateralToken).safeTransfer(msg.sender, redeemAmount);
+        uint256 payout = redeemUnderpays ? redeemAmount - 1 : redeemAmount;
+        IERC20(collateralToken).safeTransfer(msg.sender, payout);
     }
 
     function consumeLosingPositions(

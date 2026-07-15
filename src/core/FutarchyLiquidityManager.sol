@@ -453,31 +453,12 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     /// @dev Failure-isolated merge primitive. Only a self-call from redemption may invoke it.
     function mergeOutcomeSlice(bool companyAsset, uint256 amount) external {
         if (msg.sender != address(this)) revert OnlySelf();
-        IERC20 collateralToken = companyAsset ? COMPANY_TOKEN : IERC20(address(WRAPPED_NATIVE));
-        IERC20 yesToken =
-            IERC20(companyAsset ? _capturedYesCompanyToken : _capturedYesCurrencyToken);
-        IERC20 noToken = IERC20(companyAsset ? _capturedNoCompanyToken : _capturedNoCurrencyToken);
-        uint256 beforeBalance = collateralToken.balanceOf(address(this));
-        uint256 yesBefore = yesToken.balanceOf(address(this));
-        uint256 noBefore = noToken.balanceOf(address(this));
-        _forceApprove(yesToken, address(CONDITIONAL_ROUTER), amount);
-        _forceApprove(noToken, address(CONDITIONAL_ROUTER), amount);
-        CONDITIONAL_ROUTER.mergePositions(
-            address(collateralToken),
-            _capturedConditionId,
-            address(yesToken),
-            address(noToken),
+        _mergeOutcomeAmount(
+            companyAsset ? address(COMPANY_TOKEN) : address(WRAPPED_NATIVE),
+            companyAsset ? _capturedYesCompanyToken : _capturedYesCurrencyToken,
+            companyAsset ? _capturedNoCompanyToken : _capturedNoCurrencyToken,
             amount
         );
-        _forceApprove(yesToken, address(CONDITIONAL_ROUTER), 0);
-        _forceApprove(noToken, address(CONDITIONAL_ROUTER), 0);
-        if (
-            collateralToken.balanceOf(address(this)) - beforeBalance != amount
-                || yesBefore - yesToken.balanceOf(address(this)) != amount
-                || noBefore - noToken.balanceOf(address(this)) != amount
-        ) {
-            revert IncompleteOutcomeRecovery();
-        }
     }
 
     /// @notice Whether the bound proposal source may atomically activate a fresh market now.
@@ -978,11 +959,19 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         uint256 redeemAmount = yesWins ? yesRemainder : noRemainder;
         address winningToken = yesWins ? yesToken : noToken;
         if (redeemAmount > 0) {
-            _forceApprove(IERC20(winningToken), address(CONDITIONAL_ROUTER), redeemAmount);
+            IERC20 collateral = IERC20(collateralToken);
+            IERC20 winner = IERC20(winningToken);
+            uint256 collateralBefore = collateral.balanceOf(address(this));
+            uint256 winnerBefore = winner.balanceOf(address(this));
+            _forceApprove(winner, address(CONDITIONAL_ROUTER), redeemAmount);
             CONDITIONAL_ROUTER.redeemPositions(
                 collateralToken, _capturedConditionId, yesToken, noToken, redeemAmount
             );
-            _forceApprove(IERC20(winningToken), address(CONDITIONAL_ROUTER), 0);
+            _forceApprove(winner, address(CONDITIONAL_ROUTER), 0);
+            if (
+                collateral.balanceOf(address(this)) - collateralBefore != redeemAmount
+                    || winnerBefore - winner.balanceOf(address(this)) != redeemAmount
+            ) revert IncompleteOutcomeRecovery();
         }
 
         uint256 losingAmount = yesWins ? noRemainder : yesRemainder;
@@ -1002,11 +991,24 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         address noToken,
         uint256 amount
     ) internal {
-        _forceApprove(IERC20(yesToken), address(CONDITIONAL_ROUTER), amount);
-        _forceApprove(IERC20(noToken), address(CONDITIONAL_ROUTER), amount);
+        IERC20 collateral = IERC20(collateralToken);
+        IERC20 yes = IERC20(yesToken);
+        IERC20 no = IERC20(noToken);
+        uint256 collateralBefore = collateral.balanceOf(address(this));
+        uint256 yesBefore = yes.balanceOf(address(this));
+        uint256 noBefore = no.balanceOf(address(this));
+        _forceApprove(yes, address(CONDITIONAL_ROUTER), amount);
+        _forceApprove(no, address(CONDITIONAL_ROUTER), amount);
         CONDITIONAL_ROUTER.mergePositions(
             collateralToken, _capturedConditionId, yesToken, noToken, amount
         );
+        _forceApprove(yes, address(CONDITIONAL_ROUTER), 0);
+        _forceApprove(no, address(CONDITIONAL_ROUTER), 0);
+        if (
+            collateral.balanceOf(address(this)) - collateralBefore != amount
+                || yesBefore - yes.balanceOf(address(this)) != amount
+                || noBefore - no.balanceOf(address(this)) != amount
+        ) revert IncompleteOutcomeRecovery();
     }
 
     function _tryMergeOutcomeAmount(bool companyAsset, uint256 amount)
