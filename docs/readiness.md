@@ -24,9 +24,9 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 - The manager stores the CTF condition and wrapper binding used for settlement rather than rereading
   mutable proposal state.
 - Settlement requires exact collateral and outcome-token balance deltas from complete-set merges,
-  winner redemption, and losing-token consumption; even a merge that pays exact collateral while
-  consuming too few wrappers rolls back positions and binding, as do router failure and
-  underpayment.
+  winner redemption, and losing-token consumption. A merge or winner redemption that pays exact
+  collateral while consuming too few wrappers rolls back positions and binding, as do router
+  failure and underpayment.
 - Every spot and conditional adapter removal receipt must equal the manager's exact token balance
   deltas. The manager derives fee/principal classification from separate zero/nonzero removal
   phases rather than trusting returned labels. Misclassification cannot change payouts, and an
