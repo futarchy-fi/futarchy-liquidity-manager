@@ -64,7 +64,7 @@
       "status": "ready-to-audit",
       "evidence": [
         {
-          "description": "Core manager tests cover proportional principal/fee/idle accounting, sequential six-token conservation and survivor-favoring rounding, donation-resistant deposit pricing, post-exit fee/donation ownership, second-pool activation rollback, conditional underpayment fallback, exact-delta merge/winner/loser settlement rollback, and non-custodial emergency exit.",
+          "description": "Core manager tests cover proportional principal/fee/idle accounting, sequential six-token conservation and nondecreasing survivor value per share, donation-resistant deposit pricing, post-exit fee/donation ownership, second-pool activation rollback, conditional underpayment fallback, exact-delta merge/winner/loser settlement rollback, and non-custodial emergency exit.",
           "path": "test/FutarchyLiquidityManager.t.sol"
         },
         {

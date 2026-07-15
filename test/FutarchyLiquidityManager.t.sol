@@ -743,17 +743,21 @@ contract FutarchyLiquidityManagerTest is Test {
         uint256 supplyBefore = manager.totalSupply();
         uint256 shares = _fuzzValue(seed, 30, supplyBefore / 10, supplyBefore / 3);
         uint256[3] memory liquidityBefore = _activeLiquidity();
+        uint256[6] memory managedBefore = _managedBalances(tokens);
         vm.prank(holder);
         manager.redeem(shares, recipients[0], false);
         _assertSurvivorRatios(liquidityBefore, supplyBefore);
+        _assertManagedSurvivorRatios(tokens, managedBefore, supplyBefore);
         _assertConserved(tokens, initial, recipients, 1);
 
         supplyBefore = manager.totalSupply();
         shares = _fuzzValue(seed, 31, supplyBefore / 10, supplyBefore / 2);
         liquidityBefore = _activeLiquidity();
+        managedBefore = _managedBalances(tokens);
         vm.prank(holder);
         manager.redeem(shares, recipients[1], false);
         _assertSurvivorRatios(liquidityBefore, supplyBefore);
+        _assertManagedSurvivorRatios(tokens, managedBefore, supplyBefore);
         _assertConserved(tokens, initial, recipients, 2);
 
         uint256 finalShares = manager.balanceOf(holder);
@@ -889,6 +893,16 @@ contract FutarchyLiquidityManagerTest is Test {
             + IERC20(token).balanceOf(address(conditionalAdapter));
     }
 
+    function _managedBalances(address[6] memory tokens)
+        internal
+        view
+        returns (uint256[6] memory balances)
+    {
+        for (uint256 i; i < tokens.length; i++) {
+            balances[i] = _managedBalance(tokens[i]);
+        }
+    }
+
     function _activeLiquidity() internal view returns (uint256[3] memory liquidity) {
         liquidity[0] = manager.spotLiquidity();
         liquidity[1] = manager.conditionalYesLiquidity();
@@ -906,6 +920,21 @@ contract FutarchyLiquidityManagerTest is Test {
                 afterLiquidity[i] * supplyBefore,
                 beforeLiquidity[i] * supplyAfter,
                 "rounding must favor survivors"
+            );
+        }
+    }
+
+    function _assertManagedSurvivorRatios(
+        address[6] memory tokens,
+        uint256[6] memory beforeBalances,
+        uint256 supplyBefore
+    ) internal view {
+        uint256 supplyAfter = manager.totalSupply();
+        for (uint256 i; i < tokens.length; i++) {
+            assertGe(
+                _managedBalance(tokens[i]) * supplyBefore,
+                beforeBalances[i] * supplyAfter,
+                "rounding must preserve survivor value"
             );
         }
     }
