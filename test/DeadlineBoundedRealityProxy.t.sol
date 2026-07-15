@@ -91,4 +91,15 @@ contract DeadlineBoundedRealityProxyTest is Test {
         assertEq(conditionalTokens.payoutNumerators(conditionId, 0), 0);
         assertEq(conditionalTokens.payoutNumerators(conditionId, 1), 1);
     }
+
+    function test_force_fail_relays_finalized_yes_after_deadline() public {
+        realitio.setResult(questionId, bytes32(0));
+        vm.warp(uint256(openingTs) + MAX_QUESTION_DURATION);
+
+        proxy.forceFailByDeadline(address(proposal));
+
+        assertEq(conditionalTokens.payoutDenominator(conditionId), 1);
+        assertEq(conditionalTokens.payoutNumerators(conditionId, 0), 1);
+        assertEq(conditionalTokens.payoutNumerators(conditionId, 1), 0);
+    }
 }

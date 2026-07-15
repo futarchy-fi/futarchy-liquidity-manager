@@ -17,8 +17,9 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   intentionally unexposed.
 - `FutarchyOfficialProposalSource`: admits at most one official live proposal and can enforce
   on-chain proposal validation before the manager migrates liquidity.
-- `DeadlineBoundedRealityProxy`: CTF oracle proxy for new FLM-grade proposals that can resolve
-  normally through Reality or force a deterministic NO after a bounded deadline.
+- `DeadlineBoundedRealityProxy`: CTF oracle proxy for new FLM-grade proposals that relays a
+  finalized Reality result even on the deadline path, or forces deterministic NO after a bounded
+  deadline only while Reality remains unresolved.
 - `AlgebraPoolStabilityGuard`: shared, immutable 30-minute TWAP check that rejects migration when
   the established spot pool's current tick differs from its average by more than 50 ticks.
 - `FutarchyLiquidityManagerFactory`: permissionless atomic bundle deployer pinned to immutable bare

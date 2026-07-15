@@ -109,11 +109,14 @@ adapters or of a raw off-ratio Uniswap V2 mint.
 
 Validation alone cannot guarantee that a Reality question eventually resolves. For new
 FLM-grade markets, use `DeadlineBoundedRealityProxy` as the CTF oracle. It supports normal
-Reality resolution and a fallback `forceFailByDeadline` path that reports NO after:
+Reality resolution and a fallback `forceFailByDeadline` path after:
 
 ```text
 Reality opening timestamp + maxQuestionDuration
 ```
+
+The fallback first relays any finalized Reality result, so a caller cannot race a finalized YES
+answer with forced NO. It reports NO only if Reality is still unresolved at the deadline.
 
 This cannot retrofit deadlines onto conditions created with a different oracle address.
 

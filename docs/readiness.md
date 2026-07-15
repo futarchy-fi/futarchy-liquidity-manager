@@ -23,6 +23,9 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   revert without changing the registry, captured binding, pools, or liquidity.
 - The manager stores the CTF condition and wrapper binding used for settlement rather than rereading
   mutable proposal state.
+- The deadline proxy relays a finalized Reality result even when its fallback path is called after
+  the deadline; it forces NO only while Reality remains unresolved, so delayed CTF relay cannot
+  overturn a finalized YES answer.
 - Settlement requires exact collateral and outcome-token balance deltas from complete-set merges,
   winner redemption, and losing-token consumption. A merge or winner redemption that pays exact
   collateral while consuming too few wrappers rolls back positions and binding, as do router

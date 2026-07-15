@@ -50,9 +50,10 @@ contract DeadlineBoundedRealityProxy {
         _reportPayouts(questionId, answer == 0);
     }
 
-    /// @notice Reports deterministic NO for a proposal if Reality has not resolved by deadline.
+    /// @notice Relays a finalized Reality result, or reports deterministic NO if unresolved by the
+    /// deadline.
     /// @dev Reverts before `openingTs + maxQuestionDuration` and if the condition already has a
-    /// payout denominator.
+    /// payout denominator. A finalized result always wins the deadline race.
     /// @param proposal Futarchy proposal exposing the Reality question id.
     function forceFailByDeadline(address proposal) external {
         bytes32 questionId = IFutarchyProposalCore(proposal).questionId();
@@ -68,7 +69,11 @@ contract DeadlineBoundedRealityProxy {
         uint256 deadline = uint256(openingTs) + maxQuestionDuration;
         if (block.timestamp < deadline) revert DeadlineNotReached(deadline);
 
-        _reportPayouts(questionId, false);
+        try realitio.resultForOnceSettled(questionId) returns (bytes32 answer) {
+            _reportPayouts(questionId, uint256(answer) == 0);
+        } catch {
+            _reportPayouts(questionId, false);
+        }
     }
 
     function _reportPayouts(bytes32 questionId, bool yesWins) internal {
