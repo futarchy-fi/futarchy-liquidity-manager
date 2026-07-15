@@ -34,6 +34,7 @@ contract FutarchyLiquidityManagerHandler is Test {
 
     uint256 public migrations;
     uint256 public settlements;
+    uint256 public successfulDeposits;
     uint256 public successfulRedemptions;
     uint256 public feeAccruals;
     uint256 public donations;
@@ -74,6 +75,10 @@ contract FutarchyLiquidityManagerHandler is Test {
     function depositToSpot(uint96 companySeed, uint96 nativeSeed) external {
         if (manager.emergencyExitArmedAt() != 0 || manager.emergencyExitExecuted()) return;
 
+        uint256 supplyBefore = manager.totalSupply();
+        if (supplyBefore == 0) return;
+        uint256[3] memory liquidityBefore = _activeLiquidity();
+        uint256[6] memory balancesBefore = _managedBalances();
         uint256 companyAmount = bound(uint256(companySeed), 1e9, 50 ether);
         uint256 nativeAmount = bound(uint256(nativeSeed), 1e9, 50 ether);
 
@@ -81,7 +86,26 @@ contract FutarchyLiquidityManagerHandler is Test {
         vm.deal(address(this), address(this).balance + nativeAmount);
         company.approve(address(manager), companyAmount);
 
-        try manager.depositToSpot{value: nativeAmount}(companyAmount) {} catch {}
+        try manager.depositToSpot{value: nativeAmount}(companyAmount) {
+            successfulDeposits++;
+            uint256 supplyAfter = manager.totalSupply();
+            uint256[3] memory liquidityAfter = _activeLiquidity();
+            uint256[6] memory balancesAfter = _managedBalances();
+            for (uint256 i; i < liquidityBefore.length; ++i) {
+                assertGe(
+                    uint256(liquidityAfter[i]) * supplyBefore,
+                    uint256(liquidityBefore[i]) * supplyAfter,
+                    "deposit diluted existing liquidity"
+                );
+            }
+            for (uint256 i; i < balancesBefore.length; ++i) {
+                assertGe(
+                    balancesAfter[i] * supplyBefore,
+                    balancesBefore[i] * supplyAfter,
+                    "deposit diluted existing assets"
+                );
+            }
+        } catch {}
     }
 
     function redeem(uint96 sharesSeed) external {
@@ -319,6 +343,9 @@ contract FutarchyLiquidityManagerInvariantTest is StdInvariant, Test {
     }
 
     function test_handlerReachesAtomicActivationAndSettlement() public {
+        handler.depositToSpot(1 ether, 1 ether);
+        assertEq(handler.successfulDeposits(), 1);
+
         handler.migrateToConditional();
         assertEq(handler.migrations(), 1);
         assertTrue(manager.inConditionalMode());
