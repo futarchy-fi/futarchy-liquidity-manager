@@ -541,8 +541,8 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
 
     /// @notice Permissionlessly settles the stored active CTF condition.
     /// @dev Spot-to-conditional activation is source-only and cannot be reached through this call.
+    /// Settlement remains available while emergency mode is armed or executed.
     function sync() external nonReentrant returns (SyncAction action) {
-        _assertNotEmergencyMode();
         _assertInitialized();
         if (!inConditionalMode) {
             return SyncAction.None;
@@ -556,8 +556,9 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
                 && block.timestamp >= emergencyExitArmedAt + EMERGENCY_EXIT_DELAY;
     }
 
-    /// @notice Arms emergency mode. Deposits and sync are blocked until disarmed; redemptions stay
-    /// open. After the delay anyone may unwind positions, but can never take shareholder assets.
+    /// @notice Arms emergency mode. Deposits and activation are blocked; settlement and redemptions
+    /// stay open. After the delay anyone may unwind positions, but can never take shareholder
+    /// assets.
     function armEmergencyExit() external {
         _checkOwner();
         if (emergencyExitExecuted) revert EmergencyExitAlreadyExecuted();

@@ -883,6 +883,35 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(collateralOut, 100 ether);
     }
 
+    function test_emergency_exit_does_not_block_permissionless_settlement() public {
+        _bootstrap();
+        _activateProposal(true);
+        manager.armEmergencyExit();
+
+        vm.warp(block.timestamp + manager.EMERGENCY_EXIT_DELAY());
+        vm.prank(depositor);
+        manager.executeEmergencyExit();
+
+        router.setPayouts(1, 1, 0);
+        vm.prank(depositor);
+        FutarchyLiquidityManager.SyncAction action = manager.sync();
+
+        assertEq(uint256(action), uint256(FutarchyLiquidityManager.SyncAction.MigratedBackToSpot));
+        assertFalse(manager.inConditionalMode());
+        assertEq(manager.spotLiquidity(), 0);
+        assertEq(manager.conditionalYesLiquidity(), 0);
+        assertEq(manager.conditionalNoLiquidity(), 0);
+        assertEq(manager.activeProposal(), address(0));
+        assertEq(manager.activeConditionId(), bytes32(0));
+        assertEq(company.balanceOf(address(manager)), 100 ether);
+        assertEq(wrappedNative.balanceOf(address(manager)), 100 ether);
+        assertEq(yesCompany.balanceOf(address(manager)), 0);
+        assertEq(noCompany.balanceOf(address(manager)), 0);
+        assertEq(yesCurrency.balanceOf(address(manager)), 0);
+        assertEq(noCurrency.balanceOf(address(manager)), 0);
+        assertTrue(manager.emergencyExitExecuted());
+    }
+
     function test_emergency_authorization_controls_are_owner_only() public {
         _bootstrap();
         manager.armEmergencyExit();

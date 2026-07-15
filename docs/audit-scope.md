@@ -60,7 +60,8 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
 - Deadline proxy gives new FLM-grade proposals a bounded liveness path.
 - Emergency exit only unwinds positions into the manager. It neither burns shares nor transfers
   shareholder assets, redemption remains available while emergency mode is armed or executed, and
-  anyone may execute the unwind after the owner-authorized delay.
+  anyone may execute the unwind after the owner-authorized delay. Arming or execution never blocks
+  permissionless settlement of a captured CTF condition.
 - Adapters cannot over-pull tokens from the manager.
 - Source-atomic conditional activation fails closed before persistent state changes if the shared
   spot-pool guard cannot read valid history or detects more than 50 ticks of deviation.

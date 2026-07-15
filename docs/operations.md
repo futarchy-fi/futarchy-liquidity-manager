@@ -83,7 +83,8 @@ slippage parameters therefore cannot be selected by a depositor, redeemer, or em
   - Transaction: `manager.sync`.
   - Takes no execution parameters and can only settle the condition captured during activation.
     It cannot activate a proposal. Settlement does not consult the mutable source or spot guard and
-    leaves recovered base assets idle and share-owned.
+    leaves recovered base assets idle and share-owned. It remains callable while emergency mode is
+    armed or executed.
 - `redeem`
   - Transaction: `manager.redeem`.
   - Uses `shares`, `recipient`, and `unwrapNative`.
