@@ -72,11 +72,11 @@
       "status": "ready-to-audit",
       "evidence": [
         {
-          "description": "Core manager tests cover constructor rejection of an identical company/collateral token, independent rejection of every outcome-to-outcome and outcome-to-base alias before spot movement, every independent base/YES/NO token-ordering parity, proportional principal/fee/idle accounting with adversarial receipt-label misclassification, exact two-phase adapter-removal deltas with spot and conditional overreport rollback, divergent YES/NO liquidity and post-swap principal composition, sequential six-token conservation and nondecreasing survivor value per share, exact settlement after randomized one-to-four partial exits, donation-resistant deposit pricing, spot and conditional six-token post-exit fee/donation ownership, rejection of direct native transfers outside that accounting model while wrapper unwrapping remains live, second-pool activation rollback, per-underlying conditional merge isolation with approval-failure, partial-consumption, and underpayment fallback, exact-delta merge and winner underconsumption/underpayment, late second-underlying rollback of prior recovery, losing-wrapper settlement rollback including after zero-supply final redemption, owner-authorized delayed permissionless non-custodial emergency exit, and permissionless settlement while emergency mode is armed or executed.",
+          "description": "Core manager tests cover constructor rejection of an identical company/collateral token and code-less dependencies, independent rejection of every outcome-to-outcome and outcome-to-base alias before spot movement, every independent base/YES/NO token-ordering parity, proportional principal/fee/idle accounting with adversarial receipt-label misclassification, exact two-phase adapter-removal deltas with spot and conditional overreport rollback, divergent YES/NO liquidity and post-swap principal composition, sequential six-token conservation and nondecreasing survivor value per share, exact settlement after randomized one-to-four partial exits, donation-resistant deposit pricing, spot and conditional six-token post-exit fee/donation ownership, rejection of direct native transfers outside that accounting model while wrapper unwrapping remains live, second-pool activation rollback, per-underlying conditional merge isolation with approval-failure, partial-consumption, and underpayment fallback, exact-delta merge and winner underconsumption/underpayment, late second-underlying rollback of prior recovery, losing-wrapper settlement rollback including after zero-supply final redemption, owner-authorized delayed permissionless non-custodial emergency exit, and permissionless settlement while emergency mode is armed or executed.",
           "path": "test/FutarchyLiquidityManager.t.sol"
         },
         {
-          "description": "The permissionless bundle factory test proves an identical company/collateral token fails manager construction and rolls back deployment.",
+          "description": "Factory tests prove constructor rejection of code-less shared dependencies and that identical or code-less company-token manager wiring rolls back the permissionless bundle.",
           "path": "test/FutarchyLiquidityManagerFactory.t.sol"
         },
         {
@@ -183,7 +183,7 @@
       "status": "ready-to-audit",
       "evidence": [
         {
-          "description": "Deployment script reads JSON config instead of hard-coded production addresses and records config/deployed-code hashes in the deployment output.",
+          "description": "Deployment script reads JSON config instead of hard-coded production addresses, rejects configured code-less token and protocol dependencies before broadcast, and records config/deployed-code hashes in the deployment output.",
           "path": "script/DeployFutarchyLiquidityManager.s.sol"
         },
         {

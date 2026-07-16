@@ -43,6 +43,8 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
 - LP shares remain proportional through deposits, withdrawals, migration, and settlement.
 - Manager construction rejects an identical company/collateral token before either two-asset share
   accounting or bundle deployment can become live.
+- Manager and factory construction reject code-less token, router, adapter, guard, and AMM
+  dependencies before a permanently unusable direct deployment or bundle can persist.
 - A spot deposit fully consolidates the spot position before pricing new shares, so accrued fees,
   donations, and idle balances cannot be diluted. Redemption snapshots idle assets and removes only
   proportional liquidity and fees; a partial redeemer cannot collect value belonging to survivors.
@@ -78,7 +80,7 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   share-owned.
 - The factory accepts no caller-supplied constructor suffixes: it verifies bare creation-code
   hashes, appends all wiring itself, enforces the EIP-3860 limit, and rolls back partial bundles,
-  including an invalid identical-base-token manager deployment.
+  including invalid identical-base-token and code-less-company-token manager deployments.
 
 ## Permissions
 

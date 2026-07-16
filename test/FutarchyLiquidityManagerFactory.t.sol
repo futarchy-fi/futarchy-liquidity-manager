@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {VmSafe} from "forge-std/Vm.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {
     SwaprAlgebraDirectConditionalAdapter
@@ -12,6 +13,7 @@ import {FutarchyLiquidityManager, IWrappedNative} from "../src/core/FutarchyLiqu
 import {
     FutarchyLiquidityManagerFactory
 } from "../src/factories/FutarchyLiquidityManagerFactory.sol";
+import {IFutarchyConditionalRouter} from "../src/interfaces/IFutarchyConditionalRouter.sol";
 import {ISwaprAlgebraPositionManager} from "../src/interfaces/ISwaprAlgebraPositionManager.sol";
 import {FutarchyOfficialProposalSource} from "../src/sources/FutarchyOfficialProposalSource.sol";
 import {MockAlgebraFactoryLike} from "./mocks/MockAlgebraFactoryLike.sol";
@@ -197,6 +199,15 @@ contract FutarchyLiquidityManagerFactoryTest is Test {
         factory.createLiquidityManager(params, _creationCodes());
     }
 
+    function test_revertsOnEoaCompanyTokenAndRollsBackBundle() public {
+        FutarchyLiquidityManagerFactory.CreateParams memory params =
+            _createParams(_defaultValidationConfigData());
+        params.companyToken = IERC20(address(0xBEEF));
+
+        vm.expectRevert(FutarchyLiquidityManagerFactory.DeploymentFailed.selector);
+        factory.createLiquidityManager(params, _creationCodes());
+    }
+
     function test_revertsOnMutatedCreationCode() public {
         FutarchyLiquidityManagerFactory.CreationCodes memory codes = _creationCodes();
         codes.manager[0] = bytes1(uint8(codes.manager[0]) ^ 1);
@@ -328,6 +339,23 @@ contract FutarchyLiquidityManagerFactoryTest is Test {
 
         vm.expectRevert(FutarchyLiquidityManagerFactory.InvalidAmmWiring.selector);
         _newFactory(positionManager, algebraFactory, mismatchedGuard);
+    }
+
+    function test_constructorRejectsEoaDependency() public {
+        vm.expectRevert(FutarchyLiquidityManagerFactory.InvalidDependency.selector);
+        new FutarchyLiquidityManagerFactory(
+            positionManager,
+            algebraFactory,
+            IFutarchyConditionalRouter(address(0xBEEF)),
+            stabilityGuard,
+            IWrappedNative(address(wrappedNative)),
+            TICK_LOWER,
+            TICK_UPPER,
+            keccak256(type(FutarchyOfficialProposalSource).creationCode),
+            keccak256(type(SwaprAlgebraLiquidityAdapter).creationCode),
+            keccak256(type(SwaprAlgebraDirectConditionalAdapter).creationCode),
+            keccak256(type(FutarchyLiquidityManager).creationCode)
+        );
     }
 
     function test_revertsOnInvalidFactoryTickRange() public {

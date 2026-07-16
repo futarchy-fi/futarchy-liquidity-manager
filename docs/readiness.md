@@ -26,8 +26,12 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   revert without changing the registry, captured binding, pools, or liquidity.
 - Manager construction rejects an identical company/collateral ERC-20; direct and permissionless
   factory tests prove the invalid two-bucket configuration cannot persist.
+- Manager and factory construction reject code-less token, router, adapter, guard, and AMM
+  dependencies; direct tests and a failed permissionless bundle prove the invalid wiring cannot
+  persist.
 - Strict deployment preflight independently rejects that identical pair and requires the frozen
-  validation policy's proposal/collateral tokens to equal the manager pair before broadcast.
+  validation policy's proposal/collateral tokens to equal the manager pair. The deployment script
+  also requires code at every configured token, AMM, router, and guard address before broadcast.
 - The manager stores the CTF condition and wrapper binding used for settlement rather than rereading
   mutable proposal state.
 - The deadline proxy relays a finalized Reality result even when its fallback path is called after

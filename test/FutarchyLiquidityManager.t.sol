@@ -1056,6 +1056,22 @@ contract FutarchyLiquidityManagerTest is Test {
         );
     }
 
+    function test_constructor_rejects_eoa_dependency() public {
+        vm.expectRevert(FutarchyLiquidityManager.InvalidDependency.selector);
+        new FutarchyLiquidityManager(
+            bootstrapRecipient,
+            IERC20(address(0xBEEF)),
+            IWrappedNative(address(wrappedNative)),
+            proposalSource,
+            spotAdapter,
+            conditionalAdapter,
+            router,
+            stabilityGuard,
+            owner,
+            FutarchyLiquidityManager.LpTokenMetadata({name: "Futarchy LP", symbol: "fLP"})
+        );
+    }
+
     function test_merge_outcome_slice_is_self_only() public {
         vm.expectRevert(FutarchyLiquidityManager.OnlySelf.selector);
         manager.mergeOutcomeSlice(true, 1);

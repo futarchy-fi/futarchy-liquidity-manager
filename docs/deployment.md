@@ -33,6 +33,11 @@ Required organization-specific fields:
 - `officialProposer`: the only proposal creator whose official proposal can trigger migration.
 - `lpTokenName` and `lpTokenSymbol`: ERC20 metadata for FLM shares.
 
+Every configured token and protocol dependency used by the manager or factory must already contain
+deployed contract code on the target chain. Manager and factory constructors enforce this for
+direct callers, and the deployment script checks the configured token, AMM, router, and guard
+addresses before starting a broadcast.
+
 Gnosis defaults included in the example:
 
 - `wrappedNative`: collateral token used by the manager. Use WXDAI for native-collateral flows, or

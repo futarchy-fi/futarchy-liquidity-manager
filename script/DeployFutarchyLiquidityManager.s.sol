@@ -198,6 +198,12 @@ contract DeployFutarchyLiquidityManager is Script {
         _requireNonzero(cfg.algebraFactory, "algebraFactory");
         _requireNonzero(cfg.poolStabilityGuard, "poolStabilityGuard");
         _requireNonzero(cfg.futarchyRouter, "futarchyRouter");
+        _requireCode(cfg.companyToken, "companyToken");
+        _requireCode(cfg.wrappedNative, "wrappedNative");
+        _requireCode(cfg.positionManager, "positionManager");
+        _requireCode(cfg.algebraFactory, "algebraFactory");
+        _requireCode(cfg.poolStabilityGuard, "poolStabilityGuard");
+        _requireCode(cfg.futarchyRouter, "futarchyRouter");
         require(cfg.companyToken != cfg.wrappedNative, "identical base tokens");
         if (cfg.validation.enabled) {
             require(
@@ -220,6 +226,10 @@ contract DeployFutarchyLiquidityManager is Script {
 
     function _requireNonzero(address value, string memory label) internal pure {
         require(value != address(0), label);
+    }
+
+    function _requireCode(address value, string memory label) internal view {
+        require(value.code.length != 0, string.concat(label, " must be a contract"));
     }
 
     function _creationCodes()

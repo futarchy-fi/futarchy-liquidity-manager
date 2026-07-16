@@ -65,6 +65,7 @@ contract FutarchyLiquidityManagerFactory {
     bytes32 public immutable MANAGER_CREATION_CODE_HASH;
 
     error ZeroAddress();
+    error InvalidDependency();
     error InvalidLifecycleCoordinator();
     error InvalidAmmWiring();
     error ZeroCreationCodeHash();
@@ -103,6 +104,12 @@ contract FutarchyLiquidityManagerFactory {
         ) {
             revert ZeroAddress();
         }
+        if (
+            address(positionManager).code.length == 0 || address(algebraFactory).code.length == 0
+                || address(conditionalRouter).code.length == 0
+                || address(poolStabilityGuard).code.length == 0
+                || address(wrappedNative).code.length == 0
+        ) revert InvalidDependency();
         if (
             positionManager.factory() != address(algebraFactory)
                 || IAlgebraFactoryBoundGuard(address(poolStabilityGuard)).FACTORY()
