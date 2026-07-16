@@ -110,7 +110,9 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   anyone may execute the unwind after the owner-authorized delay. Arming or execution never blocks
   permissionless settlement of a captured CTF condition. The pinned-mainnet lifecycle proves this
   against donated official-v4 positions and canonical CTF even after the source registry is
-  cleared, with zero caller gain and final shareholder conservation.
+  cleared, with zero caller gain and final shareholder conservation. It also faults the second
+  emergency removal after the first official-v4 unwind and proves the whole attempt rolls back
+  before an identical outsider retry succeeds.
 - Adapters cannot over-pull tokens from the manager.
 - Source-atomic conditional activation fails closed before persistent state changes if the shared
   spot-pool guard cannot read valid history or detects more than 50 ticks of deviation.

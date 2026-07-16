@@ -155,11 +155,12 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   both v4 removals and company merge/winner recovery. The failed sync restores the captured
   binding/accounting, adapter positions, PoolManager balances, CTF collateral/underlying custody,
   wrapper supply/custody, and allowances; the identical retry and final exit then succeed.
-  A sixth run arms emergency mode with donated fees live, lets an unrelated account unwind both
-  official-v4 positions after the delay, and proves the caller receives no shares or assets. The
-  captured proposal remains intact; after canonical CTF resolution and source-registry clearing,
-  the same outsider settles permissionlessly and the shareholder recovers both base assets within
-  five wei.
+  A sixth run arms emergency mode with donated fees live and lets an unrelated account begin the
+  delayed unwind. A fault at the second adapter removal restores the first official-v4 position,
+  both custody envelopes, manager accounting, and the unexecuted emergency flag. The identical
+  outsider retry unwinds both positions without receiving shares or assets; the captured proposal
+  remains intact, source-independent canonical CTF settlement succeeds, and the shareholder
+  recovers both base assets within five wei.
 - The pinned block's actual gas limit is 60,000,000. Charging 21,000 base gas plus the worst-case
   16 gas for every calldata byte yields 12,125,922 gas for the atomic bundle transaction,
   2,343,088 gas for source/CTF/two-pool activation, 1,460,745 gas for symmetric donated-fee partial
@@ -204,6 +205,7 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 | First or second official mainnet v4 initialization/liquidity | `testFork_firstRealV4InitializeFailureRollsBackAndRetrySucceeds`, `testFork_firstRealV4LiquidityFailureRollsBackAndRetrySucceeds`, `testFork_secondRealV4InitializeFailureRollsBackAndRetrySucceeds`, and `testFork_secondRealV4LiquidityFailureRollsBackAndRetrySucceeds` fault each deployed PoolManager boundary, prove prior live-stack effects and any pool initialization disappear, and retry the identical activation. |
 | Canonical mainnet CTF merge during redemption | `testFork_realCompanyMergeFailurePaysExactInKindAndRemainsRedeemable` faults the company merge, proves collateral still merges and exact YES/NO company wrappers are paid in kind, then redeems/consumes those wrappers after resolution and conserves both assets through survivor settlement and final exit. |
 | Late canonical mainnet CTF merge during settlement | `testFork_lateRealSettlementMergeFailureRollsBackAndRetrySucceeds` proves both v4 removals and company merge/winner redemption execute before the collateral fault, compares captured binding/accounting plus actual protocol custody and positions, then completes the identical settlement after clearing the fault. |
+| Second conditional removal during emergency unwind | `testFork_outsiderEmergencyExitRollsBackSettlesAndPreservesAllShares` executes the first official-v4 removal before faulting the second adapter boundary, proves both positions, PoolManager/manager custody, accounting, shares, and the emergency flag roll back, then completes the identical outsider retry and source-independent settlement. |
 | AMM create, initialize, or first mint | `test_freshAddPoolCreateAndInitializeFailuresRollBack`, `test_freshAddFirstMintFailureRollsBackPoolAndCustody`, and `test_firstLiquidityFailureRollsBackInitializationAndCustody`. |
 | Outer lifecycle step after successful activation | `test_atomic_activation_uses_captured_source_snapshot` forces its resolver step to revert and compares the complete source, manager, spot, CTF, router, wrapper, pool, balance, and allowance envelope. |
 | Atomic bundle deployment/wiring | `test_lateManagerFailureRollsBackHookAndEveryCreate`, `test_sameTokenManagerFailureAlsoRollsBackMinedHook`, and the empty-runtime/initcode/hash fault cases. |

@@ -22,6 +22,7 @@ import {
     IFutarchyWrapped1155Factory
 } from "../../src/interfaces/IFutarchyConditionalDependencies.sol";
 import {IFutarchyConditionalRouter} from "../../src/interfaces/IFutarchyConditionalRouter.sol";
+import {IFutarchyLiquidityAdapter} from "../../src/interfaces/IFutarchyLiquidityAdapter.sol";
 import {IUniswapV3FactoryLike} from "../../src/interfaces/IUniswapV3FactoryLike.sol";
 import {
     IUniswapV3NonfungiblePositionManager
@@ -114,7 +115,7 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         _runLifecycle(true, false, ActivationFault.None, false, true);
     }
 
-    function testFork_outsiderEmergencyExitSettlesAndPreservesAllShares() public {
+    function testFork_outsiderEmergencyExitRollsBackSettlesAndPreservesAllShares() public {
         _runLifecycle(true, false, ActivationFault.None, false, false, true);
     }
 
@@ -732,6 +733,8 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
     ) private {
         address outsider = address(0xCAFE);
         uint256 supplyBefore = manager.totalSupply();
+        uint128 yesLiquidityBefore = manager.conditionalYesLiquidity();
+        uint128 noLiquidityBefore = manager.conditionalNoLiquidity();
         uint256[6] memory outsiderBalancesBefore = [
             company.balanceOf(outsider),
             collateral.balanceOf(outsider),
@@ -740,11 +743,63 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
             IERC20(outcomes[2]).balanceOf(outsider),
             IERC20(outcomes[3]).balanceOf(outsider)
         ];
+        uint256[4] memory managerBalancesBefore;
+        uint256[4] memory poolManagerBalancesBefore;
+        for (uint256 i; i < outcomes.length; ++i) {
+            managerBalancesBefore[i] = IERC20(outcomes[i]).balanceOf(address(manager));
+            poolManagerBalancesBefore[i] = IERC20(outcomes[i]).balanceOf(POOL_MANAGER);
+        }
 
         manager.armEmergencyExit();
         assertFalse(manager.emergencyExitReady());
         vm.warp(block.timestamp + manager.EMERGENCY_EXIT_DELAY());
         assertTrue(manager.emergencyExitReady());
+
+        (address yesToken0, address yesToken1) =
+            outcomes[0] < outcomes[2] ? (outcomes[0], outcomes[2]) : (outcomes[2], outcomes[0]);
+        (address noToken0, address noToken1) =
+            outcomes[1] < outcomes[3] ? (outcomes[1], outcomes[3]) : (outcomes[3], outcomes[1]);
+        bytes memory faultData = abi.encodeWithSignature("Error(string)", "emergency removal fault");
+        vm.mockCallRevert(
+            address(conditional),
+            abi.encodeWithSelector(
+                IFutarchyLiquidityAdapter.removeLiquidityDetailed.selector,
+                noToken0,
+                noToken1,
+                uint128(0)
+            ),
+            faultData
+        );
+        vm.expectCall(
+            address(conditional),
+            abi.encodeWithSelector(
+                IFutarchyLiquidityAdapter.removeLiquidityDetailed.selector,
+                yesToken0,
+                yesToken1,
+                yesLiquidityBefore
+            )
+        );
+        vm.expectRevert(faultData);
+        vm.prank(outsider);
+        manager.executeEmergencyExit();
+
+        assertFalse(manager.emergencyExitExecuted());
+        assertTrue(manager.emergencyExitReady());
+        assertEq(manager.totalSupply(), supplyBefore);
+        assertEq(manager.conditionalYesLiquidity(), yesLiquidityBefore);
+        assertEq(manager.conditionalNoLiquidity(), noLiquidityBefore);
+        assertEq(
+            conditional.positionLiquidity(_pairKey(outcomes[0], outcomes[2])), yesLiquidityBefore
+        );
+        assertEq(
+            conditional.positionLiquidity(_pairKey(outcomes[1], outcomes[3])), noLiquidityBefore
+        );
+        for (uint256 i; i < outcomes.length; ++i) {
+            assertEq(IERC20(outcomes[i]).balanceOf(address(manager)), managerBalancesBefore[i]);
+            assertEq(IERC20(outcomes[i]).balanceOf(POOL_MANAGER), poolManagerBalancesBefore[i]);
+        }
+
+        vm.clearMockedCalls();
         vm.prank(outsider);
         manager.executeEmergencyExit();
 

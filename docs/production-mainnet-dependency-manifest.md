@@ -84,11 +84,11 @@ custody, wrapper supply/custody, and allowances. Clearing the fault lets the ide
 final exit complete.
 
 An emergency run accrues donations in both official-v4 positions, arms the delayed exit, and lets
-an unrelated account execute the unwind. That caller receives no LP shares, base assets, or outcome
-wrappers; both adapter positions reach zero while the captured proposal and share supply remain
-unchanged. After canonical CTF resolution and source-registry clearing, the outsider calls
-settlement permissionlessly and the shareholder's final exit recovers both base assets within five
-wei.
+an unrelated account begin the unwind. A fault at the second adapter removal restores the already
+removed first official-v4 position, PoolManager/manager custody, accounting, shares, and the
+unexecuted emergency flag. The identical outsider retry receives no assets, reaches zero position
+liquidity, settles canonical CTF after source-registry clearing, and leaves final shareholder
+recovery within five wei per base asset.
 
 Nine rollback variants fault official-v3 spot principal removal, each canonical CTF split, wrapper
 conversion on each underlying, and each official-PoolManager initialization and first-liquidity
