@@ -686,29 +686,33 @@ contract FutarchyLiquidityManagerTest is Test {
             vm.expectRevert(payoutFault);
             manager.redeem(10 ether, recipient, false);
 
-            assertEq(manager.totalSupply(), 100 ether);
-            assertEq(manager.balanceOf(bootstrapRecipient), 100 ether);
-            assertEq(manager.spotLiquidity(), 20 ether);
-            assertEq(manager.conditionalYesLiquidity(), 80 ether);
-            assertEq(manager.conditionalNoLiquidity(), 80 ether);
-            assertEq(spotAdapter.totalLiquidity(), 20 ether);
-            assertEq(conditionalAdapter.totalLiquidity(), 160 ether);
-            assertEq(spotAdapter.removeDetailedCalls(), spotRemoveCallsBefore);
-            assertEq(conditionalAdapter.removeDetailedCalls(), conditionalRemoveCallsBefore);
-            for (uint256 i; i < tokens.length; i++) {
-                assertEq(_managedBalance(tokens[i]), managedBefore[i], "managed balance rollback");
-                assertEq(
-                    IERC20(tokens[i]).balanceOf(address(router)),
-                    routerBefore[i],
-                    "router balance rollback"
-                );
-                assertEq(IERC20(tokens[i]).balanceOf(recipient), 0, "recipient balance rollback");
-            }
+            _assertConditionalRedeemRollback(
+                recipient,
+                tokens,
+                managedBefore,
+                routerBefore,
+                spotRemoveCallsBefore,
+                conditionalRemoveCallsBefore
+            );
             vm.clearMockedCalls();
         }
 
+        vm.mockCallRevert(recipient, bytes(""), payoutFault);
         vm.prank(bootstrapRecipient);
-        (uint256 companyOut, uint256 collateralOut) = manager.redeem(10 ether, recipient, false);
+        vm.expectRevert();
+        manager.redeem(10 ether, recipient, true);
+        _assertConditionalRedeemRollback(
+            recipient,
+            tokens,
+            managedBefore,
+            routerBefore,
+            spotRemoveCallsBefore,
+            conditionalRemoveCallsBefore
+        );
+        vm.clearMockedCalls();
+
+        vm.prank(bootstrapRecipient);
+        (uint256 companyOut, uint256 collateralOut) = manager.redeem(10 ether, recipient, true);
 
         assertEq(companyOut, 10 ether);
         assertEq(collateralOut, 10 ether);
@@ -718,7 +722,8 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(manager.conditionalYesLiquidity(), 72 ether);
         assertEq(manager.conditionalNoLiquidity(), 72 ether);
         assertEq(company.balanceOf(recipient), 10 ether);
-        assertEq(wrappedNative.balanceOf(recipient), 10 ether);
+        assertEq(wrappedNative.balanceOf(recipient), 0);
+        assertEq(recipient.balance, 10 ether);
     }
 
     function test_conditional_redeem_is_proportional_without_add_or_guard() public {
@@ -1555,6 +1560,35 @@ contract FutarchyLiquidityManagerTest is Test {
         liquidity[0] = manager.spotLiquidity();
         liquidity[1] = manager.conditionalYesLiquidity();
         liquidity[2] = manager.conditionalNoLiquidity();
+    }
+
+    function _assertConditionalRedeemRollback(
+        address recipient,
+        address[6] memory tokens,
+        uint256[6] memory managedBefore,
+        uint256[6] memory routerBefore,
+        uint256 spotRemoveCallsBefore,
+        uint256 conditionalRemoveCallsBefore
+    ) internal view {
+        assertEq(manager.totalSupply(), 100 ether);
+        assertEq(manager.balanceOf(bootstrapRecipient), 100 ether);
+        assertEq(manager.spotLiquidity(), 20 ether);
+        assertEq(manager.conditionalYesLiquidity(), 80 ether);
+        assertEq(manager.conditionalNoLiquidity(), 80 ether);
+        assertEq(spotAdapter.totalLiquidity(), 20 ether);
+        assertEq(conditionalAdapter.totalLiquidity(), 160 ether);
+        assertEq(spotAdapter.removeDetailedCalls(), spotRemoveCallsBefore);
+        assertEq(conditionalAdapter.removeDetailedCalls(), conditionalRemoveCallsBefore);
+        for (uint256 i; i < tokens.length; i++) {
+            assertEq(_managedBalance(tokens[i]), managedBefore[i], "managed balance rollback");
+            assertEq(
+                IERC20(tokens[i]).balanceOf(address(router)),
+                routerBefore[i],
+                "router balance rollback"
+            );
+            assertEq(IERC20(tokens[i]).balanceOf(recipient), 0, "recipient balance rollback");
+        }
+        assertEq(recipient.balance, 0, "recipient native balance rollback");
     }
 
     function _assertSurvivorRatios(uint256[3] memory beforeLiquidity, uint256 supplyBefore)

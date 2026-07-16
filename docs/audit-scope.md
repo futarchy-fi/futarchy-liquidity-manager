@@ -90,8 +90,8 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
 - Deposits are accepted only in spot mode and only in the vault's existing two-asset proportion.
 - Conditional redemption touches only the withdrawing fraction. Matched complete sets are merged
   when possible; router failure and unmatched balances fall back to in-kind outcome tokens. A
-  failure of either final recipient transfer must roll back the preceding removals, share burn,
-  merges, and custody changes atomically, including the first payout when the second fails.
+  failure of either final ERC20 recipient transfer or post-unwrap native delivery must roll back
+  the preceding removals, share burn, merges, payouts, unwrap, and custody changes atomically.
 - Stateful fee and donation sequences cannot dilute an existing holder: every successful deposit
   and redemption must preserve or increase each remaining liquidity and six-token balance claim
   per share. All issued test assets remain in modeled manager, adapter, router, or holder custody,

@@ -391,7 +391,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | Source capture verification fails after manager activation completes | The entire proposal write reverts. The pinned-mainnet fixture restores the spot NFT, CTF/wrapper custody, both official-v4 positions, manager binding, and empty registry, then activates the identical proposal after clearing the fault. |
 | Second conditional removal reverts during proportional redemption | The whole redemption reverts. The pinned-mainnet fixture executes the first official-v4 proportional removal before faulting the second adapter boundary, then proves shares, positions, spot identity, and all six holder/manager/PoolManager balances restore before the identical retry. |
 | Merge router is unavailable or maliciously reverts | Withdrawing outcome slice is paid in kind. The pinned-mainnet fixture faults the canonical company-side CTF merge, proves collateral still merges, then independently redeems/consumes the exact company wrappers after resolution and conserves both assets through final exit. |
-| Either final base-token transfer to the recipient reverts after liquidity removal and complete-set merges | The whole redemption reverts. A focused test faults company and wrapped-collateral payout independently; the latter occurs after company payment. Each proves the share burn, all three liquidity slices, removal counters, and six-token manager/adapter/router/recipient custody restore before the identical retry succeeds. |
+| A final company-token, wrapped-collateral, or post-unwrap native transfer to the recipient reverts after liquidity removal and complete-set merges | The whole redemption reverts. A focused test faults all three payout paths independently; the latter two occur after company payment and native delivery occurs after WETH withdrawal. Each proves the share burn, all three liquidity slices, removal counters, and token/native manager/adapter/router/recipient custody restore before the identical native retry succeeds. |
 | Settlement router reverts, partially consumes, or underpays | The whole settlement reverts; active positions and the captured binding remain intact. The pinned-mainnet late-fault run executes both v4 removals and company merge/winner redemption before the collateral CTF merge reverts, compares protocol custody and positions, then completes the identical settlement after the fault is cleared. |
 | Rounding across sequential redemptions | No overpayment; survivor ratio never falls; final holder receives dust. A nonfinal all-zero liquidity plan reverts without burning shares, so its holder must first combine or transfer enough shares to withdraw at least one liquidity unit. |
 | Bundle, activation, or conditional redemption approaches the Ethereum block limit | The pinned mainnet fork charges base gas plus worst-case nonzero calldata, compares each transaction to the block's actual 60,000,000 gas limit, and requires more than half a block of headroom. |
@@ -439,8 +439,8 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 - prove per-token conservation across arbitrary sequential redemptions;
 - prove adapter-add and guard call counts remain zero during redemption;
 - test divergent YES/NO prices and liquidity, merge failure, and unmatched in-kind payout;
-- fault each exact final recipient payout after proportional removal and merging, then prove
-  complete rollback (including the first payout when the second fails) and identical-retry success;
+- fault each exact final ERC20 payout and post-unwrap native delivery after proportional removal
+  and merging, then prove complete rollback of prior payouts and unwrap plus identical-retry success;
 - on the pinned full mainnet stack, fault one canonical CTF merge, prove the other underlying still
   merges, and redeem/consume the exact in-kind slice after resolution;
 - settle correctly after one or many partial redemptions;
