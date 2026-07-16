@@ -73,7 +73,10 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 - Every ERC20 payout and zero-supply sweep requires the recipient's balance to increase by exactly
   the reported amount. A regression enables a company-token recipient fee only after bootstrap,
   proves redemption restores shares and liquidity instead of silently underpaying, then disables
-  the fee and completes the identical exit.
+  the fee and completes the identical exit. After a final unresolved redemption burns all shares,
+  a separate regression faults the fourth captured-wrapper sweep, proves the preceding three
+  wrapper payments roll back, and then transfers all four exact balances to the bootstrap recipient
+  on the identical retry.
 - CTF split collateral and every spot or conditional adapter refund also require exact recipient
   deltas. Late-fee regressions prove an underpaid CTF split restores collateral and wrapper state,
   and an underpaid refund restores the complete v3 NFT or v4 position change before exact retry.
@@ -249,6 +252,7 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 | Successful ERC20 call underpays its recipient | `test_redemption_rejects_late_transfer_fee_without_burning_shares` enables a company-token recipient fee only after bootstrap. The exact recipient-delta check restores shares and liquidity, and the identical redemption succeeds after the fee is disabled. |
 | Router merge underpays its direct caller | `test_merge_rejects_late_transfer_fee_without_consuming_wrappers` enables a fee only for the caller, restores both complete-set wrappers and collateral custody, then completes the identical merge fee-free. |
 | Any in-kind outcome transfer during proportional redemption | `test_each_in_kind_outcome_transfer_failure_rolls_back_complete_redemption` forces both merges into fallback, then independently faults each of the four exact wrapper transfers. Every case restores shares, spot/YES/NO liquidity, removal counters, managed/router custody, and any preceding wrapper payments before the identical retry pays the exact base and four-wrapper slice. |
+| Fourth captured-wrapper transfer during a zero-supply sweep | `test_zero_supply_outcome_sweep_rolls_back_and_retries_atomically` donates all four active outcomes after the final unresolved share burn, faults the fourth transfer, proves the prior three payments restore, then sweeps every exact balance to the bootstrap recipient on retry. |
 | Each final recipient payout path during proportional redemption | `test_each_final_payout_failure_rolls_back_complete_conditional_redemption` independently faults the exact company-token transfer, wrapped-collateral transfer, and native delivery after unwrap. Each occurs after spot/YES/NO removal, share burn, and both complete-set merges; the later faults occur after company payment, and native delivery also occurs after WETH withdrawal. Every case restores shares, liquidity, removal counters, and token/native custody before the identical native retry succeeds. |
 | Native recipient reenters redemption during payout | `test_native_payout_blocks_reentrant_redemption_without_blocking_outer_exit` gives the recipient remaining shares and forwards native payout gas to its callback. The nested redemption is rejected while the outer proportional burn, liquidity reduction, and exact company/native payment complete. |
 | Late canonical mainnet CTF merge during settlement | `testFork_lateRealSettlementMergeFailureRollsBackAndRetrySucceeds` proves both v4 removals and company merge/winner redemption execute before the collateral fault, compares captured binding/accounting plus actual protocol custody and positions, then completes the identical settlement after clearing the fault. |

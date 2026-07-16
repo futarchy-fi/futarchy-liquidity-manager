@@ -1334,6 +1334,44 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(bootstrapRecipient.balance, nativeBefore + 4 ether);
     }
 
+    function test_zero_supply_outcome_sweep_rolls_back_and_retries_atomically() public {
+        _bootstrap();
+        _activateProposal(true);
+        vm.prank(bootstrapRecipient);
+        manager.redeem(100 ether, bootstrapRecipient, false);
+
+        yesCompany.mint(address(manager), 1 ether);
+        noCompany.mint(address(manager), 2 ether);
+        yesCurrency.mint(address(manager), 3 ether);
+        noCurrency.mint(address(manager), 4 ether);
+
+        bytes memory fault = abi.encodeWithSignature("Error(string)", "outcome sweep fault");
+        vm.mockCallRevert(
+            address(noCurrency),
+            abi.encodeCall(IERC20.transfer, (bootstrapRecipient, 4 ether)),
+            fault
+        );
+        vm.expectRevert(fault);
+        manager.sweepIdleToBootstrapRecipient(false);
+
+        assertEq(yesCompany.balanceOf(address(manager)), 1 ether);
+        assertEq(noCompany.balanceOf(address(manager)), 2 ether);
+        assertEq(yesCurrency.balanceOf(address(manager)), 3 ether);
+        assertEq(noCurrency.balanceOf(address(manager)), 4 ether);
+        assertEq(yesCompany.balanceOf(bootstrapRecipient), 0);
+        assertEq(noCompany.balanceOf(bootstrapRecipient), 0);
+        assertEq(yesCurrency.balanceOf(bootstrapRecipient), 0);
+        assertEq(noCurrency.balanceOf(bootstrapRecipient), 0);
+
+        vm.clearMockedCalls();
+        manager.sweepIdleToBootstrapRecipient(false);
+
+        assertEq(yesCompany.balanceOf(bootstrapRecipient), 1 ether);
+        assertEq(noCompany.balanceOf(bootstrapRecipient), 2 ether);
+        assertEq(yesCurrency.balanceOf(bootstrapRecipient), 3 ether);
+        assertEq(noCurrency.balanceOf(bootstrapRecipient), 4 ether);
+    }
+
     function test_direct_native_transfer_is_rejected() public {
         _bootstrap();
 
