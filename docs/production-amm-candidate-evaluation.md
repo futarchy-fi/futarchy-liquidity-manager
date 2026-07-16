@@ -6,8 +6,8 @@ FAO production now targets Ethereum mainnet, not Gnosis Chain. Ethereum has an o
 deployment, so the prior missing-deployment blocker is superseded. Uniswap v4 with an immutable
 initialization-only hook is selected for implementation. The repository now contains the gate and
 manager-bound direct conditional adapter plus an atomic caller-bound CREATE2 bundle factory, but
-not a full-lifecycle mainnet fork proof, final deployment manifest, or external review. Do not sign
-a deployment batch or fund this path until those gates pass.
+not the final production dependency manifest, exact-config rehearsal, or external review. Do not
+sign a deployment batch or fund this path until those gates pass.
 
 ## Candidate decision
 
@@ -71,6 +71,8 @@ permission bits before any child deployment, and then deploys the hook, proposal
 adapter, v4 conditional adapter, and manager. The hook→adapter, both adapter→manager, and
 source→manager bindings all complete in the same reverting transaction. Deterministic tests prove a
 late manager failure removes the already-created hook and every preceding child.
+The source's immutable pool lookup is the deployed v4 conditional adapter itself, so registry views
+resolve both singleton pool keys without retaining a legacy Algebra-factory dependency.
 
 The production batch must call this factory directly from the Safe or creator address used while
 mining the hook salt. It must not use a public relay or intermediary proxy: `msg.sender` is the salt
@@ -95,10 +97,16 @@ with its own Foundry configuration and Solidity 0.8.26:
 - the same pinned fork proves the committed adapter initializes and adds through the official
   PoolManager, realizes a third-party pool donation as shareholder fees, removes one third, then
   removes the exact remainder without adapter residue.
+- a full pinned-mainnet fixture deploys the caller-bound factory bundle, uses canonical Ethereum
+  Conditional Tokens to split both base assets through the real router, atomically activates the
+  real source and manager into two official-PoolManager positions, resolves through CTF, and removes
+  and redeems both positions with at most one wei of v4 rounding. The spot position manager and
+  Wrapped1155 factory remain deterministic stand-ins pending final production selection.
 
-These measurements validate the singleton's architectural shape only. They do not replace the
-required full outer-transaction Ethereum-mainnet fork fixture with both positions, CTF work,
-transfers, calldata, and failure-path rollback.
+These fixtures validate the singleton and full outer-transaction architecture, but not the final
+spot manager, Wrapped1155 factory, deployment addresses, calldata, or Safe batch. Deterministic
+tests remain the exhaustive failure-path rollback evidence until the exact production dependency
+fixture is selected.
 
 The fee design follows the upstream
 [`modifyLiquidity` contract](https://github.com/Uniswap/v4-core/blob/46c6834698c48bc4a463a86d8420f4eb1d7f3b75/src/interfaces/IPoolManager.sol),
@@ -132,8 +140,8 @@ legal review remains a real-funds gate; this document is an engineering analysis
 2. Pin and independently verify the official Ethereum PoolManager runtime hash and every imported
    upstream file/license; complete legal review before real funds.
 3. Run every adversarial, conservation, rollback, gas, bytecode, configuration, and batch gate in
-   `production-amm-successor.md`, including the full source/CTF/two-pool manager lifecycle, on a
-   pinned Ethereum-mainnet fork and the final deployment config.
+   `production-amm-successor.md` against the final spot/wrapper dependencies and deployment config;
+   repeat the now-passing source/CTF/two-pool manager lifecycle with those exact addresses.
 4. Complete independent contract and role review before funding.
 
 Until then, both the committed Algebra path and the partial v4 path remain no-funds prototypes.

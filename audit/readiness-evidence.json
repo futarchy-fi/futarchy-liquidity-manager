@@ -100,6 +100,10 @@
           "path": "test/V4FutarchyLiquidityManagerFactory.t.sol"
         },
         {
+          "description": "A pinned Ethereum-mainnet fork drives the factory-deployed source, canonical Conditional Tokens, router, manager, and two conditional positions through atomic activation and settlement against the official v4 PoolManager.",
+          "path": "test/fork/V4FutarchyLiquidityManagerLifecycleMainnetFork.t.sol"
+        },
+        {
           "description": "The production router test proves exact CTF split receipts and exact wrapper mint deltas.",
           "path": "test/FutarchyConditionalRouter.t.sol"
         },

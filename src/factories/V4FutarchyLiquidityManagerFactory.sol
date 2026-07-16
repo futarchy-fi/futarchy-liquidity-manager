@@ -10,7 +10,6 @@ import {
 import {UniswapV3LiquidityAdapter} from "../adapters/UniswapV3LiquidityAdapter.sol";
 import {V4InitializationGate} from "../adapters/V4InitializationGate.sol";
 import {FutarchyLiquidityManager, IWrappedNative} from "../core/FutarchyLiquidityManager.sol";
-import {IAlgebraFactoryLike} from "../interfaces/IAlgebraFactoryLike.sol";
 import {IFutarchyConditionalRouter} from "../interfaces/IFutarchyConditionalRouter.sol";
 import {IPoolStabilityGuard} from "../interfaces/IPoolStabilityGuard.sol";
 import {
@@ -63,7 +62,6 @@ contract V4FutarchyLiquidityManagerFactory {
     }
 
     IUniswapV3NonfungiblePositionManager public immutable SPOT_POSITION_MANAGER;
-    IAlgebraFactoryLike public immutable PROPOSAL_AMM_FACTORY;
     IV4PoolManagerMinimal public immutable V4_POOL_MANAGER;
     bytes32 public immutable V4_POOL_MANAGER_CODEHASH;
     IFutarchyConditionalRouter public immutable CONDITIONAL_ROUTER;
@@ -102,7 +100,6 @@ contract V4FutarchyLiquidityManagerFactory {
 
     constructor(
         IUniswapV3NonfungiblePositionManager spotPositionManager,
-        IAlgebraFactoryLike proposalAmmFactory,
         IV4PoolManagerMinimal v4PoolManager,
         bytes32 v4PoolManagerCodehash,
         IFutarchyConditionalRouter conditionalRouter,
@@ -117,13 +114,12 @@ contract V4FutarchyLiquidityManagerFactory {
         bytes32 managerCreationCodeHash
     ) {
         if (
-            address(spotPositionManager) == address(0) || address(proposalAmmFactory) == address(0)
-                || address(v4PoolManager) == address(0) || address(conditionalRouter) == address(0)
+            address(spotPositionManager) == address(0) || address(v4PoolManager) == address(0)
+                || address(conditionalRouter) == address(0)
                 || address(poolStabilityGuard) == address(0) || address(wrappedNative) == address(0)
         ) revert ZeroAddress();
         if (
             address(spotPositionManager).code.length == 0
-                || address(proposalAmmFactory).code.length == 0
                 || address(v4PoolManager).codehash != v4PoolManagerCodehash
                 || address(conditionalRouter).code.length == 0
                 || address(poolStabilityGuard).code.length == 0
@@ -146,7 +142,6 @@ contract V4FutarchyLiquidityManagerFactory {
         ) revert ZeroCreationCodeHash();
 
         SPOT_POSITION_MANAGER = spotPositionManager;
-        PROPOSAL_AMM_FACTORY = proposalAmmFactory;
         V4_POOL_MANAGER = v4PoolManager;
         V4_POOL_MANAGER_CODEHASH = v4PoolManagerCodehash;
         CONDITIONAL_ROUTER = conditionalRouter;
@@ -186,16 +181,6 @@ contract V4FutarchyLiquidityManagerFactory {
             _deployCreate2(codes.initializationGate, gateArgs, effectiveSalt);
         if (deployed.initializationGate != predictedGate) revert DeploymentFailed();
 
-        deployed.proposalSource = _deploy(
-            codes.proposalSource,
-            abi.encode(
-                params.owner,
-                params.proposalManager,
-                params.officialProposer,
-                PROPOSAL_AMM_FACTORY,
-                params.proposalValidationConfigData
-            )
-        );
         deployed.spotAdapter = _deploy(
             codes.spotAdapter, abi.encode(SPOT_POSITION_MANAGER, SPOT_TICK_LOWER, SPOT_TICK_UPPER)
         );
@@ -205,6 +190,16 @@ contract V4FutarchyLiquidityManagerFactory {
                 V4_POOL_MANAGER,
                 V4_POOL_MANAGER_CODEHASH,
                 V4InitializationGate(deployed.initializationGate)
+            )
+        );
+        deployed.proposalSource = _deploy(
+            codes.proposalSource,
+            abi.encode(
+                params.owner,
+                params.proposalManager,
+                params.officialProposer,
+                deployed.conditionalAdapter,
+                params.proposalValidationConfigData
             )
         );
         deployed.manager = _deploy(codes.manager, _managerConstructorArgs(params, deployed));

@@ -18,8 +18,8 @@ a mutable burn cooldown violate the production threat model. See
 FAO production targets Ethereum mainnet. The selected successor uses the official Uniswap v4
 PoolManager plus an initialization-only hook and a direct manager-bound conditional adapter. The
 caller-bound CREATE2 factory now deploys and irreversibly binds that bundle atomically. The
-repository remains unfundable until a full-lifecycle mainnet fork, final deployment manifest, and
-external review are complete.
+repository remains unfundable until the final dependency manifest and exact production-config
+rehearsal, plus external and legal review, are complete.
 
 ## Layout
 
@@ -79,6 +79,13 @@ Run its direct add, donation-fee collection, and proportional-removal lifecycle:
 ```sh
 RUN_MAINNET_FORK_TESTS=true \
   forge test --match-contract V4ConditionalLiquidityAdapterMainnetForkTest
+```
+
+Run the factory-deployed source/CTF/two-pool activation and settlement lifecycle:
+
+```sh
+RUN_MAINNET_FORK_TESTS=true \
+  forge test --match-contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest
 ```
 
 Generate a deployment from explicit JSON config:

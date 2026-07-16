@@ -33,9 +33,10 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   source/CTF/two-pool manager lifecycle remains outside the implemented v4 surface.
 - `V4FutarchyLiquidityManagerFactory`: permissionless atomic v4 bundle deployer. It hash-pins all
   five child creation codes, deploys the initialization gate at a caller-bound mined CREATE2
-  address, deploys the source/adapters/manager, and completes all irreversible bindings before
-  returning. Final-address deployment configuration and the full mainnet lifecycle remain outside
-  the implemented surface.
+  address, deploys the source/adapters/manager, wires the source's pool lookup directly to the v4
+  conditional adapter, and completes all irreversible bindings before returning. Final-address
+  deployment configuration and production dependency selection remain outside the implemented
+  surface.
 
 ## External Dependencies
 

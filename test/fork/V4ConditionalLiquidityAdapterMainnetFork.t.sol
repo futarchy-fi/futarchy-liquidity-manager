@@ -60,8 +60,7 @@ contract V4ConditionalLiquidityAdapterMainnetForkTest is Test {
 
     function testFork_realPoolManagerAddsCollectsAndProportionallyRemoves() public {
         if (!vm.envOr("RUN_MAINNET_FORK_TESTS", false)) return;
-        string memory rpcUrl =
-            vm.envOr("MAINNET_RPC_URL", string("https://ethereum-rpc.publicnode.com"));
+        string memory rpcUrl = vm.envOr("MAINNET_RPC_URL", string("https://rpc.mevblocker.io"));
         vm.createSelectFork(rpcUrl, FORK_BLOCK);
         assertEq(POOL_MANAGER.codehash, POOL_MANAGER_CODEHASH);
 

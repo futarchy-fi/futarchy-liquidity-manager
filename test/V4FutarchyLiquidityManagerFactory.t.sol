@@ -21,7 +21,6 @@ import {
 } from "../src/interfaces/IUniswapV3NonfungiblePositionManager.sol";
 import {UniV3PoolStabilityGuard} from "../src/oracles/UniV3PoolStabilityGuard.sol";
 import {FutarchyOfficialProposalSource} from "../src/sources/FutarchyOfficialProposalSource.sol";
-import {MockAlgebraFactoryLike} from "./mocks/MockAlgebraFactoryLike.sol";
 import {MockConditionalRouter} from "./mocks/MockConditionalRouter.sol";
 import {MockMintableERC20} from "./mocks/MockMintableERC20.sol";
 import {MockUniswapV3FactoryLike} from "./mocks/MockUniswapV3FactoryLike.sol";
@@ -52,7 +51,6 @@ contract V4FutarchyLiquidityManagerFactoryTest is Test {
 
     MockMintableERC20 private company;
     MockWrappedNative private wrappedNative;
-    MockAlgebraFactoryLike private proposalAmmFactory;
     MockUniswapV3NonfungiblePositionManager private spotPositionManager;
     MockConditionalRouter private conditionalRouter;
     UniV3PoolStabilityGuard private stabilityGuard;
@@ -62,7 +60,6 @@ contract V4FutarchyLiquidityManagerFactoryTest is Test {
     function setUp() public {
         company = new MockMintableERC20("Company", "COMP");
         wrappedNative = new MockWrappedNative();
-        proposalAmmFactory = new MockAlgebraFactoryLike();
         spotPositionManager = new MockUniswapV3NonfungiblePositionManager();
         conditionalRouter = new MockConditionalRouter();
         conditionalRouter.setConditionalTokens(address(0xC0DE));
@@ -221,6 +218,7 @@ contract V4FutarchyLiquidityManagerFactoryTest is Test {
             FutarchyOfficialProposalSource(deployed.proposalSource);
         assertEq(source.owner(), OWNER);
         assertEq(source.LIFECYCLE_COORDINATOR(), address(this));
+        assertEq(address(source.ALGEBRA_FACTORY()), deployed.conditionalAdapter);
         assertEq(source.activationTarget(), deployed.manager);
 
         FutarchyLiquidityManager manager = FutarchyLiquidityManager(payable(deployed.manager));
@@ -299,7 +297,6 @@ contract V4FutarchyLiquidityManagerFactoryTest is Test {
     ) private returns (V4FutarchyLiquidityManagerFactory) {
         return new V4FutarchyLiquidityManagerFactory(
             IUniswapV3NonfungiblePositionManager(address(spotPositionManager)),
-            proposalAmmFactory,
             IV4PoolManagerMinimal(address(v4PoolManager)),
             poolManagerCodehash,
             IFutarchyConditionalRouter(address(conditionalRouter)),
