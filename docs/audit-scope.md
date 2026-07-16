@@ -200,6 +200,11 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   have no owner or runtime setters.
 - The official proposal source owner or proposal manager is trusted to configure validation
   correctly before setting a production official proposal.
+- The immutable lifecycle coordinator is the sole authority that can set and atomically activate
+  an official proposal. The proposal contract ABI does not expose creator identity, so the
+  `creator` argument is integration attribution, not independent source-side authentication. The
+  coordinator must derive proposal address and id from its reviewed canonical factory or pipeline;
+  direct owner, EOA, and mutable proposal-manager admission is forbidden and regression-tested.
 - If manual settlement is used, the owner or proposal manager is trusted for settlement timing. For
   bounded liveness, prefer a settlement oracle or `DeadlineBoundedRealityProxy` path.
 - `BOOTSTRAP_RECIPIENT` should be controlled by the organization integration, normally a Safe or

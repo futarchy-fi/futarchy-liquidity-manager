@@ -362,6 +362,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | --- | --- |
 | Arbitrary CTF event or proposal log | Ignored; only the bound source callback can activate. |
 | Activation target captures any field differently from the source-validated snapshot | The entire source write and target activation revert. |
+| Mutable proposal manager forges `creator` metadata to admit a look-alike market | The activation setter rejects the owner, EOAs, and the replaceable proposal-manager role; only the immutable code-bearing lifecycle coordinator can perform the atomic write. Because the proposal ABI has no creator getter, `creator` is coordinator attribution rather than a separate authentication factor, and the reviewed coordinator must derive proposal identity from its canonical factory or pipeline. |
 | Existing or attacker-created conditional pool | Activation reverts with no persistent spot-liquidity movement. |
 | First conditional adapter add reverts after both CTF splits | Activation reverts and restores the source write, both splits, spot position, pool lookup, and wrapper custody. |
 | Adapter returns a pool other than its canonical pair lookup | Activation reverts and restores the source write, CTF splits, spot position, and created pool. |

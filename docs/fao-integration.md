@@ -22,7 +22,9 @@ FAO-side code or operations should:
   bound;
 - assign a proposal manager for proposal-source operations when ownership should remain separate
   from day-to-day metadata updates;
-- set only proposals whose creator equals the configured `officialProposer`;
+- make the immutable lifecycle coordinator derive proposal id and address from the canonical FAO
+  factory or evaluation pipeline. The proposal ABI has no creator getter, so the source's stored
+  `creator` is integration attribution rather than independent authentication;
 - generate operation batches from explicit JSON and audit calldata before execution.
 
 ## Minimal Bootstrap Flow

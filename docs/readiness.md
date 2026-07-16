@@ -28,6 +28,14 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   injects a first-add failure into a second policy-valid proposal, proves the empty registry,
   surviving spot slice, idle base custody, and fresh pool lookups all restore, and completes the
   identical second activation.
+- The earlier merged-branch finding that a mutable proposal manager could forge the stored
+  `creator` is closed at this branch's authority boundary: direct owner, EOA, and replacement
+  proposal-manager calls to `setOfficialProposal` all revert, while the one immutable code-bearing
+  lifecycle coordinator can complete the atomic write
+  (`test_only_immutable_coordinator_can_attest_official_creator`). The proposal ABI exposes no
+  creator getter, so the stored `creator` remains coordinator-supplied attribution rather than a
+  second on-chain authentication factor; production review must verify that the coordinator derives
+  proposal identity from its canonical factory or pipeline.
 - Manager construction rejects an identical company/collateral ERC-20; direct and permissionless
   factory tests prove the invalid two-bucket configuration cannot persist.
 - Manager and factory construction reject code-less token, router, adapter, guard, and AMM

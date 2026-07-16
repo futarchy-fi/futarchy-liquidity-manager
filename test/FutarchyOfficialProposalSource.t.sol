@@ -391,7 +391,7 @@ contract FutarchyOfficialProposalSourceTest is Test {
         source.setProposalValidationConfig(_nonRealityValidationConfig());
     }
 
-    function test_official_setter_requires_immutable_lifecycle_coordinator() public {
+    function test_only_immutable_coordinator_can_attest_official_creator() public {
         MockFutarchyProposalLike proposal = _proposal();
 
         vm.expectRevert(FutarchyOfficialProposalSource.OnlyLifecycleCoordinator.selector);
@@ -404,7 +404,7 @@ contract FutarchyOfficialProposalSourceTest is Test {
         source.setProposalManager(newProposalManager);
         vm.prank(newProposalManager);
         vm.expectRevert(FutarchyOfficialProposalSource.OnlyLifecycleCoordinator.selector);
-        source.setOfficialProposal(1, address(proposal), officialProposer);
+        source.setOfficialProposal(1, address(proposal), address(0xBAD));
 
         _setOfficialProposal(1, address(proposal), officialProposer);
         assertEq(source.LIFECYCLE_COORDINATOR(), address(coordinator));

@@ -130,7 +130,9 @@ Do not render or sign a production batch until one reviewed manifest revision fi
 - company token and collateral token addresses, decimals, code hashes, issuer/upgrade powers, and
   evidence that fee, rebase, pause, blacklist, or proxy-admin behavior cannot break funded exits;
 - the exact v3 spot tick range, initial price, existing-pool rejection behavior, and token ordering;
-- owner Safe, lifecycle coordinator, bootstrap recipient, official proposer, and emergency process;
+- owner Safe, bootstrap recipient, official proposer, and emergency process; plus the lifecycle
+  coordinator's exact runtime hash, upgrade/admin surface, and proof that it derives every proposal
+  id and address from the canonical factory or evaluation pipeline rather than caller input;
 - proposal validation stack, Reality/CTF identifiers and bounds, and final router configuration;
 - raw bundle salt, effective creator-bound salt, and predicted addresses for all five children;
 - factory address and runtime hash, final confirmation of the candidate creation hashes above,

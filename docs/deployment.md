@@ -65,7 +65,9 @@ Required organization-specific fields:
   the integration contract or Safe that initially funds liquidity.
 - `companyToken`: the token paired against the configured collateral token. It must differ from
   `wrappedNative`; validation's expected proposal/collateral tokens must equal this pair exactly.
-- `officialProposer`: the only proposal creator whose official proposal can trigger migration.
+- `officialProposer`: creator attribution that the immutable lifecycle coordinator must supply for
+  an official proposal. The proposal ABI has no creator getter, so this field is not an independent
+  source-side authentication factor; review the coordinator's canonical factory/pipeline lookup.
 - `lpTokenName` and `lpTokenSymbol`: ERC20 metadata for FLM shares.
 
 Every configured token and protocol dependency used by the manager or factory must already contain
