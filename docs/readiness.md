@@ -69,8 +69,9 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   and bounds a live-fee partial removal at 150,000 gas (116,245 measured). Both the public-vault and
   direct Algebra fixtures prove zero-liquidity collection materializes real fees without changing
   position liquidity and that an immediately following removal reports no residual fees. The real
-  public-vault manager path also preserves its spot NFT identity through a depositor's partial exit
-  and clears the ID only when the final bootstrap holder redeems. The
+  Swapr NFT add also proves exact caller balance deltas, zero adapter residue, and zero residual
+  position-manager allowances. The public-vault manager path preserves its spot NFT identity
+  through a depositor's partial exit and clears the ID only when the final bootstrap holder redeems. The
   real Uniswap V3 fixture exercises adapter-owned fresh pool creation, initialization, and first-NFT
   mint; proves the same zero-liquidity, fee-drain, and position-identity properties; and rejects
   reuse of the initialized pool after final removal. The deterministic V3 suite also rejects an

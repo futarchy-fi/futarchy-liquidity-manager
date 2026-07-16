@@ -204,6 +204,8 @@ This manager-only call must:
 - create and initialize the pool at `sqrtPriceX96`;
 - mint the first position with each unused amount no greater than 50 basis points of that supplied
   amount, using the same two-sided rule currently enforced by `MAX_SYNC_LEFTOVER_BPS`;
+- require the exact supplied-token balance delta, reconcile reported use plus refund to that input,
+  and clear any downstream token allowance before returning;
 - refund unused assets only to the manager; and
 - return and verify that the created position and pool match the requested pair and fixed range.
 

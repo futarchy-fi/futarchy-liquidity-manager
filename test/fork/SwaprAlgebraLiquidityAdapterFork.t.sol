@@ -83,6 +83,12 @@ contract SwaprAlgebraLiquidityAdapterForkTest is Test {
         assertGt(liquidityMinted, 0);
         assertGt(amount0Used, 0);
         assertGt(amount1Used, 0);
+        assertEq(IERC20(GNOSIS_GNO).balanceOf(address(this)), gnoBefore - amount0Used);
+        assertEq(IERC20(GNOSIS_WXDAI).balanceOf(address(this)), wxdaiBefore - amount1Used);
+        assertEq(IERC20(GNOSIS_GNO).balanceOf(address(adapter)), 0);
+        assertEq(IERC20(GNOSIS_WXDAI).balanceOf(address(adapter)), 0);
+        assertEq(IERC20(GNOSIS_GNO).allowance(address(adapter), SWAPR_POSITION_MANAGER), 0);
+        assertEq(IERC20(GNOSIS_WXDAI).allowance(address(adapter), SWAPR_POSITION_MANAGER), 0);
 
         uint256 tokenId = adapter.getPositionTokenId(GNOSIS_GNO, GNOSIS_WXDAI);
         assertGt(tokenId, 0);

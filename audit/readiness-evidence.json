@@ -34,7 +34,7 @@
       "status": "ready-to-audit",
       "evidence": [
         {
-          "description": "Swapr Algebra NFPM smoke test proves real zero-liquidity fee materialization preserves position liquidity and NFT identity, drains fees before principal removal, proves the public-vault manager preserves its spot NFT across a partial exit and clears it on the final exit, and covers full-unwind spot and source-activated fresh-pool conditional public-vault gas checks.",
+          "description": "Swapr Algebra NFPM smoke test proves exact add-time caller balance deltas, zero adapter residue, zero residual position-manager allowances, real zero-liquidity fee materialization preserving position liquidity and NFT identity, and fee drainage before principal removal; it also proves the public-vault manager preserves its spot NFT across a partial exit and clears it on the final exit, and covers full-unwind spot and source-activated fresh-pool conditional public-vault gas checks.",
           "path": "test/fork/SwaprAlgebraLiquidityAdapterFork.t.sol"
         },
         {

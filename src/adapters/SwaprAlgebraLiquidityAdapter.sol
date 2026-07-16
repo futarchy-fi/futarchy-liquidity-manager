@@ -177,8 +177,8 @@ contract SwaprAlgebraLiquidityAdapter is IFutarchyLiquidityAdapter {
     {
         bytes32 key = _pairKey(token0, token1);
         AddParams memory params = _decodeAddParams(data);
-        _pullAndApprove(token0, amount0Desired, msg.sender);
-        _pullAndApprove(token1, amount1Desired, msg.sender);
+        uint256 balance0Before = _pullExactAndApprove(token0, amount0Desired);
+        uint256 balance1Before = _pullExactAndApprove(token1, amount1Desired);
 
         uint256 tokenId = positionTokenId[key];
         if (tokenId == 0) {
@@ -199,8 +199,8 @@ contract SwaprAlgebraLiquidityAdapter is IFutarchyLiquidityAdapter {
             emit LiquidityIncreased(key, tokenId, liquidityMinted);
         }
 
-        _refundIfAny(token0, amount0Desired, amount0Used, msg.sender);
-        _refundIfAny(token1, amount1Desired, amount1Used, msg.sender);
+        _refundAndClear(token0, balance0Before, amount0Desired, amount0Used);
+        _refundAndClear(token1, balance1Before, amount1Desired, amount1Used);
     }
 
     /// @notice Collects fees, then removes exactly the requested share of the stored position.
@@ -277,14 +277,6 @@ contract SwaprAlgebraLiquidityAdapter is IFutarchyLiquidityAdapter {
             return params;
         }
         params = abi.decode(data, (AddParams));
-    }
-
-    function _pullAndApprove(address token, uint256 amount, address from) internal {
-        if (amount == 0) return;
-        IERC20(token).safeTransferFrom(from, address(this), amount);
-        // OpenZeppelin v4 compatibility: no IERC20.forceApprove
-        IERC20(token).safeApprove(address(POSITION_MANAGER), 0);
-        IERC20(token).safeApprove(address(POSITION_MANAGER), amount);
     }
 
     function _pullExactAndApprove(address token, uint256 amount)
@@ -377,16 +369,6 @@ contract SwaprAlgebraLiquidityAdapter is IFutarchyLiquidityAdapter {
             });
         (liquidityAdded, amount0Used, amount1Used) =
             POSITION_MANAGER.increaseLiquidity(increaseParams);
-    }
-
-    function _refundIfAny(
-        address token,
-        uint256 amountCollected,
-        uint256 amountUsed,
-        address recipient
-    ) internal {
-        if (amountCollected <= amountUsed) return;
-        IERC20(token).safeTransfer(recipient, amountCollected - amountUsed);
     }
 
     function _refundAndClear(

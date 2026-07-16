@@ -109,7 +109,9 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   received. It classifies the entire exact delta from a zero-liquidity call as fees and the exact
   delta from the immediately following nonzero call as principal, so it does not trust the
   adapter's returned field labels. Adapter zero-liquidity semantics, custody, and protocol
-  interactions still require adapter review.
+  interactions still require adapter review. NFT-adapter adds independently enforce exact input
+  balance deltas, reconcile reported use to refunds, restore pre-call token custody, and clear
+  downstream position-manager allowances.
 - Deposits require exact ERC20 balance deltas; fee-on-transfer assets are rejected. Rebasing assets
   are not a supported company-token or collateral configuration.
 - Native collateral is wrapped during payable deposits. The manager rejects direct native

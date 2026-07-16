@@ -52,6 +52,11 @@ proportional contributions, rounded down; the accepted asset amounts are rounded
 is refunded or left unpulled. A redemption receives the same fraction of each consolidated asset,
 with the final redeemer receiving all rounding dust.
 
+The NFT adapters enforce the same custody envelope on both existing-position and fresh-position
+adds: each input pull must match the adapter balance delta exactly, reported use plus refund must
+equal that input, adapter token balances must return to their pre-call values, and downstream
+position-manager allowances must be zero before the call returns.
+
 Redemption does not consolidate or restore survivor positions. It snapshots the six possible idle
 balances, removes only the caller's floor-rounded share of each active position, adds proportional
 fees, and leaves every remainder share-owned. Every adapter removal receipt must exactly match the
