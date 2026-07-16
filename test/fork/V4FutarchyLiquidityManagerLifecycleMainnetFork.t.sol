@@ -79,6 +79,14 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         0x4d7b8525cd5d14343fa67a732fba5b24cddba11620ca88392f4ec6c52f91fd69;
 
     function testFork_factoryBundleCompletesRealCtfTwoPoolLifecycle() public {
+        _runLifecycle(true);
+    }
+
+    function testFork_singleLegDonationPaysZeroWhenThatLegLoses() public {
+        _runLifecycle(false);
+    }
+
+    function _runLifecycle(bool yesWins) private {
         if (!vm.envOr("RUN_MAINNET_FORK_TESTS", false)) return;
         vm.createSelectFork(
             vm.envOr("MAINNET_RPC_URL", string("https://rpc.mevblocker.io")), FORK_BLOCK
@@ -344,9 +352,11 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         } else {
             donor.donate(yesPoolKey, 0, DONATION);
         }
+        assertEq(IERC20(yesCompany).balanceOf(address(donor)), 0);
+        assertEq(IERC20(noCompany).balanceOf(address(this)), DONATION);
 
         uint256[] memory payouts = new uint256[](2);
-        payouts[0] = 1;
+        payouts[yesWins ? 0 : 1] = 1;
         ctf.reportPayouts(questionId, payouts);
         source.clearOfficialProposal();
         assertEq(
@@ -368,7 +378,7 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         assertEq(collateral.balanceOf(partialHolder), partialCollateralOut);
         assertApproxEqAbs(
             company.balanceOf(address(this)) + company.balanceOf(partialHolder),
-            AMOUNT + (3 * DONATION),
+            AMOUNT + ((yesWins ? 3 : 2) * DONATION),
             5
         );
         assertApproxEqAbs(
@@ -378,6 +388,7 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         );
         assertEq(company.balanceOf(address(manager)), 0);
         assertEq(collateral.balanceOf(address(manager)), 0);
+        assertEq(IERC20(noCompany).balanceOf(address(this)), DONATION);
     }
 
     function _creationCodes()

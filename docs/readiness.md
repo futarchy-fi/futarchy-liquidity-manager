@@ -125,9 +125,10 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   identity survives; spot, YES, and NO liquidity decrease by their exact floor-rounded shares;
   canonical CTF merges complete sets and the redeemer receives no outcome residue. A second
   complete-set donation plus a YES-company-only donation after that exit leave the exited balances
-  fixed and belong entirely to the survivor. The final holder drains all positions and manager
-  balances; combined v3/v4 recovery is 103 company versus 102 collateral within five wei, matching
-  the deliberately asymmetric original plus donated inventory.
+  fixed and belong entirely to the survivor. Both settlement outcomes pass. A winning donated leg
+  yields LP recovery of 103 company versus 102 collateral within five wei; a losing donated leg
+  leaves LP recovery at 102 versus 102 and its untouched NO-company counterpart outside the
+  manager, so no losing fee is converted into base value.
 - The pinned block's actual gas limit is 60,000,000. Charging 21,000 base gas plus the worst-case
   16 gas for every calldata byte yields less than 12,360,000 gas for the atomic bundle transaction,
   2,343,088 gas for source/CTF/two-pool activation, and 1,460,754 gas for donated-fee partial

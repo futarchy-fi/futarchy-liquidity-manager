@@ -37,8 +37,10 @@ the later TWAP correctly reverts `OLD`.
 
 The same fixture donates complete sets across both live v4 pools before a one-third exit, then adds
 another complete set and a YES-company-only donation after it. The exited balances remain fixed;
-final recovery is 103 company versus 102 collateral within five wei, so asymmetric live fees are
-credited only to then-current shares without fabricating the undonated asset.
+both resolutions run against the live stack. A winning donated leg produces LP recovery of 103
+company versus 102 collateral within five wei; a losing donated leg leaves LP recovery at 102
+versus 102 and its untouched NO-company counterpart outside the manager. Asymmetric live fees are
+therefore credited only to then-current shares and only at their realized payout.
 
 At this block the actual gas limit is `60,000,000`. Conservative transaction estimates add `21,000`
 base gas and charge all calldata bytes at the nonzero rate of 16 gas: the atomic bundle is below
