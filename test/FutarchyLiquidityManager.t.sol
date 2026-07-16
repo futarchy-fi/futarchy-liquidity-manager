@@ -527,11 +527,20 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(incumbentCollateral, 100 ether);
     }
 
-    function test_late_resolved_outcome_donation_is_recovered_before_next_activation() public {
+    function test_partial_redeem_and_late_donation_preserve_next_activation() public {
         _bootstrap();
         _activateProposal(true);
+
+        vm.prank(bootstrapRecipient);
+        manager.redeem(10 ether, bootstrapRecipient, false);
+        assertEq(manager.totalSupply(), 90 ether);
+        assertEq(manager.spotLiquidity(), 18 ether);
+        assertEq(manager.conditionalYesLiquidity(), 72 ether);
+        assertEq(manager.conditionalNoLiquidity(), 72 ether);
+
         router.setPayouts(1, 1, 0);
         manager.sync();
+        assertEq(manager.spotLiquidity(), 18 ether);
 
         yesCompany.mint(address(manager), 7 ether);
         company.mint(address(router), 7 ether);
@@ -582,7 +591,10 @@ contract FutarchyLiquidityManagerTest is Test {
         assertTrue(manager.inConditionalMode());
         assertEq(manager.activeProposal(), address(nextProposal));
         assertEq(yesCompany.balanceOf(address(manager)), 0);
-        assertEq(company.balanceOf(address(manager)), 87 ether);
+        assertEq(manager.spotLiquidity(), 3.6 ether);
+        assertEq(manager.conditionalYesLiquidity(), 14.4 ether);
+        assertEq(manager.conditionalNoLiquidity(), 14.4 ether);
+        assertEq(company.balanceOf(address(manager)), 79 ether);
 
         router.setPayouts(1, 0, 1);
         manager.sync();
@@ -593,7 +605,7 @@ contract FutarchyLiquidityManagerTest is Test {
 
         assertEq(uint256(action), uint256(FutarchyLiquidityManager.SyncAction.None));
         assertEq(nextNoCompany.balanceOf(address(manager)), 0);
-        assertEq(company.balanceOf(address(manager)), 107 ether);
+        assertEq(company.balanceOf(address(manager)), 97.4 ether);
     }
 
     function test_settlement_losing_underconsumption_rolls_back_positions_and_binding() public {
