@@ -79,7 +79,9 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
 - Stateful fee and donation sequences cannot dilute an existing holder: every successful deposit
   and redemption must preserve or increase each remaining liquidity and six-token balance claim
   per share. All issued test assets remain in modeled manager, adapter, router, or holder custody,
-  and zero share supply leaves no balance under manager or adapter control.
+  and zero share supply leaves no balance under manager or adapter control. The same randomized
+  campaign arms, disarms, and executes emergency mode while retaining settlement and redemption,
+  and requires executed emergency mode to leave no position liquidity.
 - The manager persists the verified settlement winner with the last captured wrappers. Any later
   donation in that resolved snapshot is converted before a spot-mode sync, deposit, redemption, or
   activation, so it is priced for current shares and cannot be orphaned by pointer replacement.

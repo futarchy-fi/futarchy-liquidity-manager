@@ -38,6 +38,9 @@ contract FutarchyLiquidityManagerHandler is Test {
     uint256 public successfulRedemptions;
     uint256 public feeAccruals;
     uint256 public donations;
+    uint256 public emergencyArms;
+    uint256 public emergencyDisarms;
+    uint256 public emergencyExecutions;
     bool public winnerIsYes = true;
 
     constructor(
@@ -159,6 +162,11 @@ contract FutarchyLiquidityManagerHandler is Test {
 
     function accrueFees(uint8 pairSeed, uint96 amount0Seed, uint96 amount1Seed) external {
         if (manager.totalSupply() == 0) return;
+        if (
+            manager.inConditionalMode() && manager.conditionalYesLiquidity() == 0
+                && manager.conditionalNoLiquidity() == 0
+        ) return;
+        if (!manager.inConditionalMode() && manager.spotLiquidity() == 0) return;
         uint256 pair = uint256(pairSeed) % (manager.inConditionalMode() ? 3 : 1);
         (
             MockFutarchyLiquidityAdapter adapter,
@@ -206,7 +214,6 @@ contract FutarchyLiquidityManagerHandler is Test {
     }
 
     function settleAndReturnToSpot(bool _winnerIsYes) external {
-        if (manager.emergencyExitArmedAt() != 0 || manager.emergencyExitExecuted()) return;
         if (!manager.inConditionalMode()) return;
 
         winnerIsYes = _winnerIsYes;
@@ -230,6 +237,29 @@ contract FutarchyLiquidityManagerHandler is Test {
         try manager.sync() {
             settlements++;
         } catch {}
+    }
+
+    function armEmergencyExit() external {
+        if (manager.emergencyExitArmedAt() != 0 || manager.emergencyExitExecuted()) return;
+        vm.prank(manager.owner());
+        manager.armEmergencyExit();
+        emergencyArms++;
+    }
+
+    function disarmEmergencyExit() external {
+        if (manager.emergencyExitArmedAt() == 0 || manager.emergencyExitExecuted()) return;
+        vm.prank(manager.owner());
+        manager.disarmEmergencyExit();
+        emergencyDisarms++;
+    }
+
+    function executeEmergencyExit() external {
+        uint256 armedAt = manager.emergencyExitArmedAt();
+        if (armedAt == 0 || manager.emergencyExitExecuted()) return;
+        uint256 readyAt = armedAt + manager.EMERGENCY_EXIT_DELAY();
+        if (block.timestamp < readyAt) vm.warp(readyAt);
+        manager.executeEmergencyExit();
+        emergencyExecutions++;
     }
 
     function _tokens() internal view returns (MockMintableERC20[6] memory tokens) {
@@ -385,6 +415,25 @@ contract FutarchyLiquidityManagerInvariantTest is StdInvariant, Test {
         assertEq(handler.successfulRedemptions(), 2);
     }
 
+    function test_handlerReachesEmergencyExecutionAndSettlement() public {
+        handler.armEmergencyExit();
+        handler.disarmEmergencyExit();
+        assertEq(handler.emergencyArms(), 1);
+        assertEq(handler.emergencyDisarms(), 1);
+
+        handler.migrateToConditional();
+        handler.armEmergencyExit();
+        handler.executeEmergencyExit();
+        assertTrue(manager.inConditionalMode());
+        assertTrue(manager.emergencyExitExecuted());
+        assertEq(handler.emergencyExecutions(), 1);
+
+        handler.settleAndReturnToSpot(false);
+        assertEq(handler.settlements(), 1);
+        assertFalse(manager.inConditionalMode());
+        assertTrue(manager.emergencyExitExecuted());
+    }
+
     function invariant_conditionalAccountingIsConsistent() public view {
         if (manager.inConditionalMode()) {
             assertTrue(manager.activeProposal() != address(0));
@@ -433,6 +482,24 @@ contract FutarchyLiquidityManagerInvariantTest is StdInvariant, Test {
         _assertZeroManagedBalance(noCompany);
         _assertZeroManagedBalance(yesCurrency);
         _assertZeroManagedBalance(noCurrency);
+    }
+
+    function invariant_emergencyExecutionLeavesNoPositionLiquidity() public view {
+        if (!manager.emergencyExitExecuted()) return;
+        assertEq(manager.spotLiquidity(), 0);
+        assertEq(manager.conditionalYesLiquidity(), 0);
+        assertEq(manager.conditionalNoLiquidity(), 0);
+        assertEq(
+            spotAdapter.liquidityByPair(keccak256(abi.encode(manager.TOKEN0(), manager.TOKEN1()))),
+            0
+        );
+        assertEq(
+            conditionalAdapter.liquidityByPair(_pairKey(address(yesCompany), address(yesCurrency))),
+            0
+        );
+        assertEq(
+            conditionalAdapter.liquidityByPair(_pairKey(address(noCompany), address(noCurrency))), 0
+        );
     }
 
     function _assertKnownCustody(IERC20 token) internal view {

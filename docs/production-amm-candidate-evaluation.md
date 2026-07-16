@@ -129,9 +129,10 @@ with its own Foundry configuration and Solidity 0.8.26:
   redemption costs 1,460,745 gas, and the asymmetric in-kind case costs 1,487,553 gas by that upper
   bound. Each is asserted below half the actual block limit, leaving more than 30,000,000 gas of
   explicit headroom.
-- the documented deep invariant command passes at commit `7b1ff9d`: four manager invariants each
-  execute 128,000 calls and two UniV3 invariants each execute 131,072 calls, all with zero reverts.
-  This is current prototype evidence and must be repeated for the final configured candidate.
+- the expanded deep invariant command passes with five manager invariants executing 128,000 calls
+  each across deposit, activation, fee, donation, redemption, settlement, and emergency actions;
+  two UniV3 invariants execute 131,072 calls each. All complete with zero reverts. This is current
+  prototype evidence and must be repeated for the final configured candidate.
 
 These fixtures validate the singleton and full outer-transaction architecture, but not the final
 token pair, deployment addresses, exact calldata, or Safe batch. The pinned dependency evidence

@@ -140,7 +140,7 @@
           "path": "test/AlgebraPoolStabilityGuard.t.sol"
         },
         {
-          "description": "The initialized invariant harness interleaves deposits, activation, fees, donations, redemptions, and CTF settlement; every successful deposit and redemption checks survivor-favoring liquidity and six-token balance ratios, while global invariants enforce conditional binding, adapter-liquidity consistency, known custody of all six issued tokens, and zero managed residue at zero share supply.",
+          "description": "The initialized invariant harness interleaves deposits, activation, fees, donations, redemptions, CTF settlement, and emergency arm, disarm, and permissionless execution; settlement remains available during emergency mode, every successful deposit and redemption checks survivor-favoring liquidity and six-token balance ratios, and global invariants enforce conditional binding, adapter-liquidity consistency, known custody of all six issued tokens, zero managed residue at zero share supply, and zero position liquidity after emergency execution.",
           "path": "test/invariant/FutarchyLiquidityManagerInvariant.t.sol"
         },
         {

@@ -73,10 +73,12 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   after a conditional exit only to the remaining shares; and proves a failure for one underlying
   does not prevent the other underlying from merging. It settles after randomized one-to-four
   partial exits and gives final rounding residue to the last holder. The stateful manager invariant
-  campaign also interleaves
-  deposits, activation, fees, donations, redemptions, and settlement; every successful deposit and
-  redemption checks survivor-favoring liquidity and six-token balance ratios, all six tokens remain
-  in known custody, and zero share supply leaves no managed asset balance.
+  campaign also interleaves deposits, activation, fees, donations, redemptions, settlement, and
+  emergency arm, disarm, and permissionless execution. Settlement remains in the action set while
+  emergency mode is armed or executed; every successful deposit and redemption checks
+  survivor-favoring liquidity and six-token balance ratios, all six tokens remain in known custody,
+  zero share supply leaves no managed asset balance, and executed emergency mode leaves no
+  position liquidity.
 - Independent executable rounding properties prove that floor-rounded share minting plus
   ceil-rounded accepted deposits cannot dilute either base asset, while floor-rounded liquidity,
   idle, and fee payouts cannot reduce the corresponding survivor claim per share.
@@ -145,19 +147,21 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   2,343,088 gas for source/CTF/two-pool activation, 1,460,745 gas for symmetric donated-fee partial
   redemption, and 1,487,553 gas for asymmetric in-kind redemption. The fork asserts each remains
   below half a block, leaving more than 30,000,000 gas of explicit headroom.
-- At commit `7b1ff9d`, the prescribed deep invariant command passes with zero reverts: each of four
-  manager accounting/custody invariants runs 256 times at depth 500 (128,000 calls each), while the
-  two UniV3 invariants retain their stricter inline 256-by-512 configuration (131,072 calls each).
-  The final candidate must re-run this gate after its exact configuration is fixed.
-- The current 237-test instrumented suite also passes Foundry's coverage profile with `--ir-minimum`
+- The expanded prescribed deep invariant command passes with zero reverts: each of five manager
+  accounting, custody, and emergency invariants runs 256 times at depth 500 (128,000 calls each)
+  across nine randomized actions, while the two UniV3 invariants retain their stricter inline
+  256-by-512 configuration (131,072 calls each). The final candidate must re-run this gate after
+  its exact configuration is fixed.
+- The current 239-test instrumented suite also passes Foundry's coverage profile with `--ir-minimum`
   after excluding the production-profile-only artifact-hash assertion (coverage deliberately
   recompiles different bytecode). This flag is required because unoptimized instrumentation
-  exceeds Solidity's stack limit. The manager reports 92.50%
-  line, 90.91% statement, 68.63% branch, and 98.61% function coverage. Production compilation
+  exceeds Solidity's stack limit. The manager reports 93.06%
+  line, 91.20% statement, 67.65% branch, and 98.61% function coverage. Production compilation
   independently confirms a 24,171-byte manager runtime, 405 bytes below EIP-170.
-- The current 238-test normal suite adds artifact-drift, permissionless interleaving, code-less
-  PoolManager, and immutable spot-tick-policy checks; the interleaving test proves all five
-  precomputed CREATE2 addresses survive an unrelated bundle deployment.
+- The current 240-test normal suite includes direct emergency-handler reachability and a fifth
+  invariant that requires executed emergency mode to leave every manager position at zero
+  liquidity. Artifact drift, permissionless bundle interleaving, code-less PoolManager, and
+  immutable spot-tick-policy checks remain green.
 - The current compiler profile and bare creation-code hashes for the v4 factory and all five
   children are pinned in `production-mainnet-dependency-manifest.md`; an executable drift test
   requires an explicit manifest update whenever any artifact changes.
