@@ -89,7 +89,8 @@
       "evidence": [
         {
           "description": "Core manager tests cover constructor rejection of an identical company/collateral token and code-less dependencies, independent rejection of every outcome-to-outcome and outcome-to-base alias before spot movement, every independent base/YES/NO token-ordering parity, proportional principal/fee/idle accounting with adversarial receipt-label misclassification, exact two-phase adapter-removal deltas with spot and conditional overreport rollback, divergent YES/NO liquidity and post-swap principal composition, sequential six-token conservation and nondecreasing survivor value per share, rejection of a nonfinal all-zero liquidity plan without burning the dust holder's shares followed by successful redemption after aggregation, complete rollback and exact-retry success when any of four in-kind wrapper transfers fails after merge fallback, including restoration of preceding wrapper payments, complete rollback and identical native-retry success when company-token payout, wrapped-collateral payout, or post-unwrap native delivery fails after removal, share burn, and complete-set merging, including rollback of preceding payouts and WETH withdrawal, rejection of nested redemption from a gas-forwarded native recipient callback while the outer exact exit succeeds, exact settlement after randomized one-to-four partial exits, donation-resistant deposit pricing, spot and conditional six-token post-exit fee/donation ownership, resolved-wrapper donation recovery before spot redemption, deposit pricing, and later activation, rejection of direct native transfers outside that accounting model while wrapper unwrapping remains live, second-pool activation rollback, per-underlying conditional merge isolation with approval-failure, partial-consumption, and underpayment fallback, exact-delta merge and winner underconsumption/underpayment, late second-underlying rollback of prior recovery, losing-wrapper settlement rollback including after zero-supply final redemption, owner-authorized delayed permissionless non-custodial emergency exit, and permissionless settlement while emergency mode is armed or executed.",
-          "path": "test/FutarchyLiquidityManager.t.sol"
+          "path": "test/FutarchyLiquidityManager.t.sol",
+          "symbol": "testFuzz_conditional_sequential_redemptions_conserve_every_token"
         },
         {
           "description": "A fourth captured-wrapper transfer fault after the final unresolved share burn restores every earlier wrapper payment and manager balance before an identical exact sweep retry.",
@@ -98,7 +99,8 @@
         },
         {
           "description": "Adapter-safety tests require exact recipient deltas for ERC20 payouts, including rollback without a share burn when a company token enables a recipient fee only after bootstrap and successful identical retry after the fee is disabled.",
-          "path": "test/FutarchyLiquidityManagerAdapterSafety.t.sol"
+          "path": "test/FutarchyLiquidityManagerAdapterSafety.t.sol",
+          "symbol": "test_redemption_rejects_late_transfer_fee_without_burning_shares"
         },
         {
           "description": "Factory tests prove constructor rejection of code-less shared dependencies and that identical or code-less company-token manager wiring rolls back the permissionless bundle.",
@@ -131,7 +133,8 @@
         },
         {
           "description": "The real source-manager-router binding test proves already-resolved-condition, first-conditional-add, canonical fresh-pool identity, first- and second-CTF-split, second-fresh-position, and external post-activation resolver-binding rollback across coordinator state, registry, spot position, manager binding, CTF collateral, wrapper total supply and custody, base custody, router allowances, and fresh pools; and exact-replay or second-live-proposal rejection without changing active positions or binding.",
-          "path": "test/FutarchyProposalBinding.t.sol"
+          "path": "test/FutarchyProposalBinding.t.sol",
+          "symbol": "test_atomic_activation_uses_captured_source_snapshot"
         },
         {
           "description": "Adapter over-pull safety test.",
@@ -155,11 +158,18 @@
         },
         {
           "description": "The initialized invariant harness interleaves deposits, activation, fees, donations, redemptions, CTF settlement, and emergency arm, disarm, and permissionless execution; settlement remains available during emergency mode, every successful deposit and redemption checks survivor-favoring liquidity and six-token balance ratios, and global invariants enforce conditional binding, adapter-liquidity consistency, known custody of all six issued tokens, zero managed residue at zero share supply, and zero position liquidity after emergency execution.",
-          "path": "test/invariant/FutarchyLiquidityManagerInvariant.t.sol"
+          "path": "test/invariant/FutarchyLiquidityManagerInvariant.t.sol",
+          "symbol": "invariant_conditionalAccountingIsConsistent"
         },
         {
           "description": "Independent integer properties prove that deposit floor/ceiling rounding cannot dilute either base asset and that partial liquidity, idle, and fee floor rounding favors survivors.",
-          "path": "test/VaultShareRoundingMath.t.sol"
+          "path": "test/VaultShareRoundingMath.t.sol",
+          "symbol": "testFuzz_depositRoundingCannotDiluteEitherAsset"
+        },
+        {
+          "description": "The survivor-favoring redemption rounding property is pinned independently from the deposit property.",
+          "path": "test/VaultShareRoundingMath.t.sol",
+          "symbol": "testFuzz_partialRedemptionRoundingFavorsSurvivors"
         },
         {
           "description": "Deeper invariant pass command is documented for pre-deploy review.",
