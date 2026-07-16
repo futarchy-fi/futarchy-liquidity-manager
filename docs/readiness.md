@@ -23,7 +23,11 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   explicit external resolver-binding failure after activation restore the same envelope, including
   coordinator state, CTF collateral, wrapper total supply and custody, base custody, and manager
   router allowances. After successful activation, both an exact replay and a different proposal ID
-  revert without changing the registry, captured binding, pools, or liquidity.
+  revert without changing the registry, captured binding, pools, or liquidity. The same real
+  source-manager-router fixture then performs a proportional unresolved exit and settlement,
+  injects a first-add failure into a second policy-valid proposal, proves the empty registry,
+  surviving spot slice, idle base custody, and fresh pool lookups all restore, and completes the
+  identical second activation.
 - Manager construction rejects an identical company/collateral ERC-20; direct and permissionless
   factory tests prove the invalid two-bucket configuration cannot persist.
 - Manager and factory construction reject code-less token, router, adapter, guard, and AMM
@@ -236,7 +240,7 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 | Both canonical mainnet CTF splits | `testFork_firstRealCtfSplitFailureRollsBackAndRetrySucceeds` and `testFork_secondRealCtfSplitFailureRollsBackAndRetrySucceeds` fault each deployed CTF call, including after the first underlying completed, compare base/CTF custody and allowances, then retry successfully. |
 | CTF receives less collateral than the wrappers minted | `test_split_rejects_late_ctf_transfer_fee_without_minting_wrappers` enables a fee only for the CTF recipient, proves user collateral plus wrapper/underlying state restore, then retries the identical split fee-free. |
 | Deployed wrapper conversion for either underlying | `testFork_firstRealWrapperMintFailureRollsBackAndRetrySucceeds` and `testFork_secondAssetRealWrapperMintFailureRollsBackAndRetrySucceeds` fault the canonical ERC1155-to-ERC20 conversion before the first and after the complete first underlying, restore CTF/wrapper custody and supply, then retry successfully. |
-| First conditional pool/add | The same full binding test injects first-add and post-add accounting failures and proves the created pool, split wrappers, and spot removal all roll back. |
+| First conditional pool/add | The same full binding test injects first-add and post-add accounting failures and proves the created pool, split wrappers, and spot removal all roll back. It repeats the first-add fault after a proportional exit and settlement, proves the reduced spot slice and idle survivor custody restore with no registry or fresh pools, then activates the identical second proposal. |
 | Second conditional pool | `test_activation_rolls_back_first_pool_when_second_pool_is_precreated` proves the newly created first pool disappears while the adversarial second pool remains. |
 | First or second official mainnet v4 initialization/liquidity | `testFork_firstRealV4InitializeFailureRollsBackAndRetrySucceeds`, `testFork_firstRealV4LiquidityFailureRollsBackAndRetrySucceeds`, `testFork_secondRealV4InitializeFailureRollsBackAndRetrySucceeds`, and `testFork_secondRealV4LiquidityFailureRollsBackAndRetrySucceeds` fault each deployed PoolManager boundary, prove prior live-stack effects and any pool initialization disappear, and retry the identical activation. |
 | Spot or conditional adapter refund underpays the manager | `test_refundRejectsLateTransferFeeAndRollsBackPosition` and `test_prefundedRefundRejectsLateTransferFeeAndRollsBackPosition` enable fees only on the manager refund, restore the v3 NFT or fresh v4 position and all custody, then complete the identical add fee-free. |

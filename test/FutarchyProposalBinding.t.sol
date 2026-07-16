@@ -150,8 +150,12 @@ contract FutarchyProposalBindingTest is Test {
         MockMintableERC20 company = new MockMintableERC20("Company", "COMP");
         MockMintableERC20 collateral = new MockMintableERC20("Collateral", "COLL");
         bytes32 sourceQuestion = keccak256("policy-approved question");
-        (FutarchyOfficialProposalSource source, bytes32 sourceCondition) =
-            _source(coordinator, ctf, poolFactory, company, collateral, sourceQuestion);
+        (
+            FutarchyOfficialProposalSource source,
+            bytes32 sourceCondition,
+            MockRealityETH reality,
+            address oracle
+        ) = _source(coordinator, ctf, poolFactory, company, collateral, sourceQuestion);
         bytes32 executionQuestion = keccak256("caller-dependent question");
         bytes32 executionCondition = ctf.getConditionId(address(0xBAD), executionQuestion, 2);
         ctf.setOutcomeSlotCount(executionCondition, 2);
@@ -376,13 +380,73 @@ contract FutarchyProposalBindingTest is Test {
             assertEq(conditional.addFreshCalls(), 2);
         }
 
+        manager.redeem(10 ether, address(this), false);
+        assertEq(manager.totalSupply(), 90 ether);
+        assertEq(manager.spotLiquidity(), 18 ether);
+        assertEq(manager.conditionalYesLiquidity(), 72 ether);
+        assertEq(manager.conditionalNoLiquidity(), 72 ether);
+
         source.clearOfficialProposal();
         ctf.setPayout(sourceCondition, 1, 1, 0);
         FutarchyLiquidityManager.SyncAction action = manager.sync();
         assertEq(uint256(action), uint256(FutarchyLiquidityManager.SyncAction.MigratedBackToSpot));
         assertFalse(manager.inConditionalMode());
-        assertEq(company.balanceOf(address(manager)), 80 ether);
-        assertEq(collateral.balanceOf(address(manager)), 80 ether);
+        assertEq(company.balanceOf(address(manager)), 72 ether);
+        assertEq(collateral.balanceOf(address(manager)), 72 ether);
+
+        bytes32 nextQuestion = keccak256("second policy-approved question");
+        bytes32 nextCondition = ctf.getConditionId(oracle, nextQuestion, 2);
+        ctf.setOutcomeSlotCount(nextCondition, 2);
+        reality.setQuestion(
+            nextQuestion,
+            bytes32(uint256(2)),
+            address(0xA11B),
+            uint32(block.timestamp + 1 hours),
+            uint32(1 days),
+            1 ether
+        );
+        address[4] memory nextWrappers;
+        nextWrappers[0] = _wrapper(ctf, wrapperFactory, address(company), nextCondition, 1);
+        nextWrappers[1] = _wrapper(ctf, wrapperFactory, address(company), nextCondition, 2);
+        nextWrappers[2] = _wrapper(ctf, wrapperFactory, address(collateral), nextCondition, 1);
+        nextWrappers[3] = _wrapper(ctf, wrapperFactory, address(collateral), nextCondition, 2);
+        CallerDependentProposal nextProposal = new CallerDependentProposal(
+            address(source),
+            address(company),
+            address(collateral),
+            nextQuestion,
+            nextQuestion,
+            nextCondition,
+            nextCondition,
+            nextWrappers,
+            nextWrappers
+        );
+
+        conditional.setAddReverts(true);
+        vm.expectRevert();
+        coordinator.setOfficial(source, 2, address(nextProposal), address(this));
+        conditional.setAddReverts(false);
+
+        assertFalse(source.currentOfficialProposal().exists);
+        assertFalse(manager.inConditionalMode());
+        assertEq(manager.spotLiquidity(), 18 ether);
+        assertEq(company.balanceOf(address(manager)), 72 ether);
+        assertEq(collateral.balanceOf(address(manager)), 72 ether);
+        assertEq(poolFactory.poolByPair(nextWrappers[0], nextWrappers[2]), address(0));
+        assertEq(poolFactory.poolByPair(nextWrappers[1], nextWrappers[3]), address(0));
+
+        coordinator.setOfficial(source, 2, address(nextProposal), address(this));
+
+        FutarchyOfficialProposalSource.OfficialProposal memory nextOfficial =
+            source.currentOfficialProposal();
+        assertEq(nextOfficial.id, 2);
+        assertEq(nextOfficial.proposal, address(nextProposal));
+        assertTrue(nextOfficial.exists);
+        assertTrue(manager.inConditionalMode());
+        assertEq(manager.activeConditionId(), nextCondition);
+        assertEq(manager.spotLiquidity(), 3.6 ether);
+        assertEq(manager.conditionalYesLiquidity(), 14.4 ether);
+        assertEq(manager.conditionalNoLiquidity(), 14.4 ether);
     }
 
     function _source(
@@ -392,9 +456,17 @@ contract FutarchyProposalBindingTest is Test {
         MockMintableERC20 company,
         MockMintableERC20 collateral,
         bytes32 question
-    ) private returns (FutarchyOfficialProposalSource source, bytes32 condition) {
-        MockRealityETH reality = new MockRealityETH();
-        address oracle = address(
+    )
+        private
+        returns (
+            FutarchyOfficialProposalSource source,
+            bytes32 condition,
+            MockRealityETH reality,
+            address oracle
+        )
+    {
+        reality = new MockRealityETH();
+        oracle = address(
             new DeadlineBoundedRealityProxy(
                 IConditionalTokensCore(address(ctf)), IRealityETHCore(address(reality)), 1 days
             )
