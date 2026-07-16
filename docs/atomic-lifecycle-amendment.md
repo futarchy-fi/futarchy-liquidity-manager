@@ -372,6 +372,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | Adapter preserves receipt totals but swaps principal/fee field labels | The manager ignores labels and classifies exact deltas by the zero-liquidity and nonzero phases. |
 | Adapter's zero-liquidity call removes principal or leaves realized fees owed | The adapter violates the audited phase contract; deterministic and real-fork fixtures must prove unchanged liquidity and an immediately fee-free principal phase for the pinned bytecode. |
 | A caller initializes a predictable v4 conditional pool before activation | The initialization-only hook rejects every origin except its irreversibly bound adapter; a failed first position reverts that initialization in the same transaction. |
+| Canonical CTF split or either official-PoolManager initialization reverts during activation | The complete source write, spot removal, prior CTF/wrapper work, and any earlier v4 initialization revert together. Pinned-mainnet fault runs compare the registry, spot NFT/liquidity, base balances, wrapper supply/custody, and both conditional positions, then prove the identical activation succeeds after the fault is cleared. |
 | Another wallet front-runs the published bundle salt | The factory hashes the creating wallet with its raw salt, then deploys every child with CREATE2 using domain-separated derivatives. The other caller derives a different bundle and cannot consume any intended address. |
 | An unrelated permissionless bundle advances the factory nonce after Safe review | No child address depends on the factory nonce. Exact prediction survives arbitrary intervening bundle deployments. |
 | A third party uses the same v4 pool, ticks, and salt | PoolManager position identity also includes `msg.sender`; the third party creates a separate position and cannot change the adapter-owned liquidity. |
@@ -419,7 +420,10 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 - cover fresh create-initialize-mint against real Algebra and Uniswap V3 deployments; and
 - on the pinned official Ethereum v4 PoolManager, prove outsider initialization rejection,
   adapter-only initialization plus first liquidity, donation-fee realization, partial removal, and
-  final removal.
+  final removal; and
+- on the full pinned mainnet stack, inject canonical CTF split, first-v4-initialize, and
+  second-v4-initialize failures, compare the outer rollback envelope, then retry the identical
+  activation successfully.
 
 ### Proportional redemption
 

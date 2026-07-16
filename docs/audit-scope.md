@@ -43,7 +43,10 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   exact prediction view remains stable across unrelated permissionless deployments. It wires the
   source's pool lookup directly to the v4 conditional adapter and completes all irreversible
   bindings before returning. Final-address deployment configuration and production dependency
-  selection remain outside the implemented surface.
+  selection remain outside the implemented surface. The full-stack fork also faults the canonical
+  CTF split and each official-PoolManager initialization boundary independently, verifies the
+  complete source/spot/wrapper/conditional rollback envelope, and proves an identical retry
+  succeeds.
 
 ## External Dependencies
 

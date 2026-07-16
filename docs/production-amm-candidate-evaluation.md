@@ -111,6 +111,10 @@ with its own Foundry configuration and Solidity 0.8.26:
   Wrapped1155 factory. Combined v3/v4 rounding leaves at most two wei per base asset; only the spot
   tokens remain deterministic stand-ins. The production v3 guard passes after the fixture raises
   observation cardinality before the first mint and waits its full 30-minute history window.
+- three fault variants of that full fixture revert the canonical CTF split, the first official-v4
+  initialization, and the exact second official-v4 initialization. Each restores the empty source
+  registry, original spot NFT/liquidity and base balances, zero wrapper supply/custody, and absent
+  conditional positions. After clearing the fault, the identical proposal activates successfully.
 - both live v4 pools receive a one-complete-set donation before a one-third holder exits the
   unresolved spot, YES, and NO positions. The zero-liquidity fee phase pays that holder its exact
   pro-rata original inventory plus donated fees within four wei; the spot NFT identity survives and
@@ -137,8 +141,8 @@ with its own Foundry configuration and Solidity 0.8.26:
 These fixtures validate the singleton and full outer-transaction architecture, but not the final
 token pair, deployment addresses, exact calldata, or Safe batch. The pinned dependency evidence
 and unresolved fields are recorded in `production-mainnet-dependency-manifest.md`. Deterministic
-tests remain the exhaustive failure-path rollback evidence until the exact production dependency
-fixture is selected.
+tests remain the exhaustive failure-path matrix until the exact production dependency fixture is
+selected; the pinned live stack now directly covers its CTF and both v4 initialization boundaries.
 
 The fee design follows the upstream
 [`modifyLiquidity` contract](https://github.com/Uniswap/v4-core/blob/46c6834698c48bc4a463a86d8420f4eb1d7f3b75/src/interfaces/IPoolManager.sol),

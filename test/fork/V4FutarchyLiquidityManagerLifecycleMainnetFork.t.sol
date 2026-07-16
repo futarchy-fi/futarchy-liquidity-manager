@@ -52,6 +52,13 @@ interface IMainnetUniV3Pool {
 }
 
 contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
+    enum ActivationFault {
+        None,
+        CtfSplit,
+        FirstV4Initialize,
+        SecondV4Initialize
+    }
+
     uint256 private constant FORK_BLOCK = 25_542_490;
     uint256 private constant FORK_BLOCK_GAS_LIMIT = 60_000_000;
     uint256 private constant MAX_CONSERVATIVE_TRANSACTION_GAS = FORK_BLOCK_GAS_LIMIT / 2;
@@ -79,18 +86,32 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         0x4d7b8525cd5d14343fa67a732fba5b24cddba11620ca88392f4ec6c52f91fd69;
 
     function testFork_factoryBundleCompletesRealCtfTwoPoolLifecycle() public {
-        _runLifecycle(true, false);
+        _runLifecycle(true, false, ActivationFault.None);
     }
 
     function testFork_singleLegDonationPaysZeroWhenThatLegLoses() public {
-        _runLifecycle(false, false);
+        _runLifecycle(false, false, ActivationFault.None);
     }
 
     function testFork_partialExitReturnsAsymmetricFeeInKind() public {
-        _runLifecycle(true, true);
+        _runLifecycle(true, true, ActivationFault.None);
     }
 
-    function _runLifecycle(bool yesWins, bool singleLegBeforeExit) private {
+    function testFork_realCtfSplitFailureRollsBackAndRetrySucceeds() public {
+        _runLifecycle(true, false, ActivationFault.CtfSplit);
+    }
+
+    function testFork_firstRealV4InitializeFailureRollsBackAndRetrySucceeds() public {
+        _runLifecycle(true, false, ActivationFault.FirstV4Initialize);
+    }
+
+    function testFork_secondRealV4InitializeFailureRollsBackAndRetrySucceeds() public {
+        _runLifecycle(true, false, ActivationFault.SecondV4Initialize);
+    }
+
+    function _runLifecycle(bool yesWins, bool singleLegBeforeExit, ActivationFault activationFault)
+        private
+    {
         if (!vm.envOr("RUN_MAINNET_FORK_TESTS", false)) return;
         vm.createSelectFork(
             vm.envOr("MAINNET_RPC_URL", string("https://rpc.mevblocker.io")), FORK_BLOCK
@@ -223,6 +244,20 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         company.approve(address(manager), AMOUNT);
         collateral.approve(address(manager), AMOUNT);
         manager.initializeFromBootstrap(AMOUNT, AMOUNT);
+        if (activationFault != ActivationFault.None) {
+            _exerciseActivationRollback(
+                activationFault,
+                source,
+                proposal,
+                manager,
+                spot,
+                conditional,
+                company,
+                collateral,
+                [yesCompany, noCompany, yesCollateral, noCollateral]
+            );
+            return;
+        }
         bytes memory activationCalldata = abi.encodeWithSelector(
             FutarchyOfficialProposalSource.setOfficialProposal.selector,
             uint256(1),
@@ -438,6 +473,73 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
                 5
             );
         }
+    }
+
+    function _exerciseActivationRollback(
+        ActivationFault fault,
+        FutarchyOfficialProposalSource source,
+        MockFutarchyProposalLike proposal,
+        FutarchyLiquidityManager manager,
+        UniswapV3LiquidityAdapter spot,
+        V4ConditionalLiquidityAdapter conditional,
+        MockMintableERC20 company,
+        MockMintableERC20 collateral,
+        address[4] memory outcomes
+    ) private {
+        uint128 spotLiquidityBefore = manager.spotLiquidity();
+        uint256 spotTokenIdBefore = spot.getPositionTokenId(address(company), address(collateral));
+        uint256 companyBalanceBefore = company.balanceOf(address(manager));
+        uint256 collateralBalanceBefore = collateral.balanceOf(address(manager));
+        uint256[4] memory suppliesBefore;
+        for (uint256 i; i < outcomes.length; ++i) {
+            suppliesBefore[i] = IERC20(outcomes[i]).totalSupply();
+        }
+
+        bytes memory faultData = abi.encodeWithSignature("Error(string)", "injected fault");
+        if (fault == ActivationFault.CtfSplit) {
+            vm.mockCallRevert(
+                CONDITIONAL_TOKENS, IFutarchyConditionalTokens.splitPosition.selector, faultData
+            );
+        } else if (fault == ActivationFault.FirstV4Initialize) {
+            vm.mockCallRevert(POOL_MANAGER, IV4PoolManagerMinimal.initialize.selector, faultData);
+        } else {
+            vm.mockCallRevert(
+                POOL_MANAGER,
+                abi.encodeWithSelector(
+                    IV4PoolManagerMinimal.initialize.selector,
+                    _v4PoolKey(conditional, outcomes[1], outcomes[3]),
+                    uint160(1 << 96)
+                ),
+                faultData
+            );
+        }
+
+        vm.expectRevert(faultData);
+        source.setOfficialProposal(1, address(proposal), address(this));
+
+        FutarchyOfficialProposalSource.OfficialProposal memory official =
+            source.currentOfficialProposal();
+        assertFalse(official.exists);
+        assertFalse(manager.inConditionalMode());
+        assertEq(manager.spotLiquidity(), spotLiquidityBefore);
+        assertEq(spot.getPositionTokenId(address(company), address(collateral)), spotTokenIdBefore);
+        assertEq(company.balanceOf(address(manager)), companyBalanceBefore);
+        assertEq(collateral.balanceOf(address(manager)), collateralBalanceBefore);
+        assertEq(conditional.positionLiquidity(_pairKey(outcomes[0], outcomes[2])), 0);
+        assertEq(conditional.positionLiquidity(_pairKey(outcomes[1], outcomes[3])), 0);
+        assertEq(conditional.poolByPair(outcomes[0], outcomes[2]), address(0));
+        assertEq(conditional.poolByPair(outcomes[1], outcomes[3]), address(0));
+        for (uint256 i; i < outcomes.length; ++i) {
+            assertEq(IERC20(outcomes[i]).totalSupply(), suppliesBefore[i]);
+            assertEq(IERC20(outcomes[i]).balanceOf(address(manager)), 0);
+            assertEq(IERC20(outcomes[i]).balanceOf(address(conditional)), 0);
+        }
+
+        vm.clearMockedCalls();
+        source.setOfficialProposal(1, address(proposal), address(this));
+        assertTrue(manager.inConditionalMode());
+        assertGt(conditional.positionLiquidity(_pairKey(outcomes[0], outcomes[2])), 0);
+        assertGt(conditional.positionLiquidity(_pairKey(outcomes[1], outcomes[3])), 0);
     }
 
     function _donateSingleYesCompany(
