@@ -84,7 +84,7 @@
           "path": "test/FutarchyOfficialProposalSource.t.sol"
         },
         {
-          "description": "Deadline proxy tests prove the post-deadline fallback relays an already-finalized Reality result and forces NO only while Reality remains unresolved.",
+          "description": "Deadline proxy tests prove the post-deadline fallback relays an already-finalized Reality result, fails closed when a normal finalized result is unavailable, and forces NO for unresolved state including Reality's canonical unresolved-answer sentinel.",
           "path": "test/DeadlineBoundedRealityProxy.t.sol"
         },
         {

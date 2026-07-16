@@ -26,7 +26,9 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   mutable proposal state.
 - The deadline proxy relays a finalized Reality result even when its fallback path is called after
   the deadline; it forces NO only while Reality remains unresolved, so delayed CTF relay cannot
-  overturn a finalized YES answer.
+  overturn a finalized YES answer. If Reality metadata says a normal answer is already final but
+  the result read fails, the fallback now fails closed instead of misclassifying the read failure
+  as an unresolved question; the canonical unresolved-answer sentinel retains the bounded NO path.
 - Settlement requires exact collateral and outcome-token balance deltas from complete-set merges,
   winner redemption, and losing-token consumption. A merge or winner redemption that pays exact
   collateral while consuming too few wrappers rolls back positions and binding, as do router

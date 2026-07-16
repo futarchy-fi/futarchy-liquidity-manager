@@ -12,6 +12,8 @@ import {
 /// @dev New FLM-grade factories can use this contract as their CTF oracle. It cannot retrofit
 /// deadlines onto conditions created with a different oracle address.
 contract DeadlineBoundedRealityProxy {
+    bytes32 private constant UNRESOLVED_ANSWER = bytes32(type(uint256).max - 1);
+
     IConditionalTokensCore public immutable conditionalTokens;
     IRealityETHCore public immutable realitio;
     uint256 public immutable maxQuestionDuration;
@@ -22,6 +24,7 @@ contract DeadlineBoundedRealityProxy {
     error MissingOpeningTime();
     error DeadlineNotReached(uint256 deadline);
     error ConditionAlreadyResolved();
+    error FinalizedResultUnavailable();
 
     /// @param _conditionalTokens Conditional Tokens Framework contract that receives payouts.
     /// @param _realitio Reality.eth contract that stores questions and final answers.
@@ -62,7 +65,13 @@ contract DeadlineBoundedRealityProxy {
             revert ConditionAlreadyResolved();
         }
 
-        (bytes32 contentHash,, uint32 openingTs,,,,,,,,) = realitio.questions(questionId);
+        (
+            bytes32 contentHash,,
+            uint32 openingTs,,
+            uint32 finalizeTs,
+            bool isPendingArbitration,,
+            bytes32 bestAnswer,,,
+        ) = realitio.questions(questionId);
         if (contentHash == bytes32(0)) revert MissingRealityQuestion();
         if (openingTs == 0) revert MissingOpeningTime();
 
@@ -72,6 +81,10 @@ contract DeadlineBoundedRealityProxy {
         try realitio.resultForOnceSettled(questionId) returns (bytes32 answer) {
             _reportPayouts(questionId, uint256(answer) == 0);
         } catch {
+            if (
+                finalizeTs != 0 && finalizeTs <= block.timestamp && !isPendingArbitration
+                    && bestAnswer != UNRESOLVED_ANSWER
+            ) revert FinalizedResultUnavailable();
             _reportPayouts(questionId, false);
         }
     }

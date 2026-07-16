@@ -55,6 +55,10 @@ contract MockRealityETH {
         _questions[questionId].isPendingArbitration = pendingArbitration;
     }
 
+    function setBestAnswer(bytes32 questionId, bytes32 answer) external {
+        _questions[questionId].bestAnswer = answer;
+    }
+
     function resultForOnceSettled(bytes32 questionId) external view returns (bytes32) {
         require(_settled[questionId], "not settled");
         return _results[questionId];

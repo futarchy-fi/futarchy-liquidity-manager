@@ -366,6 +366,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | Direct native transfer bypasses the six-token accounting model | Reverts; native currency is accepted only from the immutable wrapped-collateral contract during an unwrap. Unavoidable forced native currency is not a supported deposit or donation and remains sweepable only after share supply reaches zero. |
 | Owner becomes unavailable after arming emergency exit | After the fixed delay, any account can unwind positions into the manager; settlement of the captured CTF condition and share redemption remain permissionless, and no caller receives shareholder assets. |
 | Deadline caller races an already-finalized YES result before it reaches CTF | The deadline path relays the finalized Reality result; it reports forced NO only while Reality remains unresolved. |
+| Finalized Reality metadata exists but the normal result read fails | The deadline path fails closed without reporting payouts; only pending or canonically unresolved state may use forced NO. |
 | Bad fair-join quote or changed spot state | Entire join reverts or leaves inventory idle; no donation. |
 | Conditional pool precreation used only for griefing | Funds remain in spot; liveness may fail but custody does not. |
 
