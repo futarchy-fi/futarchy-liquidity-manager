@@ -92,6 +92,11 @@
           "path": "test/FutarchyLiquidityManager.t.sol"
         },
         {
+          "description": "A fourth captured-wrapper transfer fault after the final unresolved share burn restores every earlier wrapper payment and manager balance before an identical exact sweep retry.",
+          "path": "test/FutarchyLiquidityManager.t.sol",
+          "symbol": "test_zero_supply_outcome_sweep_rolls_back_and_retries_atomically"
+        },
+        {
           "description": "Adapter-safety tests require exact recipient deltas for ERC20 payouts, including rollback without a share burn when a company token enables a recipient fee only after bootstrap and successful identical retry after the fee is disabled.",
           "path": "test/FutarchyLiquidityManagerAdapterSafety.t.sol"
         },
@@ -114,6 +119,11 @@
         {
           "description": "The official proposal source test proves that every outcome-to-outcome and outcome-to-base alias is rejected, every captured activation field must match the validated snapshot, and a corrupt capture rolls back both source and target state.",
           "path": "test/FutarchyOfficialProposalSource.t.sol"
+        },
+        {
+          "description": "The immutable coordinator authority test rejects a replacement proposal manager's forged creator attribution before any official write or activation.",
+          "path": "test/FutarchyOfficialProposalSource.t.sol",
+          "symbol": "test_only_immutable_coordinator_can_attest_official_creator"
         },
         {
           "description": "Deadline proxy tests prove the post-deadline fallback relays an already-finalized Reality result, fails closed when a normal finalized result is unavailable, and forces NO for unresolved state including a normal answer still inside its challenge window, pending arbitration, and Reality's canonical unresolved-answer sentinel.",
