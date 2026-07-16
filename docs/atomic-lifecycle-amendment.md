@@ -393,6 +393,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | Merge router is unavailable or maliciously reverts | Withdrawing outcome slice is paid in kind. The pinned-mainnet fixture faults the canonical company-side CTF merge, proves collateral still merges, then independently redeems/consumes the exact company wrappers after resolution and conserves both assets through final exit. |
 | Any in-kind outcome transfer reverts after merge fallback | The whole redemption reverts. A focused test faults all four wrapper transfers independently after spot/YES/NO removal and share burn; each restores prior wrapper payments, liquidity, counters, and six-token custody before the identical retry succeeds. |
 | A final company-token, wrapped-collateral, or post-unwrap native transfer to the recipient reverts after liquidity removal and complete-set merges | The whole redemption reverts. A focused test faults all three payout paths independently; the latter two occur after company payment and native delivery occurs after WETH withdrawal. Each proves the share burn, all three liquidity slices, removal counters, and token/native manager/adapter/router/recipient custody restore before the identical native retry succeeds. |
+| Native recipient uses forwarded payout gas to reenter redemption | The nested redemption is rejected by the reentrancy guard. A focused callback test retains shares for the recipient and proves the outer exit still completes with exact share, liquidity, company-token, and native balances. |
 | Settlement router reverts, partially consumes, or underpays | The whole settlement reverts; active positions and the captured binding remain intact. The pinned-mainnet late-fault run executes both v4 removals and company merge/winner redemption before the collateral CTF merge reverts, compares protocol custody and positions, then completes the identical settlement after the fault is cleared. |
 | Rounding across sequential redemptions | No overpayment; survivor ratio never falls; final holder receives dust. A nonfinal all-zero liquidity plan reverts without burning shares, so its holder must first combine or transfer enough shares to withdraw at least one liquidity unit. |
 | Bundle, activation, or conditional redemption approaches the Ethereum block limit | The pinned mainnet fork charges base gas plus worst-case nonzero calldata, compares each transaction to the block's actual 60,000,000 gas limit, and requires more than half a block of headroom. |
@@ -444,6 +445,8 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
   the full redemption restore before an identical retry;
 - fault each exact final ERC20 payout and post-unwrap native delivery after proportional removal
   and merging, then prove complete rollback of prior payouts and unwrap plus identical-retry success;
+- attempt a nested redemption from the native recipient callback and prove it is blocked without
+  blocking the outer exact exit;
 - on the pinned full mainnet stack, fault one canonical CTF merge, prove the other underlying still
   merges, and redeem/consume the exact in-kind slice after resolution;
 - settle correctly after one or many partial redemptions;

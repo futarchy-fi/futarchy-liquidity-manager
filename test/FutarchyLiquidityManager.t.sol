@@ -17,6 +17,31 @@ import {MockOfficialProposalSource} from "./mocks/MockOfficialProposalSource.sol
 import {MockPoolStabilityGuard} from "./mocks/MockPoolStabilityGuard.sol";
 import {MockWrappedNative} from "./mocks/MockWrappedNative.sol";
 
+contract ReenteringRedeemer {
+    FutarchyLiquidityManager public immutable manager;
+    bool public attempted;
+    bool public blocked;
+
+    constructor(FutarchyLiquidityManager manager_) {
+        manager = manager_;
+    }
+
+    function redeem(uint256 shares) external {
+        manager.redeem(shares, address(this), true);
+    }
+
+    receive() external payable {
+        attempted = true;
+        (bool success,) = address(manager)
+            .call(
+                abi.encodeWithSelector(
+                    FutarchyLiquidityManager.redeem.selector, 1, address(this), false
+                )
+            );
+        blocked = !success;
+    }
+}
+
 contract FutarchyLiquidityManagerTest is Test {
     MockMintableERC20 internal company;
     MockWrappedNative internal wrappedNative;
@@ -724,6 +749,27 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(company.balanceOf(recipient), 10 ether);
         assertEq(wrappedNative.balanceOf(recipient), 0);
         assertEq(recipient.balance, 10 ether);
+    }
+
+    function test_native_payout_blocks_reentrant_redemption_without_blocking_outer_exit() public {
+        _bootstrap();
+        _activateProposal(true);
+        ReenteringRedeemer recipient = new ReenteringRedeemer(manager);
+        vm.prank(bootstrapRecipient);
+        manager.transfer(address(recipient), 20 ether);
+
+        recipient.redeem(10 ether);
+
+        assertTrue(recipient.attempted());
+        assertTrue(recipient.blocked());
+        assertEq(manager.balanceOf(address(recipient)), 10 ether);
+        assertEq(manager.totalSupply(), 90 ether);
+        assertEq(manager.spotLiquidity(), 18 ether);
+        assertEq(manager.conditionalYesLiquidity(), 72 ether);
+        assertEq(manager.conditionalNoLiquidity(), 72 ether);
+        assertEq(company.balanceOf(address(recipient)), 10 ether);
+        assertEq(wrappedNative.balanceOf(address(recipient)), 0);
+        assertEq(address(recipient).balance, 10 ether);
     }
 
     function test_conditional_redeem_is_proportional_without_add_or_guard() public {

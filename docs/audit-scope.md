@@ -93,6 +93,8 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   failed in-kind wrapper transfer must restore all prior wrapper payments and the complete exit.
   Failure of either final ERC20 recipient transfer or post-unwrap native delivery must roll back
   the preceding removals, share burn, merges, payouts, unwrap, and custody changes atomically.
+  Forwarded native payout gas must not permit a nested lifecycle operation; rejecting reentry must
+  not block the outer exact exit.
 - Stateful fee and donation sequences cannot dilute an existing holder: every successful deposit
   and redemption must preserve or increase each remaining liquidity and six-token balance claim
   per share. All issued test assets remain in modeled manager, adapter, router, or holder custody,
