@@ -114,6 +114,10 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         _runLifecycle(true, false, ActivationFault.None, false, true);
     }
 
+    function testFork_outsiderEmergencyExitSettlesAndPreservesAllShares() public {
+        _runLifecycle(true, false, ActivationFault.None, false, false, true);
+    }
+
     function testFork_spotRemovalFailureRollsBackAndRetrySucceeds() public {
         _runLifecycle(true, false, ActivationFault.SpotRemoval);
     }
@@ -162,6 +166,24 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         ActivationFault activationFault,
         bool companyMergeFault,
         bool settlementMergeFault
+    ) private {
+        _runLifecycle(
+            yesWins,
+            singleLegBeforeExit,
+            activationFault,
+            companyMergeFault,
+            settlementMergeFault,
+            false
+        );
+    }
+
+    function _runLifecycle(
+        bool yesWins,
+        bool singleLegBeforeExit,
+        ActivationFault activationFault,
+        bool companyMergeFault,
+        bool settlementMergeFault,
+        bool emergencyLifecycle
     ) private {
         if (!vm.envOr("RUN_MAINNET_FORK_TESTS", false)) return;
         vm.createSelectFork(
@@ -359,6 +381,22 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         assertEq(IERC20(noCompany).balanceOf(address(donor)), 0);
         assertEq(IERC20(yesCollateral).balanceOf(address(donor)), 0);
         assertEq(IERC20(noCollateral).balanceOf(address(donor)), 0);
+        if (emergencyLifecycle) {
+            _exerciseEmergencyLifecycle(
+                ctf,
+                source,
+                proposal,
+                manager,
+                spot,
+                conditional,
+                company,
+                collateral,
+                questionId,
+                conditionId,
+                [yesCompany, noCompany, yesCollateral, noCollateral]
+            );
+            return;
+        }
         if (singleLegBeforeExit) {
             _donateSingleYesCompany(
                 company,
@@ -677,6 +715,85 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
                 5
             );
         }
+    }
+
+    function _exerciseEmergencyLifecycle(
+        IMainnetConditionalTokens ctf,
+        FutarchyOfficialProposalSource source,
+        MockFutarchyProposalLike proposal,
+        FutarchyLiquidityManager manager,
+        UniswapV3LiquidityAdapter spot,
+        V4ConditionalLiquidityAdapter conditional,
+        MockMintableERC20 company,
+        MockMintableERC20 collateral,
+        bytes32 questionId,
+        bytes32 conditionId,
+        address[4] memory outcomes
+    ) private {
+        address outsider = address(0xCAFE);
+        uint256 supplyBefore = manager.totalSupply();
+        uint256[6] memory outsiderBalancesBefore = [
+            company.balanceOf(outsider),
+            collateral.balanceOf(outsider),
+            IERC20(outcomes[0]).balanceOf(outsider),
+            IERC20(outcomes[1]).balanceOf(outsider),
+            IERC20(outcomes[2]).balanceOf(outsider),
+            IERC20(outcomes[3]).balanceOf(outsider)
+        ];
+
+        manager.armEmergencyExit();
+        assertFalse(manager.emergencyExitReady());
+        vm.warp(block.timestamp + manager.EMERGENCY_EXIT_DELAY());
+        assertTrue(manager.emergencyExitReady());
+        vm.prank(outsider);
+        manager.executeEmergencyExit();
+
+        assertTrue(manager.emergencyExitExecuted());
+        assertTrue(manager.inConditionalMode());
+        assertEq(manager.activeProposal(), address(proposal));
+        assertEq(manager.activeConditionId(), conditionId);
+        assertEq(manager.totalSupply(), supplyBefore);
+        assertEq(manager.balanceOf(outsider), 0);
+        assertEq(manager.spotLiquidity(), 0);
+        assertEq(manager.conditionalYesLiquidity(), 0);
+        assertEq(manager.conditionalNoLiquidity(), 0);
+        assertEq(spot.getPositionTokenId(address(company), address(collateral)), 0);
+        assertEq(conditional.positionLiquidity(_pairKey(outcomes[0], outcomes[2])), 0);
+        assertEq(conditional.positionLiquidity(_pairKey(outcomes[1], outcomes[3])), 0);
+        for (uint256 i; i < outcomes.length; ++i) {
+            assertGt(IERC20(outcomes[i]).balanceOf(address(manager)), 0);
+            assertEq(IERC20(outcomes[i]).balanceOf(outsider), outsiderBalancesBefore[i + 2]);
+        }
+        assertEq(company.balanceOf(outsider), outsiderBalancesBefore[0]);
+        assertEq(collateral.balanceOf(outsider), outsiderBalancesBefore[1]);
+
+        uint256[] memory payouts = new uint256[](2);
+        payouts[0] = 1;
+        ctf.reportPayouts(questionId, payouts);
+        source.clearOfficialProposal();
+        vm.prank(outsider);
+        assertEq(
+            uint256(manager.sync()), uint256(FutarchyLiquidityManager.SyncAction.MigratedBackToSpot)
+        );
+
+        assertFalse(manager.inConditionalMode());
+        assertEq(manager.activeProposal(), address(0));
+        assertEq(manager.activeConditionId(), bytes32(0));
+        assertEq(manager.totalSupply(), supplyBefore);
+        assertEq(manager.spotLiquidity(), 0);
+        for (uint256 i; i < outcomes.length; ++i) {
+            assertEq(IERC20(outcomes[i]).balanceOf(address(manager)), 0);
+            assertEq(IERC20(outcomes[i]).balanceOf(outsider), outsiderBalancesBefore[i + 2]);
+        }
+
+        manager.redeem(supplyBefore, address(this), false);
+        assertEq(manager.totalSupply(), 0);
+        assertApproxEqAbs(company.balanceOf(address(this)), AMOUNT + DONATION, 5);
+        assertApproxEqAbs(collateral.balanceOf(address(this)), AMOUNT + DONATION, 5);
+        assertEq(company.balanceOf(address(manager)), 0);
+        assertEq(collateral.balanceOf(address(manager)), 0);
+        assertEq(company.balanceOf(outsider), outsiderBalancesBefore[0]);
+        assertEq(collateral.balanceOf(outsider), outsiderBalancesBefore[1]);
     }
 
     function _exerciseActivationRollback(

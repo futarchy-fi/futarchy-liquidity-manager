@@ -108,7 +108,9 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
 - Emergency exit only unwinds positions into the manager. It neither burns shares nor transfers
   shareholder assets, redemption remains available while emergency mode is armed or executed, and
   anyone may execute the unwind after the owner-authorized delay. Arming or execution never blocks
-  permissionless settlement of a captured CTF condition.
+  permissionless settlement of a captured CTF condition. The pinned-mainnet lifecycle proves this
+  against donated official-v4 positions and canonical CTF even after the source registry is
+  cleared, with zero caller gain and final shareholder conservation.
 - Adapters cannot over-pull tokens from the manager.
 - Source-atomic conditional activation fails closed before persistent state changes if the shared
   spot-pool guard cannot read valid history or detects more than 50 ticks of deviation.

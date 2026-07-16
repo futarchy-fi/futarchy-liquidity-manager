@@ -155,6 +155,11 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   both v4 removals and company merge/winner recovery. The failed sync restores the captured
   binding/accounting, adapter positions, PoolManager balances, CTF collateral/underlying custody,
   wrapper supply/custody, and allowances; the identical retry and final exit then succeed.
+  A sixth run arms emergency mode with donated fees live, lets an unrelated account unwind both
+  official-v4 positions after the delay, and proves the caller receives no shares or assets. The
+  captured proposal remains intact; after canonical CTF resolution and source-registry clearing,
+  the same outsider settles permissionlessly and the shareholder recovers both base assets within
+  five wei.
 - The pinned block's actual gas limit is 60,000,000. Charging 21,000 base gas plus the worst-case
   16 gas for every calldata byte yields 12,125,922 gas for the atomic bundle transaction,
   2,343,088 gas for source/CTF/two-pool activation, 1,460,745 gas for symmetric donated-fee partial
@@ -166,13 +171,13 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   across nine randomized actions, while the two UniV3 invariants retain their stricter inline
   256-by-512 configuration (131,072 calls each). The final candidate must re-run this gate after
   its exact configuration is fixed.
-- The current 250-test instrumented suite also passes Foundry's coverage profile with `--ir-minimum`
+- The current 251-test instrumented suite also passes Foundry's coverage profile with `--ir-minimum`
   after excluding the production-profile-only artifact-hash assertion (coverage deliberately
   recompiles different bytecode). This flag is required because unoptimized instrumentation
   exceeds Solidity's stack limit. The manager reports 93.06%
   line, 91.20% statement, 67.65% branch, and 98.61% function coverage. Production compilation
   independently confirms a 24,171-byte manager runtime, 405 bytes below EIP-170.
-- The current 251-test normal suite includes direct emergency-handler reachability, nine
+- The current 252-test normal suite includes direct emergency-handler reachability, nine
   pinned-mainnet activation rollback cases, and a fifth invariant that requires executed emergency
   mode to leave every manager position at zero liquidity. Artifact drift, permissionless bundle
   interleaving, code-less PoolManager, and immutable spot-tick-policy checks remain green.

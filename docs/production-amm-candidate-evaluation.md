@@ -139,6 +139,11 @@ with its own Foundry configuration and Solidity 0.8.26:
   restores the captured manager binding/accounting, both adapter positions, PoolManager balances,
   CTF collateral and underlying custody, wrapper supply/custody, and router allowances. Clearing
   the fault lets the identical permissionless settlement and final exit succeed.
+- with donated fees live in both official-v4 positions, the owner arms emergency mode and an
+  unrelated account executes the delayed unwind. The caller receives no shares or assets, both
+  adapter positions reach zero, and the captured proposal and share supply remain intact. After
+  canonical CTF resolution and source-registry clearing, that outsider settles permissionlessly;
+  final shareholder recovery of both base assets remains within five wei.
 - at pinned block gas limit 60,000,000, conservative transaction accounting charges 21,000 base
   gas and 16 gas for every calldata byte. The atomic five-child bundle costs 12,125,922 gas,
   source/CTF/two-pool activation costs 2,343,088 gas, the symmetric donated-fee partial
