@@ -105,10 +105,20 @@ with its own Foundry configuration and Solidity 0.8.26:
   Wrapped1155 factory. Combined v3/v4 rounding leaves at most two wei per base asset; only the spot
   tokens remain deterministic stand-ins. The production v3 guard passes after the fixture raises
   observation cardinality before the first mint and waits its full 30-minute history window.
+- while the CTF condition is unresolved, a one-third holder exits across the real spot, YES, and NO
+  positions. The spot NFT identity survives, exact floor-rounded liquidity remains for survivors,
+  canonical CTF merges the withdrawing complete sets with no outcome residue, and the final holder
+  drains the remaining positions and idle assets. Aggregate recovery stays within four wei per base
+  asset of the original inventory.
+- at pinned block gas limit 60,000,000, conservative transaction accounting charges 21,000 base
+  gas and 16 gas for every calldata byte. The atomic five-child bundle costs less than 12,360,000
+  gas, source/CTF/two-pool activation costs 2,343,088 gas, and the real-stack partial redemption
+  costs 1,354,771 gas by that upper bound. Each is asserted below half the actual block limit,
+  leaving more than 30,000,000 gas of explicit headroom.
 
 These fixtures validate the singleton and full outer-transaction architecture, but not the final
-spot manager, deployment addresses, calldata, or Safe batch. The pinned dependency evidence and
-unresolved fields are recorded in `production-mainnet-dependency-manifest.md`. Deterministic
+token pair, deployment addresses, exact calldata, or Safe batch. The pinned dependency evidence
+and unresolved fields are recorded in `production-mainnet-dependency-manifest.md`. Deterministic
 tests remain the exhaustive failure-path rollback evidence until the exact production dependency
 fixture is selected.
 

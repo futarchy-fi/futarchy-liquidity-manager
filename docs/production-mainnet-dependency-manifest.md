@@ -35,6 +35,12 @@ initial observation, waits the full 30-minute window, and proves both bootstrap 
 checks. Without that second observation slot, the first mint overwrites the only observation and
 the later TWAP correctly reverts `OLD`.
 
+At this block the actual gas limit is `60,000,000`. Conservative transaction estimates add `21,000`
+base gas and charge all calldata bytes at the nonzero rate of 16 gas: the atomic bundle is below
+`12,360,000` gas, source/CTF/two-pool activation is `2,343,088` gas, and partial real-stack
+redemption is `1,354,771` gas. The fork asserts each stays below half the block limit. These are
+fixture bounds, not estimates for still-unknown final token or coordinator calldata.
+
 ## Unresolved deployment fields
 
 Do not render or sign a production batch until one reviewed manifest revision fixes and verifies:

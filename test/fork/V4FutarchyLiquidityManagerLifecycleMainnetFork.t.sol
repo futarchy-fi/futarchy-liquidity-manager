@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {
     IV4PoolManagerMinimal,
@@ -48,6 +49,8 @@ interface IMainnetUniV3Pool {
 
 contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
     uint256 private constant FORK_BLOCK = 25_542_490;
+    uint256 private constant FORK_BLOCK_GAS_LIMIT = 60_000_000;
+    uint256 private constant MAX_CONSERVATIVE_TRANSACTION_GAS = FORK_BLOCK_GAS_LIMIT / 2;
     uint256 private constant AMOUNT = 100 ether;
     uint160 private constant ALL_HOOK_MASK = (1 << 14) - 1;
     uint160 private constant BEFORE_INITIALIZE_FLAG = 1 << 13;
@@ -80,6 +83,7 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         assertEq(WRAPPED_1155_FACTORY.codehash, WRAPPED_1155_FACTORY_CODEHASH);
         assertEq(SPOT_POSITION_MANAGER.codehash, SPOT_POSITION_MANAGER_CODEHASH);
         assertEq(SPOT_FACTORY.codehash, SPOT_FACTORY_CODEHASH);
+        assertEq(block.gaslimit, FORK_BLOCK_GAS_LIMIT);
 
         IMainnetConditionalTokens ctf = IMainnetConditionalTokens(CONDITIONAL_TOKENS);
         IFutarchyWrapped1155Factory wrapperFactory =
@@ -137,25 +141,40 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
                 maxMinBond: 0
             });
         bytes32 rawSalt = _findHookSalt(factory);
+        V4FutarchyLiquidityManagerFactory.CreateParams memory createParams =
+            V4FutarchyLiquidityManagerFactory.CreateParams({
+                organization: address(0xFA0),
+                owner: address(this),
+                proposalManager: address(this),
+                bootstrapRecipient: address(this),
+                companyToken: company,
+                officialProposer: address(this),
+                lpTokenName: "Mainnet Lifecycle FLM",
+                lpTokenSymbol: "ML-FLM",
+                proposalValidationConfigData: abi.encode(validation),
+                hookSalt: rawSalt
+            });
+        V4FutarchyLiquidityManagerFactory.CreationCodes memory creationCodes = _creationCodes();
+        bytes memory factoryCalldata = abi.encodeWithSelector(
+            V4FutarchyLiquidityManagerFactory.createLiquidityManager.selector,
+            createParams,
+            creationCodes
+        );
+        uint256 gasBefore = gasleft();
         V4FutarchyLiquidityManagerFactory.DeployedContracts memory deployed =
-            factory.createLiquidityManager(
-                V4FutarchyLiquidityManagerFactory.CreateParams({
-                    organization: address(0xFA0),
-                    owner: address(this),
-                    proposalManager: address(this),
-                    bootstrapRecipient: address(this),
-                    companyToken: company,
-                    officialProposer: address(this),
-                    lpTokenName: "Mainnet Lifecycle FLM",
-                    lpTokenSymbol: "ML-FLM",
-                    proposalValidationConfigData: abi.encode(validation),
-                    hookSalt: rawSalt
-                }),
-                _creationCodes()
-            );
+            factory.createLiquidityManager(createParams, creationCodes);
+        uint256 factoryTransactionGas =
+            gasBefore - gasleft() + 21_000 + (factoryCalldata.length * 16);
+        emit log_named_uint("conservative factory transaction gas", factoryTransactionGas);
+        assertLt(
+            factoryTransactionGas,
+            MAX_CONSERVATIVE_TRANSACTION_GAS,
+            "factory transaction has less than half-block headroom"
+        );
 
         V4ConditionalLiquidityAdapter conditional =
             V4ConditionalLiquidityAdapter(deployed.conditionalAdapter);
+        UniswapV3LiquidityAdapter spot = UniswapV3LiquidityAdapter(deployed.spotAdapter);
         FutarchyOfficialProposalSource source =
             FutarchyOfficialProposalSource(deployed.proposalSource);
         FutarchyLiquidityManager manager = FutarchyLiquidityManager(payable(deployed.manager));
@@ -180,7 +199,22 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         company.approve(address(manager), AMOUNT);
         collateral.approve(address(manager), AMOUNT);
         manager.initializeFromBootstrap(AMOUNT, AMOUNT);
+        bytes memory activationCalldata = abi.encodeWithSelector(
+            FutarchyOfficialProposalSource.setOfficialProposal.selector,
+            uint256(1),
+            address(proposal),
+            address(this)
+        );
+        gasBefore = gasleft();
         source.setOfficialProposal(1, address(proposal), address(this));
+        uint256 activationTransactionGas =
+            gasBefore - gasleft() + 21_000 + (activationCalldata.length * 16);
+        emit log_named_uint("conservative activation transaction gas", activationTransactionGas);
+        assertLt(
+            activationTransactionGas,
+            MAX_CONSERVATIVE_TRANSACTION_GAS,
+            "activation transaction has less than half-block headroom"
+        );
 
         assertTrue(manager.inConditionalMode());
         assertEq(manager.activeConditionId(), conditionId);
@@ -190,6 +224,62 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         assertGt(conditional.positionLiquidity(_pairKey(noCompany, noCollateral)), 0);
         assertEq(source.officialProposalExtended().yesPool, POOL_MANAGER);
         assertEq(source.officialProposalExtended().noPool, POOL_MANAGER);
+
+        uint256 supplyBeforePartial = manager.totalSupply();
+        uint256 partialShares = supplyBeforePartial / 3;
+        address partialHolder = address(0xBEEF);
+        assertTrue(manager.transfer(partialHolder, partialShares));
+        uint256 spotTokenId = spot.getPositionTokenId(address(company), address(collateral));
+        uint128 spotLiquidityBefore = manager.spotLiquidity();
+        uint128 yesLiquidityBefore = manager.conditionalYesLiquidity();
+        uint128 noLiquidityBefore = manager.conditionalNoLiquidity();
+        bytes memory redemptionCalldata = abi.encodeWithSelector(
+            FutarchyLiquidityManager.redeem.selector, partialShares, partialHolder, false
+        );
+        vm.prank(partialHolder);
+        gasBefore = gasleft();
+        (uint256 partialCompanyOut, uint256 partialCollateralOut) =
+            manager.redeem(partialShares, partialHolder, false);
+        uint256 redemptionTransactionGas =
+            gasBefore - gasleft() + 21_000 + (redemptionCalldata.length * 16);
+        emit log_named_uint(
+            "conservative partial redemption transaction gas", redemptionTransactionGas
+        );
+        assertLt(
+            redemptionTransactionGas,
+            MAX_CONSERVATIVE_TRANSACTION_GAS,
+            "partial redemption has less than half-block headroom"
+        );
+
+        assertEq(company.balanceOf(partialHolder), partialCompanyOut);
+        assertEq(collateral.balanceOf(partialHolder), partialCollateralOut);
+        assertGt(partialCompanyOut, 0);
+        assertGt(partialCollateralOut, 0);
+        assertEq(manager.totalSupply(), supplyBeforePartial - partialShares);
+        assertEq(
+            manager.spotLiquidity(),
+            spotLiquidityBefore
+                - uint128(uint256(spotLiquidityBefore) * partialShares / supplyBeforePartial)
+        );
+        assertEq(
+            manager.conditionalYesLiquidity(),
+            yesLiquidityBefore
+                - uint128(uint256(yesLiquidityBefore) * partialShares / supplyBeforePartial)
+        );
+        assertEq(
+            manager.conditionalNoLiquidity(),
+            noLiquidityBefore
+                - uint128(uint256(noLiquidityBefore) * partialShares / supplyBeforePartial)
+        );
+        assertEq(
+            spot.getPositionTokenId(address(company), address(collateral)),
+            spotTokenId,
+            "partial redemption replaced spot NFT"
+        );
+        assertEq(IERC20(yesCompany).balanceOf(partialHolder), 0);
+        assertEq(IERC20(noCompany).balanceOf(partialHolder), 0);
+        assertEq(IERC20(yesCollateral).balanceOf(partialHolder), 0);
+        assertEq(IERC20(noCollateral).balanceOf(partialHolder), 0);
 
         uint256[] memory payouts = new uint256[](2);
         payouts[0] = 1;
@@ -204,8 +294,20 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         assertEq(manager.conditionalNoLiquidity(), 0);
         assertEq(conditional.positionLiquidity(_pairKey(yesCompany, yesCollateral)), 0);
         assertEq(conditional.positionLiquidity(_pairKey(noCompany, noCollateral)), 0);
-        assertApproxEqAbs(company.balanceOf(address(manager)), AMOUNT * 80 / 100, 2);
-        assertApproxEqAbs(collateral.balanceOf(address(manager)), AMOUNT * 80 / 100, 2);
+
+        uint256 remainingShares = manager.balanceOf(address(this));
+        manager.redeem(remainingShares, address(this), false);
+        assertEq(manager.totalSupply(), 0);
+        assertEq(manager.spotLiquidity(), 0);
+        assertEq(spot.getPositionTokenId(address(company), address(collateral)), 0);
+        assertApproxEqAbs(
+            company.balanceOf(address(this)) + company.balanceOf(partialHolder), AMOUNT, 4
+        );
+        assertApproxEqAbs(
+            collateral.balanceOf(address(this)) + collateral.balanceOf(partialHolder), AMOUNT, 4
+        );
+        assertEq(company.balanceOf(address(manager)), 0);
+        assertEq(collateral.balanceOf(address(manager)), 0);
     }
 
     function _creationCodes()

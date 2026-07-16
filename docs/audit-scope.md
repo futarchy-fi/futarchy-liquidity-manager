@@ -20,8 +20,9 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
 - `DeadlineBoundedRealityProxy`: CTF oracle proxy for new FLM-grade proposals that relays a
   finalized Reality result even on the deadline path, or forces deterministic NO after a bounded
   deadline only while Reality remains unresolved.
-- `AlgebraPoolStabilityGuard`: shared, immutable 30-minute TWAP check that rejects migration when
-  the established spot pool's current tick differs from its average by more than 50 ticks.
+- `UniV3PoolStabilityGuard`: immutable 30-minute TWAP check for the selected Ethereum spot path. A
+  pinned fork proves the configured fee/factory, required observation history, and 50-tick bound
+  against the official v3 factory. `AlgebraPoolStabilityGuard` remains legacy prototype scope.
 - `FutarchyLiquidityManagerFactory`: permissionless atomic bundle deployer pinned to immutable bare
   creation-code hashes and shared protocol dependencies.
 - `V4InitializationGate`: partial Ethereum-mainnet successor seam. It reserves pool initialization
@@ -29,8 +30,10 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   bundle factory deploys it at the mined address and binds it in the same transaction.
 - `V4ConditionalLiquidityAdapter`: manager-bound direct v4 position owner. It atomically initializes
   and adds a fresh full-range position, settles exact PoolManager deltas, separates fee pokes from
-  principal removal, and rejects dependency-codehash or fee-report drift. The full mainnet
-  source/CTF/two-pool manager lifecycle remains outside the implemented v4 surface.
+  principal removal, and rejects dependency-codehash or fee-report drift. A pinned full-mainnet
+  fixture covers the source, canonical CTF, deployed wrapper factory, both v4 positions, settlement,
+  a one-third unresolved redemption, and final-holder conservation together with the real v3 spot
+  position manager and production guard.
 - `V4FutarchyLiquidityManagerFactory`: permissionless atomic v4 bundle deployer. It hash-pins all
   five child creation codes, deploys the initialization gate at a caller-bound mined CREATE2
   address, deploys the source/adapters/manager, wires the source's pool lookup directly to the v4
@@ -46,8 +49,11 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
 - Futarchy proposal contract exposing collateral, wrapped outcomes, question id, and condition id.
 - Conditional Tokens Framework.
 - Reality.eth.
-- Algebra/Swapr pool factory.
-- Algebra pool observations with at least 30 minutes of usable spot-pool history.
+- Official Ethereum Uniswap v3 position manager/factory and a spot pool with at least 30 minutes of
+  usable observations; a fresh pool needs observation cardinality raised before its first mint.
+- Official Ethereum Uniswap v4 PoolManager and the exact-permission initialization gate.
+- Canonical CTF Wrapped1155 factory.
+- Algebra/Swapr dependencies only for historical prototype and regression coverage.
 - Liquidity adapter contracts.
 - Conditional split/merge/redeem router.
 
@@ -144,8 +150,8 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   deltas. The manager independently requires exact merge, winner-redemption, and losing-consumption
   deltas during settlement; a failed redemption-time merge falls back to transferring that exact
   outcome-token slice.
-- The immutable stability guard is shared by deployments using the same Algebra factory. Its
-  factory, 30-minute window, and 50-tick bound have no owner or runtime setters.
+- The immutable stability guard pins its v3 factory and fee. Its 30-minute window and 50-tick bound
+  have no owner or runtime setters.
 - The official proposal source owner or proposal manager is trusted to configure validation
   correctly before setting a production official proposal.
 - If manual settlement is used, the owner or proposal manager is trusted for settlement timing. For

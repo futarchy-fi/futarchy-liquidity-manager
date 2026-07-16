@@ -8,10 +8,11 @@ this adapter must not be funded.
 ## Status
 
 The proposal-source, manager, router, and accounting portions of this document describe the
-contracts at repository head. The production AMM portion remains incomplete: the current Swapr
-Algebra adapter cannot satisfy immutable removal liveness, so the repository remains a no-funds
-prototype. `production-amm-successor.md` and `production-amm-candidate-evaluation.md` define that
-remaining replacement gate.
+contracts at repository head. The immutable Uniswap v4 conditional successor is implemented and
+mainnet-fork validated; the Swapr Algebra adapter still cannot satisfy immutable removal liveness
+and must not be funded. The repository remains a no-funds prototype until the final mainnet tokens,
+configuration, deployment artifacts, and independent review satisfy
+`production-amm-successor.md` and `production-amm-candidate-evaluation.md`.
 
 The amendment has two independent safety goals:
 
@@ -375,6 +376,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | A v4 fee report is inflated or disagrees with realizable value | A zero-liquidity poke must return identical caller and fee deltas, and only the caller delta is taken. Principal removal follows an internal poke and requires its own fee report to be zero. Any mismatch reverts the unlock. |
 | The selected PoolManager runtime or hook binding changes | The adapter pins and rechecks the PoolManager code hash and the hook's PoolManager/adapter binding before every operation. The hook has no proxy, owner setter, or add/remove-liquidity permission. |
 | An arbitrary contract calls the adapter unlock callback | Only the pinned PoolManager is accepted; manager-facing add/remove entry points remain restricted to the irreversible manager binding. |
+| The first spot mint overwrites a fresh v3 pool's only oracle observation | Production setup raises observation cardinality before minting and waits the complete 30-minute window. Otherwise the immutable guard fails closed with `OLD`; activation cannot proceed on fabricated history. |
 | One redeemer manipulates or removes TWAP history | Redemption still succeeds; no guard is consulted. |
 | First partial redeemer attempts to take all NFT fees | Pre-collect/decrease/post-collect separation limits payout to its share. |
 | Fees or donations arrive after a partial redemption | Only the then-current share supply owns the new value; exited holders gain no retroactive claim. |
@@ -383,6 +385,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | Merge router is unavailable or maliciously reverts | Withdrawing outcome slice is paid in kind. |
 | Settlement router reverts, partially consumes, or underpays | The whole settlement reverts; active positions and the captured binding remain intact. |
 | Rounding across sequential redemptions | No overpayment; survivor ratio never falls; final holder receives dust. |
+| Bundle, activation, or conditional redemption approaches the Ethereum block limit | The pinned mainnet fork charges base gas plus worst-case nonzero calldata, compares each transaction to the block's actual 60,000,000 gas limit, and requires more than half a block of headroom. |
 | Direct native transfer bypasses the six-token accounting model | Reverts; native currency is accepted only from the immutable wrapped-collateral contract during an unwrap. Unavoidable forced native currency is not a supported deposit or donation and remains sweepable only after share supply reaches zero. |
 | Owner becomes unavailable after arming emergency exit | After the fixed delay, any account can unwind positions into the manager; settlement of the captured CTF condition and share redemption remain permissionless, and no caller receives shareholder assets. |
 | Deadline caller races an already-finalized YES result before it reaches CTF | The deadline path relays the finalized Reality result; it reports forced NO only while Reality remains unresolved. |
