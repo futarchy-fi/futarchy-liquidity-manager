@@ -81,10 +81,11 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   survivor-favoring liquidity and six-token balance ratios, all six tokens remain in known custody,
   zero share supply leaves no managed asset balance, and executed emergency mode leaves no
   position liquidity.
-- A final company-token payout fault after all three proportional removals and both complete-set
-  merges rolls back the share burn, manager and adapter liquidity, removal counters, and six-token
-  manager/adapter/router/recipient custody. Clearing only that fault lets the identical redemption
-  succeed.
+- Independent company-token and wrapped-collateral payout faults after all three proportional
+  removals and both complete-set merges roll back the share burn, manager and adapter liquidity,
+  removal counters, and six-token manager/adapter/router/recipient custody. The second fault also
+  rolls back the recipient's preceding company-token transfer. Clearing the faults lets the
+  identical redemption succeed.
 - Independent executable rounding properties prove that floor-rounded share minting plus
   ceil-rounded accepted deposits cannot dilute either base asset, while floor-rounded liquidity,
   idle, and fee payouts cannot reduce the corresponding survivor claim per share. A direct unit
@@ -225,7 +226,7 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 | First or second official mainnet v4 initialization/liquidity | `testFork_firstRealV4InitializeFailureRollsBackAndRetrySucceeds`, `testFork_firstRealV4LiquidityFailureRollsBackAndRetrySucceeds`, `testFork_secondRealV4InitializeFailureRollsBackAndRetrySucceeds`, and `testFork_secondRealV4LiquidityFailureRollsBackAndRetrySucceeds` fault each deployed PoolManager boundary, prove prior live-stack effects and any pool initialization disappear, and retry the identical activation. |
 | Second conditional removal during proportional redemption | `testFork_lateRemovalRollbackThenCompanyMergeFailureRemainsRedeemable` completes the proportional YES removal before faulting the NO adapter boundary, then proves LP shares, both positions, spot identity, and all six holder/manager/PoolManager balances roll back. |
 | Canonical mainnet CTF merge during redemption | The identical retry in `testFork_lateRemovalRollbackThenCompanyMergeFailureRemainsRedeemable` faults the company merge, proves collateral still merges and exact YES/NO company wrappers are paid in kind, then redeems/consumes those wrappers after resolution and conserves both assets through survivor settlement and final exit. |
-| Final recipient payout during proportional redemption | `test_final_payout_failure_rolls_back_complete_conditional_redemption` faults the exact company-token transfer after spot/YES/NO removal, share burn, and both complete-set merges; shares, liquidity, removal counters, and six-token custody restore before the identical retry succeeds. |
+| Either final recipient payout during proportional redemption | `test_each_final_payout_failure_rolls_back_complete_conditional_redemption` independently faults the exact company-token and wrapped-collateral transfers after spot/YES/NO removal, share burn, and both complete-set merges; the latter occurs after company payment, and each restores shares, liquidity, removal counters, and six-token custody before the identical retry succeeds. |
 | Late canonical mainnet CTF merge during settlement | `testFork_lateRealSettlementMergeFailureRollsBackAndRetrySucceeds` proves both v4 removals and company merge/winner redemption execute before the collateral fault, compares captured binding/accounting plus actual protocol custody and positions, then completes the identical settlement after clearing the fault. |
 | Second conditional removal during emergency unwind | `testFork_outsiderEmergencyRollbackKeepsUnresolvedRedemptionLive` executes the first official-v4 removal before faulting the second adapter boundary, proves both positions, PoolManager/manager custody, accounting, shares, and the emergency flag roll back, then completes the identical outsider retry, unresolved shareholder redemption, and source-independent survivor settlement. |
 | Official-v3 spot emergency unwind | `testFork_outsiderSpotEmergencyRollbackPreservesSharesAndAssets` faults principal removal after fee collection; `testFork_outsiderSpotEmergencyBurnRollbackPreservesSharesAndAssets` faults NFT burn after fee collection, full principal removal, and principal collection. Both prove the NFT/liquidity, manager/adapter/v3-pool/NPM balances, shares, and emergency flag restore, then let the same outsider retry with zero gain and recover both bootstrap assets within two wei. |
