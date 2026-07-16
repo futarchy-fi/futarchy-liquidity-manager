@@ -600,6 +600,37 @@ contract FutarchyOfficialProposalSourceTest is Test {
         _setOfficialProposal(13, address(proposal), officialProposer);
     }
 
+    function test_validation_rejects_every_duplicate_outcome_pair() public {
+        _enableValidation();
+        (MockFutarchyProposalLike proposal,,) = _validProposal(true, true);
+        address[4] memory outcomes = [yesComp, noComp, yesCurr, noCurr];
+
+        for (uint256 first; first < outcomes.length; first++) {
+            for (uint256 second = first + 1; second < outcomes.length; second++) {
+                proposal.setWrappedOutcome(second, outcomes[first]);
+
+                (bool valid, FutarchyOfficialProposalSource.ProposalValidationFailure failure) =
+                    source.validateProposal(address(proposal));
+                assertFalse(valid);
+                assertEq(
+                    uint256(failure),
+                    uint256(
+                        FutarchyOfficialProposalSource.ProposalValidationFailure
+                        .DuplicateOutcomeToken
+                    )
+                );
+
+                _expectValidationFailure(
+                    FutarchyOfficialProposalSource.ProposalValidationFailure.DuplicateOutcomeToken
+                );
+                _setOfficialProposal(
+                    100 + first * outcomes.length + second, address(proposal), officialProposer
+                );
+                proposal.setWrappedOutcome(second, outcomes[second]);
+            }
+        }
+    }
+
     function test_validation_rejects_wrong_ctf_oracle_condition() public {
         _enableValidation();
         (MockFutarchyProposalLike proposal, bytes32 questionId,) = _validProposal(true, true);

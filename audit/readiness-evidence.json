@@ -80,7 +80,7 @@
           "path": "test/FutarchyConditionalRouter.t.sol"
         },
         {
-          "description": "The official proposal source test proves that every captured activation field must match the validated snapshot and that a corrupt capture rolls back both source and target state.",
+          "description": "The official proposal source test proves that all six possible pairs among the four wrapped outcomes must be distinct, every captured activation field must match the validated snapshot, and a corrupt capture rolls back both source and target state.",
           "path": "test/FutarchyOfficialProposalSource.t.sol"
         },
         {

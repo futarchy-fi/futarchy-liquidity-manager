@@ -531,7 +531,11 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         ) {
             return ProposalValidationFailure.MissingOutcomeToken;
         }
-        if (p.yesCompanyToken == p.noCompanyToken || p.yesCurrencyToken == p.noCurrencyToken) {
+        if (
+            p.yesCompanyToken == p.noCompanyToken || p.yesCompanyToken == p.yesCurrencyToken
+                || p.yesCompanyToken == p.noCurrencyToken || p.noCompanyToken == p.yesCurrencyToken
+                || p.noCompanyToken == p.noCurrencyToken || p.yesCurrencyToken == p.noCurrencyToken
+        ) {
             return ProposalValidationFailure.DuplicateOutcomeToken;
         }
         return ProposalValidationFailure.None;
