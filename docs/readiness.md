@@ -128,12 +128,15 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   fixed and belong entirely to the survivor. Both settlement outcomes pass. A winning donated leg
   yields LP recovery of 103 company versus 102 collateral within five wei; a losing donated leg
   leaves LP recovery at 102 versus 102 and its untouched NO-company counterpart outside the
-  manager, so no losing fee is converted into base value.
+  manager, so no losing fee is converted into base value. A third run places the single-leg fee
+  before the unresolved exit: the redeemer receives its floor-rounded YES-company share in kind
+  within four wei, retains the same base balance through settlement, and can redeem the winning
+  wrapper independently afterward.
 - The pinned block's actual gas limit is 60,000,000. Charging 21,000 base gas plus the worst-case
   16 gas for every calldata byte yields less than 12,360,000 gas for the atomic bundle transaction,
-  2,343,088 gas for source/CTF/two-pool activation, and 1,460,754 gas for donated-fee partial
-  redemption. The fork asserts each remains below half a block, leaving more than 30,000,000 gas of
-  explicit headroom.
+  2,343,088 gas for source/CTF/two-pool activation, 1,460,745 gas for symmetric donated-fee partial
+  redemption, and 1,487,553 gas for asymmetric in-kind redemption. The fork asserts each remains
+  below half a block, leaving more than 30,000,000 gas of explicit headroom.
 
 ## Required before any funded deployment
 

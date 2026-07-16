@@ -42,12 +42,16 @@ company versus 102 collateral within five wei; a losing donated leg leaves LP re
 versus 102 and its untouched NO-company counterpart outside the manager. Asymmetric live fees are
 therefore credited only to then-current shares and only at their realized payout.
 
+A separate run moves the YES-company-only donation before the unresolved one-third exit. The
+redeemer receives its floor-rounded fee share as an unmatched wrapper within four wei, keeps the
+same base balance through settlement, and redeems the winning wrapper independently afterward.
+
 At this block the actual gas limit is `60,000,000`. Conservative transaction estimates add `21,000`
 base gas and charge all calldata bytes at the nonzero rate of 16 gas: the atomic bundle is below
 `12,360,000` gas, source/CTF/two-pool activation is `2,343,088` gas, and partial real-stack
-redemption after live v4 donations is `1,460,754` gas. The fork asserts each stays below half the
-block limit. These are fixture bounds, not estimates for still-unknown final token or coordinator
-calldata.
+redemption after symmetric live v4 donations is `1,460,745` gas; the asymmetric in-kind case is
+`1,487,553` gas. The fork asserts each stays below half the block limit. These are fixture bounds,
+not estimates for still-unknown final token or coordinator calldata.
 
 ## Unresolved deployment fields
 

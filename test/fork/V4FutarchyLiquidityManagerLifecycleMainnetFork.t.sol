@@ -79,14 +79,18 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         0x4d7b8525cd5d14343fa67a732fba5b24cddba11620ca88392f4ec6c52f91fd69;
 
     function testFork_factoryBundleCompletesRealCtfTwoPoolLifecycle() public {
-        _runLifecycle(true);
+        _runLifecycle(true, false);
     }
 
     function testFork_singleLegDonationPaysZeroWhenThatLegLoses() public {
-        _runLifecycle(false);
+        _runLifecycle(false, false);
     }
 
-    function _runLifecycle(bool yesWins) private {
+    function testFork_partialExitReturnsAsymmetricFeeInKind() public {
+        _runLifecycle(true, true);
+    }
+
+    function _runLifecycle(bool yesWins, bool singleLegBeforeExit) private {
         if (!vm.envOr("RUN_MAINNET_FORK_TESTS", false)) return;
         vm.createSelectFork(
             vm.envOr("MAINNET_RPC_URL", string("https://rpc.mevblocker.io")), FORK_BLOCK
@@ -261,6 +265,18 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         assertEq(IERC20(noCompany).balanceOf(address(donor)), 0);
         assertEq(IERC20(yesCollateral).balanceOf(address(donor)), 0);
         assertEq(IERC20(noCollateral).balanceOf(address(donor)), 0);
+        if (singleLegBeforeExit) {
+            _donateSingleYesCompany(
+                company,
+                router,
+                conditionId,
+                yesCompany,
+                noCompany,
+                conditional,
+                yesCollateral,
+                donor
+            );
+        }
 
         uint256 supplyBeforePartial = manager.totalSupply();
         uint256 partialShares = supplyBeforePartial / 3;
@@ -318,7 +334,17 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
             spotTokenId,
             "partial redemption replaced spot NFT"
         );
-        assertEq(IERC20(yesCompany).balanceOf(partialHolder), 0);
+        uint256 partialYesCompany = IERC20(yesCompany).balanceOf(partialHolder);
+        if (singleLegBeforeExit) {
+            assertApproxEqAbs(
+                partialYesCompany,
+                DONATION * partialShares / supplyBeforePartial,
+                4,
+                "asymmetric fee was not paid in kind"
+            );
+        } else {
+            assertEq(partialYesCompany, 0);
+        }
         assertEq(IERC20(noCompany).balanceOf(partialHolder), 0);
         assertEq(IERC20(yesCollateral).balanceOf(partialHolder), 0);
         assertEq(IERC20(noCollateral).balanceOf(partialHolder), 0);
@@ -342,18 +368,18 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         donor.donate(_v4PoolKey(conditional, yesCompany, yesCollateral), DONATION, DONATION);
         donor.donate(_v4PoolKey(conditional, noCompany, noCollateral), DONATION, DONATION);
 
-        company.mint(address(this), DONATION);
-        company.approve(address(router), DONATION);
-        router.splitPosition(address(company), conditionId, yesCompany, noCompany, DONATION);
-        assertTrue(IERC20(yesCompany).transfer(address(donor), DONATION));
-        V4PoolKey memory yesPoolKey = _v4PoolKey(conditional, yesCompany, yesCollateral);
-        if (yesPoolKey.currency0 == yesCompany) {
-            donor.donate(yesPoolKey, DONATION, 0);
-        } else {
-            donor.donate(yesPoolKey, 0, DONATION);
+        if (!singleLegBeforeExit) {
+            _donateSingleYesCompany(
+                company,
+                router,
+                conditionId,
+                yesCompany,
+                noCompany,
+                conditional,
+                yesCollateral,
+                donor
+            );
         }
-        assertEq(IERC20(yesCompany).balanceOf(address(donor)), 0);
-        assertEq(IERC20(noCompany).balanceOf(address(this)), DONATION);
 
         uint256[] memory payouts = new uint256[](2);
         payouts[yesWins ? 0 : 1] = 1;
@@ -377,7 +403,8 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         assertEq(company.balanceOf(partialHolder), partialCompanyOut);
         assertEq(collateral.balanceOf(partialHolder), partialCollateralOut);
         assertApproxEqAbs(
-            company.balanceOf(address(this)) + company.balanceOf(partialHolder),
+            company.balanceOf(address(this)) + company.balanceOf(partialHolder)
+                + (yesWins ? partialYesCompany : 0),
             AMOUNT + ((yesWins ? 3 : 2) * DONATION),
             5
         );
@@ -388,6 +415,45 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         );
         assertEq(company.balanceOf(address(manager)), 0);
         assertEq(collateral.balanceOf(address(manager)), 0);
+        assertEq(IERC20(noCompany).balanceOf(address(this)), DONATION);
+
+        if (singleLegBeforeExit) {
+            vm.startPrank(partialHolder);
+            IERC20(yesCompany).approve(address(router), partialYesCompany);
+            router.redeemPositions(
+                address(company), conditionId, yesCompany, noCompany, partialYesCompany
+            );
+            vm.stopPrank();
+            assertEq(IERC20(yesCompany).balanceOf(partialHolder), 0);
+            assertApproxEqAbs(
+                company.balanceOf(address(this)) + company.balanceOf(partialHolder),
+                AMOUNT + (3 * DONATION),
+                5
+            );
+        }
+    }
+
+    function _donateSingleYesCompany(
+        MockMintableERC20 company,
+        FutarchyConditionalRouter router,
+        bytes32 conditionId,
+        address yesCompany,
+        address noCompany,
+        V4ConditionalLiquidityAdapter conditional,
+        address yesCollateral,
+        MainnetV4Donor donor
+    ) private {
+        company.mint(address(this), DONATION);
+        company.approve(address(router), DONATION);
+        router.splitPosition(address(company), conditionId, yesCompany, noCompany, DONATION);
+        assertTrue(IERC20(yesCompany).transfer(address(donor), DONATION));
+        V4PoolKey memory yesPoolKey = _v4PoolKey(conditional, yesCompany, yesCollateral);
+        if (yesPoolKey.currency0 == yesCompany) {
+            donor.donate(yesPoolKey, DONATION, 0);
+        } else {
+            donor.donate(yesPoolKey, 0, DONATION);
+        }
+        assertEq(IERC20(yesCompany).balanceOf(address(donor)), 0);
         assertEq(IERC20(noCompany).balanceOf(address(this)), DONATION);
     }
 

@@ -114,12 +114,15 @@ with its own Foundry configuration and Solidity 0.8.26:
   outcomes run against the full live stack. If YES wins, LP recovery is 103 company versus 102
   collateral within five wei. If YES loses, LP recovery stays 102 versus 102 and the untouched
   NO-company counterpart remains outside the manager, proving the losing donated leg creates no
-  base payout.
+  base payout. A third run moves the YES-company-only donation before the unresolved one-third
+  exit: the redeemer receives its floor-rounded fee share in kind within four wei, its base balance
+  stays fixed through settlement, and it can redeem the winning wrapper independently afterward.
 - at pinned block gas limit 60,000,000, conservative transaction accounting charges 21,000 base
   gas and 16 gas for every calldata byte. The atomic five-child bundle costs less than 12,360,000
-  gas, source/CTF/two-pool activation costs 2,343,088 gas, and the donated-fee partial redemption
-  costs 1,460,754 gas by that upper bound. Each is asserted below half the actual block limit,
-  leaving more than 30,000,000 gas of explicit headroom.
+  gas, source/CTF/two-pool activation costs 2,343,088 gas, the symmetric donated-fee partial
+  redemption costs 1,460,745 gas, and the asymmetric in-kind case costs 1,487,553 gas by that upper
+  bound. Each is asserted below half the actual block limit, leaving more than 30,000,000 gas of
+  explicit headroom.
 
 These fixtures validate the singleton and full outer-transaction architecture, but not the final
 token pair, deployment addresses, exact calldata, or Safe batch. The pinned dependency evidence
