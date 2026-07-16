@@ -89,7 +89,9 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   proportional liquidity and fees; a partial redeemer cannot collect value belonging to survivors.
 - Deposits are accepted only in spot mode and only in the vault's existing two-asset proportion.
 - Conditional redemption touches only the withdrawing fraction. Matched complete sets are merged
-  when possible; router failure and unmatched balances fall back to in-kind outcome tokens.
+  when possible; router failure and unmatched balances fall back to in-kind outcome tokens. A
+  final recipient-transfer failure must roll back the preceding removals, share burn, merges, and
+  custody changes atomically.
 - Stateful fee and donation sequences cannot dilute an existing holder: every successful deposit
   and redemption must preserve or increase each remaining liquidity and six-token balance claim
   per share. All issued test assets remain in modeled manager, adapter, router, or holder custody,
