@@ -346,22 +346,32 @@
           "path": "docs/production-amm-successor.md"
         },
         {
+          "description": "The caller-bound v4 bundle factory atomically deploys and irreversibly binds the initialization-only gate, proposal source, spot adapter, direct conditional adapter, and manager while preventing another wallet from consuming the creator's predicted addresses.",
+          "path": "test/V4FutarchyLiquidityManagerFactory.t.sol",
+          "symbol": "test_creatorBoundSaltCannotBeConsumedByAnotherWallet"
+        },
+        {
+          "description": "The pinned Ethereum-mainnet lifecycle fork proves the factory-deployed v4 successor completes real CTF activation, two conditional positions, settlement, and full removal through the official PoolManager.",
+          "path": "test/fork/V4FutarchyLiquidityManagerLifecycleMainnetFork.t.sol",
+          "symbol": "testFork_factoryBundleCompletesRealCtfTwoPoolLifecycle"
+        },
+        {
           "description": "Deployment runbook documents limited-funds deployment order.",
           "path": "docs/deployment.md"
         },
         {
-          "description": "Committed Gnosis FAO canary config binds the reviewed ownerless guard and hash-pinned permissionless factory.",
+          "description": "The historical Gnosis FAO canary config binds the reviewed ownerless guard and hash-pinned permissionless factory; it is retained as canary evidence, not the selected production path.",
           "path": "config/gnosis.fao-canary.json"
         },
         {
-          "description": "On-chain canary receipt records transaction hashes, runtime hashes, bundle addresses, and bounded bootstrap exposure.",
+          "description": "The historical Gnosis on-chain canary receipt records transaction hashes, runtime hashes, bundle addresses, and bounded bootstrap exposure.",
           "path": "deployments/flm.gnosis.fao-canary.json"
         }
       ],
       "remaining": [
-        "Replace the Swapr Algebra conditional adapter with an integration that cannot be denied burn access by mutable cooldowns or third-party position activity.",
-        "Run a bounded spot-to-conditional-to-settlement canary against a selected validated proposal and retain its operation artifacts.",
-        "Complete external review and independently select production owner/proposal-manager/bootstrap roles before scaling beyond disposable canary value."
+        "Fix and independently reproduce the final Ethereum tokens, roles, tick policy, creator-bound salt, predicted addresses, runtime hashes, deployment calldata, and Safe batch; then rerun every gate against that exact manifest.",
+        "Run a bounded mainnet spot-to-conditional-to-settlement canary against a selected validated proposal and retain its operation artifacts.",
+        "Complete external contract and legal review, independently select production roles, and obtain explicit real-funds authorization before any canary or funded deployment."
       ]
     }
   ]
