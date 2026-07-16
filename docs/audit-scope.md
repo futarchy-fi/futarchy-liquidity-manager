@@ -54,8 +54,8 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
 - Proposal manager cannot select arbitrary unsafe proposals once validation is enabled.
 - The proposal source completes an official write only if the activation target reports an exact
   capture of every source-validated proposal field; any mismatch rolls back both contracts.
-- The source and manager independently reject every alias among the four outcome wrappers before
-  the manager consults the spot guard or moves liquidity.
+- The source and manager independently require the two base assets and four outcome wrappers to be
+  six distinct accounting tokens before the manager consults the spot guard or moves liquidity.
 - Validation rejects far-future opening times, excessive min bonds, bad timeout bounds, wrong
   arbitrators, wrong CTF oracle, non-binary conditions, wrong collateral, missing outcomes, and
   non-pristine questions. The manager-bound adapter separately rejects pre-existing conditional

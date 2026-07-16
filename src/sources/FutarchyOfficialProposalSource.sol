@@ -535,6 +535,10 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
             p.yesCompanyToken == p.noCompanyToken || p.yesCompanyToken == p.yesCurrencyToken
                 || p.yesCompanyToken == p.noCurrencyToken || p.noCompanyToken == p.yesCurrencyToken
                 || p.noCompanyToken == p.noCurrencyToken || p.yesCurrencyToken == p.noCurrencyToken
+                || p.yesCompanyToken == p.proposalToken || p.yesCompanyToken == p.collateralToken
+                || p.noCompanyToken == p.proposalToken || p.noCompanyToken == p.collateralToken
+                || p.yesCurrencyToken == p.proposalToken || p.yesCurrencyToken == p.collateralToken
+                || p.noCurrencyToken == p.proposalToken || p.noCurrencyToken == p.collateralToken
         ) {
             return ProposalValidationFailure.DuplicateOutcomeToken;
         }

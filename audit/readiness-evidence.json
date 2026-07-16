@@ -72,7 +72,7 @@
       "status": "ready-to-audit",
       "evidence": [
         {
-          "description": "Core manager tests cover independent rejection of all six possible outcome-wrapper aliases before spot movement, every independent base/YES/NO token-ordering parity, proportional principal/fee/idle accounting with adversarial receipt-label misclassification, exact two-phase adapter-removal deltas with spot and conditional overreport rollback, divergent YES/NO liquidity and post-swap principal composition, sequential six-token conservation and nondecreasing survivor value per share, exact settlement after randomized one-to-four partial exits, donation-resistant deposit pricing, spot and conditional six-token post-exit fee/donation ownership, rejection of direct native transfers outside that accounting model while wrapper unwrapping remains live, second-pool activation rollback, per-underlying conditional merge isolation with approval-failure, partial-consumption, and underpayment fallback, exact-delta merge and winner underconsumption/underpayment, late second-underlying rollback of prior recovery, losing-wrapper settlement rollback including after zero-supply final redemption, owner-authorized delayed permissionless non-custodial emergency exit, and permissionless settlement while emergency mode is armed or executed.",
+          "description": "Core manager tests cover independent rejection of every outcome-to-outcome and outcome-to-base alias before spot movement, every independent base/YES/NO token-ordering parity, proportional principal/fee/idle accounting with adversarial receipt-label misclassification, exact two-phase adapter-removal deltas with spot and conditional overreport rollback, divergent YES/NO liquidity and post-swap principal composition, sequential six-token conservation and nondecreasing survivor value per share, exact settlement after randomized one-to-four partial exits, donation-resistant deposit pricing, spot and conditional six-token post-exit fee/donation ownership, rejection of direct native transfers outside that accounting model while wrapper unwrapping remains live, second-pool activation rollback, per-underlying conditional merge isolation with approval-failure, partial-consumption, and underpayment fallback, exact-delta merge and winner underconsumption/underpayment, late second-underlying rollback of prior recovery, losing-wrapper settlement rollback including after zero-supply final redemption, owner-authorized delayed permissionless non-custodial emergency exit, and permissionless settlement while emergency mode is armed or executed.",
           "path": "test/FutarchyLiquidityManager.t.sol"
         },
         {
@@ -80,7 +80,7 @@
           "path": "test/FutarchyConditionalRouter.t.sol"
         },
         {
-          "description": "The official proposal source test proves that all six possible pairs among the four wrapped outcomes must be distinct, every captured activation field must match the validated snapshot, and a corrupt capture rolls back both source and target state.",
+          "description": "The official proposal source test proves that every outcome-to-outcome and outcome-to-base alias is rejected, every captured activation field must match the validated snapshot, and a corrupt capture rolls back both source and target state.",
           "path": "test/FutarchyOfficialProposalSource.t.sol"
         },
         {

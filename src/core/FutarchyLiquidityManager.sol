@@ -615,26 +615,31 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         emit EmergencyExitExecuted(spotRemoved, conditionalRemoved);
     }
 
+    /// @dev The frozen source has already read the proposal contract; this check independently
+    /// validates the fields that define the manager's accounting buckets.
     function _validateProposal(
         IFutarchyOfficialProposalSource.ProposalActivationData calldata proposal
     ) internal view {
         if (
-            proposal.proposal.code.length == 0 || proposal.proposalToken != address(COMPANY_TOKEN)
+            proposal.proposalToken != address(COMPANY_TOKEN)
                 || proposal.collateralToken != address(WRAPPED_NATIVE)
                 || proposal.conditionId == bytes32(0)
         ) {
             revert InvalidProposalConfig();
         }
-        address[4] memory outcomes = [
+        address[7] memory tokens = [
+            address(0),
+            proposal.proposalToken,
+            proposal.collateralToken,
             proposal.yesCompanyToken,
             proposal.noCompanyToken,
             proposal.yesCurrencyToken,
             proposal.noCurrencyToken
         ];
-        for (uint256 first; first < outcomes.length;) {
-            if (outcomes[first] == address(0)) revert InvalidProposalConfig();
-            for (uint256 second = first + 1; second < outcomes.length;) {
-                if (outcomes[first] == outcomes[second]) revert InvalidProposalConfig();
+        for (uint256 first; first < tokens.length;) {
+            address token = tokens[first];
+            for (uint256 second = first + 1; second < tokens.length;) {
+                if (token == tokens[second]) revert InvalidProposalConfig();
                 unchecked {
                     ++second;
                 }

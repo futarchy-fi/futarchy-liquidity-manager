@@ -144,6 +144,36 @@ contract FutarchyLiquidityManagerTest is Test {
         }
     }
 
+    function test_activation_rejects_every_outcome_base_alias_before_spot_movement() public {
+        _bootstrap();
+        address[4] memory outcomes =
+            [address(yesCompany), address(noCompany), address(yesCurrency), address(noCurrency)];
+        address[2] memory bases = [address(company), address(wrappedNative)];
+
+        for (uint256 base; base < bases.length; base++) {
+            for (uint256 outcome; outcome < outcomes.length; outcome++) {
+                address[4] memory aliased = outcomes;
+                aliased[outcome] = bases[base];
+                proposalSource.createProposalExtended(
+                    address(proposal),
+                    officialProposer,
+                    address(company),
+                    address(wrappedNative),
+                    aliased[0],
+                    aliased[1],
+                    aliased[2],
+                    aliased[3],
+                    address(0),
+                    address(0)
+                );
+
+                vm.expectRevert(FutarchyLiquidityManager.InvalidProposalConfig.selector);
+                proposalSource.activate(address(manager));
+                _assertActivationRolledBack();
+            }
+        }
+    }
+
     function test_activation_binds_fresh_code_bearing_pools_back_from_source() public {
         _bootstrap();
         _registerProposal(true);

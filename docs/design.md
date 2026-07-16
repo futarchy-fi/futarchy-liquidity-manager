@@ -83,7 +83,7 @@ permissionless throughout. Owner sweeping is disabled until total share supply i
 The proposal source can reject:
 
 - wrong company/collateral pair;
-- missing or duplicate wrapped outcome tokens;
+- missing wrapped outcomes or any alias among the two base and four outcome tokens;
 - wrong CTF oracle or condition id;
 - non-binary CTF conditions;
 - missing Reality question;
@@ -94,8 +94,9 @@ The proposal source can reject:
 - an answered, arbitrating, already-open, or too-short-lived Reality question.
 
 These checks are intended to prevent a weak proposal manager from freezing LP funds by selecting
-an arbitrary or never-settling conditional market. The manager independently repeats the nonzero
-and pairwise-distinct wrapper check before consulting the spot guard or moving liquidity.
+an arbitrary or never-settling conditional market. The manager independently requires all six
+base/outcome accounting tokens to be nonzero and pairwise distinct before consulting the spot guard
+or moving liquidity.
 
 ## Migration Price Guard
 

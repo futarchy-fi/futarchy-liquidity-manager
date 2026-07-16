@@ -631,6 +631,38 @@ contract FutarchyOfficialProposalSourceTest is Test {
         }
     }
 
+    function test_validation_rejects_every_outcome_base_alias() public {
+        _enableValidation();
+        (MockFutarchyProposalLike proposal,,) = _validProposal(true, true);
+        address[4] memory outcomes = [yesComp, noComp, yesCurr, noCurr];
+        address[2] memory bases = [company, wxdai];
+
+        for (uint256 base; base < bases.length; base++) {
+            for (uint256 outcome; outcome < outcomes.length; outcome++) {
+                proposal.setWrappedOutcome(outcome, bases[base]);
+
+                (bool valid, FutarchyOfficialProposalSource.ProposalValidationFailure failure) =
+                    source.validateProposal(address(proposal));
+                assertFalse(valid);
+                assertEq(
+                    uint256(failure),
+                    uint256(
+                        FutarchyOfficialProposalSource.ProposalValidationFailure
+                        .DuplicateOutcomeToken
+                    )
+                );
+
+                _expectValidationFailure(
+                    FutarchyOfficialProposalSource.ProposalValidationFailure.DuplicateOutcomeToken
+                );
+                _setOfficialProposal(
+                    200 + base * outcomes.length + outcome, address(proposal), officialProposer
+                );
+                proposal.setWrappedOutcome(outcome, outcomes[outcome]);
+            }
+        }
+    }
+
     function test_validation_rejects_wrong_ctf_oracle_condition() public {
         _enableValidation();
         (MockFutarchyProposalLike proposal, bytes32 questionId,) = _validProposal(true, true);

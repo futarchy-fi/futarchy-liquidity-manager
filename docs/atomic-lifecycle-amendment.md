@@ -70,8 +70,9 @@ is removed. The replacement sequence is:
    absent: both conditional pools must still be nonexistent.
 4. Before the setter may return, the source passes its single validated proposal snapshot to the
    bound FLM manager's `activateOfficialProposal(snapshot)` hook.
-5. The manager accepts that callback only from its immutable source, validates the snapshot's base
-   pair, condition, wrappers, and active phase, requires
+5. The manager accepts that callback only from its immutable source and validates the snapshot's
+   base pair, condition, wrappers, and active phase. It requires the two base assets and four
+   outcome wrappers to be pairwise distinct and requires
    `CTF.payoutDenominator(conditionId) == 0`, and obtains the established spot pool's guarded
    current price. It does not reread mutable proposal metadata. The current manager checks that
    require nonzero YES/NO pools are removed.
@@ -355,6 +356,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | Post-activation resolver binding reverts | The enclosing lifecycle transaction restores resolver/coordinator state, source write, CTF splits, positions, pools, and manager binding. |
 | Source cleared or replaced after activation | Stored proposal and condition still settle normally. |
 | Replayed activation or second live proposal | Reverts without changing positions or binding. |
+| An outcome wrapper aliases either base asset | Source admission and manager activation independently reject before spot movement, preserving six distinct accounting buckets. |
 | Adapter reports removal assets it did not transfer | The entire operation reverts before survivor-owned idle balances can fund the discrepancy. |
 | Adapter preserves receipt totals but swaps principal/fee field labels | The manager ignores labels and classifies exact deltas by the zero-liquidity and nonzero phases. |
 | Adapter's zero-liquidity call removes principal or leaves realized fees owed | The adapter violates the audited phase contract; deterministic and real-fork fixtures must prove unchanged liquidity and an immediately fee-free principal phase for the pinned bytecode. |
@@ -383,6 +385,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 - reject existing uninitialized, initialized, correctly priced, manipulated, YES-only, and NO-only
   pools;
 - reject an already-resolved condition before persistent spot movement and prove full rollback;
+- exhaust every outcome-to-outcome and outcome-to-base alias before persistent spot movement;
 - test every company/collateral and wrapper address ordering;
 - prove only the source can activate and `sync()` cannot perform first activation;
 - prove the source setter is reachable only through the lifecycle coordinator and that direct owner,
