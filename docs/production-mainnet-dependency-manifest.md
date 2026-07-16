@@ -42,7 +42,7 @@ hash. Under that exact profile, the bare creation-code hashes are:
 | `V4InitializationGate` | `0x56052e89d8d3305ab4d3c35922882faee512c39fe45102cc0dec86bf7e57f75f` |
 | `V4ConditionalLiquidityAdapter` | `0xba940a9f090ff9120797bb258c48717d0c508bbbc23d9379eb8c10bebcc4fc53` |
 | `FutarchyLiquidityManager` | `0x7accf3e36923467479f9a697e2ae81b5e2da0a8ab31031d61901f04cc253550c` |
-| `V4FutarchyLiquidityManagerFactory` | `0x1cda82794a379f634d9b889b9c9bc914c80685da0673296633c00e0d36caab3a` |
+| `V4FutarchyLiquidityManagerFactory` | `0xe6df50aabe5258cd3d084046eb8b3573cad874c50e7aa721257e033374497440` |
 
 `test_candidateCreationCodeHashesMatchMainnetManifest` fails on any artifact drift. These are
 candidate build identities, not deployed-address or audit approval claims; any reviewed source or

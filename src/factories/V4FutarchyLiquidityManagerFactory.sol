@@ -29,6 +29,9 @@ interface IUniV3FactoryBoundGuard {
 contract V4FutarchyLiquidityManagerFactory {
     uint256 public constant MAX_INIT_CODE_SIZE = 49_152;
     uint24 public constant SPOT_FEE = 500;
+    int24 private constant SPOT_TICK_SPACING = 10;
+    int24 private constant MIN_SPOT_TICK = -887_272;
+    int24 private constant MAX_SPOT_TICK = 887_272;
     uint160 private constant ALL_HOOK_MASK = (1 << 14) - 1;
     uint160 private constant BEFORE_INITIALIZE_FLAG = 1 << 13;
 
@@ -132,7 +135,11 @@ contract V4FutarchyLiquidityManagerFactory {
                 || IUniV3FactoryBoundGuard(address(poolStabilityGuard)).FACTORY() != spotFactory
                 || IUniV3FactoryBoundGuard(address(poolStabilityGuard)).FEE() != SPOT_FEE
         ) revert InvalidAmmWiring();
-        if (spotTickLower >= spotTickUpper) revert InvalidTickRange();
+        if (
+            spotTickLower < MIN_SPOT_TICK || spotTickUpper > MAX_SPOT_TICK
+                || spotTickLower >= spotTickUpper || spotTickLower % SPOT_TICK_SPACING != 0
+                || spotTickUpper % SPOT_TICK_SPACING != 0
+        ) revert InvalidTickRange();
         if (
             proposalSourceCreationCodeHash == bytes32(0)
                 || spotAdapterCreationCodeHash == bytes32(0)

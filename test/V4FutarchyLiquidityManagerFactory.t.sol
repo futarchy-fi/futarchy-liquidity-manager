@@ -218,7 +218,7 @@ contract V4FutarchyLiquidityManagerFactoryTest is Test {
         );
         assertEq(
             keccak256(type(V4FutarchyLiquidityManagerFactory).creationCode),
-            0x1cda82794a379f634d9b889b9c9bc914c80685da0673296633c00e0d36caab3a
+            0xe6df50aabe5258cd3d084046eb8b3573cad874c50e7aa721257e033374497440
         );
     }
 
@@ -227,7 +227,9 @@ contract V4FutarchyLiquidityManagerFactoryTest is Test {
         _newFactoryWith(
             bytes32(uint256(1)),
             stabilityGuard,
-            keccak256(type(FutarchyLiquidityManager).creationCode)
+            keccak256(type(FutarchyLiquidityManager).creationCode),
+            TICK_LOWER,
+            TICK_UPPER
         );
     }
 
@@ -238,7 +240,23 @@ contract V4FutarchyLiquidityManagerFactoryTest is Test {
         _newFactoryWith(
             address(v4PoolManager).codehash,
             stabilityGuard,
-            keccak256(type(FutarchyLiquidityManager).creationCode)
+            keccak256(type(FutarchyLiquidityManager).creationCode),
+            TICK_LOWER,
+            TICK_UPPER
+        );
+    }
+
+    function test_constructorRejectsUnusableSpotTickPolicy() public {
+        bytes32 managerHash = keccak256(type(FutarchyLiquidityManager).creationCode);
+
+        vm.expectRevert(V4FutarchyLiquidityManagerFactory.InvalidTickRange.selector);
+        _newFactoryWith(
+            address(v4PoolManager).codehash, stabilityGuard, managerHash, -887_280, TICK_UPPER
+        );
+
+        vm.expectRevert(V4FutarchyLiquidityManagerFactory.InvalidTickRange.selector);
+        _newFactoryWith(
+            address(v4PoolManager).codehash, stabilityGuard, managerHash, TICK_LOWER, 887_269
         );
     }
 
@@ -250,7 +268,9 @@ contract V4FutarchyLiquidityManagerFactoryTest is Test {
         _newFactoryWith(
             address(v4PoolManager).codehash,
             wrongGuard,
-            keccak256(type(FutarchyLiquidityManager).creationCode)
+            keccak256(type(FutarchyLiquidityManager).creationCode),
+            TICK_LOWER,
+            TICK_UPPER
         );
     }
 
@@ -359,14 +379,20 @@ contract V4FutarchyLiquidityManagerFactoryTest is Test {
         returns (V4FutarchyLiquidityManagerFactory)
     {
         return _newFactoryWith(
-            address(v4PoolManager).codehash, stabilityGuard, managerCreationCodeHash
+            address(v4PoolManager).codehash,
+            stabilityGuard,
+            managerCreationCodeHash,
+            TICK_LOWER,
+            TICK_UPPER
         );
     }
 
     function _newFactoryWith(
         bytes32 poolManagerCodehash,
         UniV3PoolStabilityGuard guard,
-        bytes32 managerCreationCodeHash
+        bytes32 managerCreationCodeHash,
+        int24 tickLower,
+        int24 tickUpper
     ) private returns (V4FutarchyLiquidityManagerFactory) {
         return new V4FutarchyLiquidityManagerFactory(
             IUniswapV3NonfungiblePositionManager(address(spotPositionManager)),
@@ -375,8 +401,8 @@ contract V4FutarchyLiquidityManagerFactoryTest is Test {
             IFutarchyConditionalRouter(address(conditionalRouter)),
             guard,
             IWrappedNative(address(wrappedNative)),
-            TICK_LOWER,
-            TICK_UPPER,
+            tickLower,
+            tickUpper,
             keccak256(type(FutarchyOfficialProposalSource).creationCode),
             keccak256(type(UniswapV3LiquidityAdapter).creationCode),
             keccak256(type(V4InitializationGate).creationCode),

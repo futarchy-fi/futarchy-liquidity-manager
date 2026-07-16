@@ -66,6 +66,8 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   accounting or bundle deployment can become live.
 - Manager and factory construction reject code-less token, router, adapter, guard, and AMM
   dependencies before a permanently unusable direct deployment or bundle can persist.
+- The v4 factory rejects immutable spot ticks outside the v3 adapter's bounds or 10-tick alignment
+  before a permanently unusable factory can persist.
 - A spot deposit fully consolidates the spot position before pricing new shares, so accrued fees,
   donations, and idle balances cannot be diluted. Redemption snapshots idle assets and removes only
   proportional liquidity and fees; a partial redeemer cannot collect value belonging to survivors.
