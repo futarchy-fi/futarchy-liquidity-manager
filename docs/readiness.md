@@ -104,7 +104,10 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   Unit tests cover atomic first-liquidity rollback, dependency drift, donation fees, dishonest fee
   reports, second-phase fee leakage, and sequential partial/final removal. A pinned mainnet fork
   proves the same direct add, donation-fee collection, and proportional removal against the
-  official PoolManager.
+  official PoolManager. The fork also installs a protocol-fee controller through the pinned owner,
+  sets the maximum valid fee in both directions, and leaves a third party's same-key, same-ticks,
+  same-salt position active while the FLM removes its own position completely; the independent
+  position remains removable afterward.
 - The selector-frozen v4 bundle factory now hash-pins the source, spot adapter, initialization gate,
   conditional adapter, and manager. Its effective CREATE2 salt commits to `msg.sender`; every child
   uses a domain-separated derivative, preventing another wallet from consuming or a permissionless

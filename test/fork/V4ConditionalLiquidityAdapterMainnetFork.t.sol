@@ -7,7 +7,8 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {
     IV4PoolManagerMinimal,
-    V4ConditionalLiquidityAdapter
+    V4ConditionalLiquidityAdapter,
+    V4ModifyLiquidityParams
 } from "../../src/adapters/V4ConditionalLiquidityAdapter.sol";
 import {V4InitializationGate, V4PoolKey} from "../../src/adapters/V4InitializationGate.sol";
 import {IFutarchyLiquidityAdapter} from "../../src/interfaces/IFutarchyLiquidityAdapter.sol";
@@ -17,6 +18,16 @@ interface IV4PoolManagerDonate is IV4PoolManagerMinimal {
     function donate(V4PoolKey memory key, uint256 amount0, uint256 amount1, bytes calldata hookData)
         external
         returns (int256 delta);
+}
+
+interface IV4PoolManagerAdmin {
+    function owner() external view returns (address);
+
+    function protocolFeeController() external view returns (address);
+
+    function setProtocolFeeController(address controller) external;
+
+    function setProtocolFee(V4PoolKey memory key, uint24 newProtocolFee) external;
 }
 
 contract MainnetV4Donor {
@@ -49,11 +60,48 @@ contract MainnetV4Donor {
     }
 }
 
+contract MainnetV4PositionActor {
+    using SafeERC20 for IERC20;
+
+    IV4PoolManagerMinimal private immutable _poolManager;
+
+    constructor(IV4PoolManagerMinimal poolManager) {
+        _poolManager = poolManager;
+    }
+
+    function modify(V4PoolKey calldata key, int256 liquidityDelta) external {
+        _poolManager.unlock(abi.encode(key, liquidityDelta));
+    }
+
+    function unlockCallback(bytes calldata rawData) external returns (bytes memory) {
+        require(msg.sender == address(_poolManager));
+        (V4PoolKey memory key, int256 liquidityDelta) = abi.decode(rawData, (V4PoolKey, int256));
+        (int256 delta,) = _poolManager.modifyLiquidity(
+            key, V4ModifyLiquidityParams(-887_270, 887_270, liquidityDelta, bytes32(0)), ""
+        );
+        _settleDelta(key.currency0, int128(delta >> 128));
+        _settleDelta(key.currency1, int128(delta));
+        return "";
+    }
+
+    function _settleDelta(address token, int128 delta) private {
+        if (delta < 0) {
+            uint256 amount = uint256(-int256(delta));
+            _poolManager.sync(token);
+            IERC20(token).safeTransfer(address(_poolManager), amount);
+            require(_poolManager.settle() == amount);
+        } else if (delta > 0) {
+            _poolManager.take(token, address(this), uint128(delta));
+        }
+    }
+}
+
 contract V4ConditionalLiquidityAdapterMainnetForkTest is Test {
     uint256 internal constant FORK_BLOCK = 25_542_490;
     uint160 internal constant Q96 = 79_228_162_514_264_337_593_543_950_336;
     uint256 internal constant AMOUNT = 100 ether;
     address internal constant POOL_MANAGER = 0x000000000004444c5dc75cB358380D2e3dE08A90;
+    address internal constant POOL_MANAGER_OWNER = 0x1a9C8182C09F50C8318d769245beA52c32BE35BC;
     bytes32 internal constant POOL_MANAGER_CODEHASH =
         0x785f1014552b7ce7d5fb7d0c970ca60edee94fd00425d7ca21609acac7ce1293;
     address internal constant HOOK_ADDRESS = address(0xfa04400000000000000000000000000000002000);
@@ -119,6 +167,27 @@ contract V4ConditionalLiquidityAdapterMainnetForkTest is Test {
         assertEq(token0.balanceOf(address(this)) - manager0Before, fees.fees0);
         assertEq(token1.balanceOf(address(this)) - manager1Before, fees.fees1);
 
+        V4PoolKey memory key = V4PoolKey({
+            currency0: address(token0),
+            currency1: address(token1),
+            fee: adapter.FEE(),
+            tickSpacing: adapter.TICK_SPACING(),
+            hooks: address(hook)
+        });
+        IV4PoolManagerAdmin admin = IV4PoolManagerAdmin(POOL_MANAGER);
+        assertEq(admin.owner(), POOL_MANAGER_OWNER);
+        assertEq(admin.protocolFeeController(), address(0));
+        vm.prank(POOL_MANAGER_OWNER);
+        admin.setProtocolFeeController(address(this));
+        admin.setProtocolFee(key, uint24(1000 | (1000 << 12)));
+
+        MainnetV4PositionActor outsider =
+            new MainnetV4PositionActor(IV4PoolManagerMinimal(POOL_MANAGER));
+        uint128 outsiderLiquidity = 10 ether;
+        token0.mint(address(outsider), outsiderLiquidity);
+        token1.mint(address(outsider), outsiderLiquidity);
+        outsider.modify(key, int256(uint256(outsiderLiquidity)));
+
         uint128 firstRemoval = liquidity / 3;
         IFutarchyLiquidityAdapter.Removal memory partialRemoval =
             adapter.removeLiquidityDetailed(address(token0), address(token1), firstRemoval);
@@ -134,5 +203,9 @@ contract V4ConditionalLiquidityAdapterMainnetForkTest is Test {
             adapter.positionLiquidity(keccak256(abi.encode(address(token0), address(token1)))), 0
         );
         assertEq(adapter.poolByPair(address(token0), address(token1)), address(0));
+
+        outsider.modify(key, -int256(uint256(outsiderLiquidity)));
+        assertGt(token0.balanceOf(address(outsider)), 0);
+        assertGt(token1.balanceOf(address(outsider)), 0);
     }
 }

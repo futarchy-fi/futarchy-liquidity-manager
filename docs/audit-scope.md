@@ -35,7 +35,9 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   symmetric and single-leg live v4 donations before and after a one-third unresolved redemption,
   in-kind unmatched outcome payout, both resolutions of the donated single leg, pro-rata fee
   allocation, and final-holder conservation together with the real v3 spot position manager and
-  production guard.
+  production guard. Its direct adapter fork additionally proves that the pinned owner's maximum
+  protocol-fee configuration and a third party's otherwise identical position cannot block or
+  consume the FLM position's partial or final removal.
 - `V4FutarchyLiquidityManagerFactory`: permissionless atomic v4 bundle deployer. It hash-pins all
   five child creation codes and deploys the entire bundle at creator-bound CREATE2 addresses. Its
   exact prediction view remains stable across unrelated permissionless deployments. It wires the

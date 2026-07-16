@@ -97,7 +97,12 @@ with its own Foundry configuration and Solidity 0.8.26:
   the same pool key.
 - the same pinned fork proves the committed adapter initializes and adds through the official
   PoolManager, realizes a third-party pool donation as shareholder fees, removes one third, then
-  removes the exact remainder without adapter residue.
+  removes the exact remainder without adapter residue. It also asserts the pinned PoolManager
+  owner and initially empty protocol-fee controller, lets that owner install a controller and set
+  the maximum valid 0.1% fee in both directions, and leaves an outsider's position open at the
+  exact same key, ticks, and salt throughout the FLM's complete exit. The outsider can remove its
+  still-independent position afterward. This directly exercises both mutable administration and
+  third-party-position liveness against the deployed bytecode.
 - a full pinned-mainnet fixture deploys the caller-bound factory bundle, uses canonical Ethereum
   Conditional Tokens to split both base assets through the real router, atomically activates the
   real source and manager into two official-PoolManager positions, resolves through CTF, and removes
@@ -142,6 +147,13 @@ behavior are fixed by upstream
 [`PoolManager.initialize`](https://github.com/Uniswap/v4-core/blob/46c6834698c48bc4a463a86d8420f4eb1d7f3b75/src/PoolManager.sol)
 and
 [`Hooks`](https://github.com/Uniswap/v4-core/blob/46c6834698c48bc4a463a86d8420f4eb1d7f3b75/src/libraries/Hooks.sol).
+At that pinned revision, `PoolManager` is a direct, non-proxy deployment inheriting
+`NoDelegateCall`. Its privileged surface is ownership transfer plus selection of the protocol-fee
+controller; that controller may set a per-direction fee capped at 0.1% and collect already-accrued
+protocol fees. The reviewed implementation exposes no pause, upgrade, hook replacement, position
+seizure, or liquidity-removal lock. The runtime-codehash assertion ties the forked deployment to
+the reviewed bytecode, while the adversarial fork above proves the only pool-level mutable fee
+setting does not prevent removal.
 
 ## Deployment and license evidence
 
