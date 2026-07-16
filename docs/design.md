@@ -89,7 +89,8 @@ The proposal source can reject:
 - an answered, arbitrating, already-open, or too-short-lived Reality question.
 
 These checks are intended to prevent a weak proposal manager from freezing LP funds by selecting
-an arbitrary or never-settling conditional market.
+an arbitrary or never-settling conditional market. The manager independently repeats the nonzero
+and pairwise-distinct wrapper check before consulting the spot guard or moving liquidity.
 
 ## Migration Price Guard
 

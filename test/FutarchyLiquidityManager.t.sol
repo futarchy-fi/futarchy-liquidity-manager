@@ -115,6 +115,35 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(manager.conditionalNoLiquidity(), 80 ether);
     }
 
+    function test_activation_rejects_every_duplicate_outcome_pair_before_spot_movement() public {
+        _bootstrap();
+        address[4] memory outcomes =
+            [address(yesCompany), address(noCompany), address(yesCurrency), address(noCurrency)];
+
+        for (uint256 first; first < outcomes.length; first++) {
+            for (uint256 second = first + 1; second < outcomes.length; second++) {
+                address[4] memory aliased = outcomes;
+                aliased[second] = aliased[first];
+                proposalSource.createProposalExtended(
+                    address(proposal),
+                    officialProposer,
+                    address(company),
+                    address(wrappedNative),
+                    aliased[0],
+                    aliased[1],
+                    aliased[2],
+                    aliased[3],
+                    address(0),
+                    address(0)
+                );
+
+                vm.expectRevert(FutarchyLiquidityManager.InvalidProposalConfig.selector);
+                proposalSource.activate(address(manager));
+                _assertActivationRolledBack();
+            }
+        }
+    }
+
     function test_activation_binds_fresh_code_bearing_pools_back_from_source() public {
         _bootstrap();
         _registerProposal(true);

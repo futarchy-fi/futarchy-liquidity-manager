@@ -484,7 +484,6 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         if (inConditionalMode) revert ProposalAlreadyActive();
 
         _validateProposal(proposal);
-        if (proposal.proposalId > type(uint96).max) revert InvalidProposalConfig();
         bytes32 conditionId = proposal.conditionId;
         (uint256 denominator,,) = CONDITIONAL_ROUTER.getPayouts(conditionId);
         if (denominator != 0) revert ConditionAlreadyResolved();
@@ -622,13 +621,27 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         if (
             proposal.proposal.code.length == 0 || proposal.proposalToken != address(COMPANY_TOKEN)
                 || proposal.collateralToken != address(WRAPPED_NATIVE)
-                || proposal.yesCompanyToken == address(0) || proposal.noCompanyToken == address(0)
-                || proposal.yesCurrencyToken == address(0) || proposal.noCurrencyToken == address(0)
-                || proposal.yesCompanyToken == proposal.noCompanyToken
-                || proposal.yesCurrencyToken == proposal.noCurrencyToken
                 || proposal.conditionId == bytes32(0)
         ) {
             revert InvalidProposalConfig();
+        }
+        address[4] memory outcomes = [
+            proposal.yesCompanyToken,
+            proposal.noCompanyToken,
+            proposal.yesCurrencyToken,
+            proposal.noCurrencyToken
+        ];
+        for (uint256 first; first < outcomes.length;) {
+            if (outcomes[first] == address(0)) revert InvalidProposalConfig();
+            for (uint256 second = first + 1; second < outcomes.length;) {
+                if (outcomes[first] == outcomes[second]) revert InvalidProposalConfig();
+                unchecked {
+                    ++second;
+                }
+            }
+            unchecked {
+                ++first;
+            }
         }
     }
 
