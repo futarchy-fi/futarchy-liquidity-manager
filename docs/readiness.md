@@ -123,12 +123,13 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   one third of the shares and redeems them while the CTF condition is unresolved. The fee phase pays
   that holder its exact pro-rata original inventory plus donation within four wei. The spot NFT
   identity survives; spot, YES, and NO liquidity decrease by their exact floor-rounded shares;
-  canonical CTF merges complete sets; the redeemer receives no outcome residue; and the final holder
-  drains all positions and manager balances. Combined v3/v4 recovery remains within four wei per
-  base asset of all original plus donated inventory.
+  canonical CTF merges complete sets and the redeemer receives no outcome residue. A second
+  complete-set donation after that exit leaves the exited balances fixed and belongs entirely to
+  the survivor. The final holder drains all positions and manager balances; combined v3/v4 recovery
+  remains within five wei per base asset of all original plus donated inventory.
 - The pinned block's actual gas limit is 60,000,000. Charging 21,000 base gas plus the worst-case
   16 gas for every calldata byte yields less than 12,360,000 gas for the atomic bundle transaction,
-  2,343,088 gas for source/CTF/two-pool activation, and 1,460,711 gas for donated-fee partial
+  2,343,088 gas for source/CTF/two-pool activation, and 1,460,754 gas for donated-fee partial
   redemption. The fork asserts each remains below half a block, leaving more than 30,000,000 gas of
   explicit headroom.
 

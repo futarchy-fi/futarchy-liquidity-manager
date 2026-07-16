@@ -315,6 +315,25 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         assertEq(IERC20(yesCollateral).balanceOf(partialHolder), 0);
         assertEq(IERC20(noCollateral).balanceOf(partialHolder), 0);
 
+        company.mint(address(this), DONATION);
+        collateral.mint(address(this), DONATION);
+        company.approve(address(router), DONATION);
+        collateral.approve(address(router), DONATION);
+        router.splitPositionPairTo(
+            conditionId,
+            address(company),
+            yesCompany,
+            noCompany,
+            DONATION,
+            address(collateral),
+            yesCollateral,
+            noCollateral,
+            DONATION,
+            address(donor)
+        );
+        donor.donate(_v4PoolKey(conditional, yesCompany, yesCollateral), DONATION, DONATION);
+        donor.donate(_v4PoolKey(conditional, noCompany, noCollateral), DONATION, DONATION);
+
         uint256[] memory payouts = new uint256[](2);
         payouts[0] = 1;
         ctf.reportPayouts(questionId, payouts);
@@ -334,15 +353,17 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         assertEq(manager.totalSupply(), 0);
         assertEq(manager.spotLiquidity(), 0);
         assertEq(spot.getPositionTokenId(address(company), address(collateral)), 0);
+        assertEq(company.balanceOf(partialHolder), partialCompanyOut);
+        assertEq(collateral.balanceOf(partialHolder), partialCollateralOut);
         assertApproxEqAbs(
             company.balanceOf(address(this)) + company.balanceOf(partialHolder),
-            AMOUNT + DONATION,
-            4
+            AMOUNT + (2 * DONATION),
+            5
         );
         assertApproxEqAbs(
             collateral.balanceOf(address(this)) + collateral.balanceOf(partialHolder),
-            AMOUNT + DONATION,
-            4
+            AMOUNT + (2 * DONATION),
+            5
         );
         assertEq(company.balanceOf(address(manager)), 0);
         assertEq(collateral.balanceOf(address(manager)), 0);
