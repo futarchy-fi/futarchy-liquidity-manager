@@ -72,10 +72,12 @@ A separate run moves the YES-company-only donation before the unresolved one-thi
 redeemer receives its floor-rounded fee share as an unmatched wrapper within four wei, keeps the
 same base balance through settlement, and redeems the winning wrapper independently afterward.
 
-Another run faults the canonical company-side CTF merge during that unresolved exit. Collateral
-still merges normally; the company slice is paid as exact YES/NO wrappers. After resolution the
-holder redeems the winner and consumes the loser independently, the survivor settles and exits,
-and aggregate recovery of both base assets remains within five wei.
+Another run first faults the second proportional adapter removal after the first official-v4
+unwind. LP shares, both positions, spot identity, and all six holder/manager/PoolManager balances
+restore exactly. Its identical retry faults the canonical company-side CTF merge: collateral still
+merges normally and the company slice is paid as exact YES/NO wrappers. After resolution the holder
+redeems the winner and consumes the loser independently, the survivor settles and exits, and
+aggregate recovery of both base assets remains within five wei.
 
 A settlement rollback run faults the canonical collateral-side CTF merge only after the company
 merge and winner redemption have executed. The failed permissionless sync restores both v4

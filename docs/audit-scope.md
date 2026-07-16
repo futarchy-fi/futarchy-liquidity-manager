@@ -35,7 +35,9 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   symmetric and single-leg live v4 donations before and after a one-third unresolved redemption,
   in-kind unmatched outcome payout, both resolutions of the donated single leg, pro-rata fee
   allocation, and final-holder conservation together with the real v3 spot position manager and
-  production guard. A canonical company-side CTF merge fault also proves per-underlying isolation:
+  production guard. A late second-position removal fault after the proportional first official-v4
+  unwind proves shares, positions, spot identity, and all six custody balances roll back. The
+  identical retry faults the canonical company-side CTF merge and proves per-underlying isolation:
   collateral still merges, the company slice is paid as exact YES/NO wrappers, and those wrappers
   remain independently redeemable/consumable after resolution without breaking final conservation.
   A late collateral-side CTF merge fault after company merge/winner recovery also proves that both

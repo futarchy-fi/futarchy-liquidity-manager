@@ -107,7 +107,7 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         _runLifecycle(true, true, ActivationFault.None);
     }
 
-    function testFork_realCompanyMergeFailurePaysExactInKindAndRemainsRedeemable() public {
+    function testFork_lateRemovalRollbackThenCompanyMergeFailureRemainsRedeemable() public {
         _runLifecycle(true, false, ActivationFault.None, true, false);
     }
 
@@ -423,6 +423,16 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
             FutarchyLiquidityManager.redeem.selector, partialShares, partialHolder, false
         );
         if (companyMergeFault) {
+            _exerciseRedemptionRemovalRollback(
+                manager,
+                spot,
+                conditional,
+                company,
+                collateral,
+                partialHolder,
+                partialShares,
+                [yesCompany, noCompany, yesCollateral, noCollateral]
+            );
             vm.mockCallRevert(
                 CONDITIONAL_TOKENS,
                 abi.encodePacked(
@@ -716,6 +726,88 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
                 5
             );
         }
+    }
+
+    function _exerciseRedemptionRemovalRollback(
+        FutarchyLiquidityManager manager,
+        UniswapV3LiquidityAdapter spot,
+        V4ConditionalLiquidityAdapter conditional,
+        MockMintableERC20 company,
+        MockMintableERC20 collateral,
+        address holder,
+        uint256 shares,
+        address[4] memory outcomes
+    ) private {
+        uint256 supplyBefore = manager.totalSupply();
+        uint256 holderSharesBefore = manager.balanceOf(holder);
+        uint128 spotLiquidityBefore = manager.spotLiquidity();
+        uint128 yesLiquidityBefore = manager.conditionalYesLiquidity();
+        uint128 noLiquidityBefore = manager.conditionalNoLiquidity();
+        uint256 spotTokenIdBefore = spot.getPositionTokenId(address(company), address(collateral));
+        address[6] memory assets = [
+            address(company),
+            address(collateral),
+            outcomes[0],
+            outcomes[1],
+            outcomes[2],
+            outcomes[3]
+        ];
+        uint256[6] memory holderBalancesBefore;
+        uint256[6] memory managerBalancesBefore;
+        uint256[6] memory poolManagerBalancesBefore;
+        for (uint256 i; i < assets.length; ++i) {
+            holderBalancesBefore[i] = IERC20(assets[i]).balanceOf(holder);
+            managerBalancesBefore[i] = IERC20(assets[i]).balanceOf(address(manager));
+            poolManagerBalancesBefore[i] = IERC20(assets[i]).balanceOf(POOL_MANAGER);
+        }
+
+        (address yesToken0, address yesToken1) =
+            outcomes[0] < outcomes[2] ? (outcomes[0], outcomes[2]) : (outcomes[2], outcomes[0]);
+        (address noToken0, address noToken1) =
+            outcomes[1] < outcomes[3] ? (outcomes[1], outcomes[3]) : (outcomes[3], outcomes[1]);
+        bytes memory faultData =
+            abi.encodeWithSignature("Error(string)", "redemption removal fault");
+        vm.mockCallRevert(
+            address(conditional),
+            abi.encodeWithSelector(
+                IFutarchyLiquidityAdapter.removeLiquidityDetailed.selector,
+                noToken0,
+                noToken1,
+                uint128(0)
+            ),
+            faultData
+        );
+        vm.expectCall(
+            address(conditional),
+            abi.encodeWithSelector(
+                IFutarchyLiquidityAdapter.removeLiquidityDetailed.selector,
+                yesToken0,
+                yesToken1,
+                uint128(uint256(yesLiquidityBefore) * shares / supplyBefore)
+            )
+        );
+        vm.expectRevert(faultData);
+        vm.prank(holder);
+        manager.redeem(shares, holder, false);
+
+        assertEq(manager.totalSupply(), supplyBefore);
+        assertEq(manager.balanceOf(holder), holderSharesBefore);
+        assertEq(manager.spotLiquidity(), spotLiquidityBefore);
+        assertEq(manager.conditionalYesLiquidity(), yesLiquidityBefore);
+        assertEq(manager.conditionalNoLiquidity(), noLiquidityBefore);
+        assertEq(spot.getPositionTokenId(address(company), address(collateral)), spotTokenIdBefore);
+        assertEq(
+            conditional.positionLiquidity(_pairKey(outcomes[0], outcomes[2])), yesLiquidityBefore
+        );
+        assertEq(
+            conditional.positionLiquidity(_pairKey(outcomes[1], outcomes[3])), noLiquidityBefore
+        );
+        for (uint256 i; i < assets.length; ++i) {
+            assertEq(IERC20(assets[i]).balanceOf(holder), holderBalancesBefore[i]);
+            assertEq(IERC20(assets[i]).balanceOf(address(manager)), managerBalancesBefore[i]);
+            assertEq(IERC20(assets[i]).balanceOf(POOL_MANAGER), poolManagerBalancesBefore[i]);
+        }
+        vm.clearMockedCalls();
     }
 
     function _exerciseEmergencyLifecycle(

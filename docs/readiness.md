@@ -148,10 +148,13 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   manager, so no losing fee is converted into base value. A third run places the single-leg fee
   before the unresolved exit: the redeemer receives its floor-rounded YES-company share in kind
   within four wei, retains the same base balance through settlement, and can redeem the winning
-  wrapper independently afterward. A fourth run faults the canonical company-side CTF merge:
-  collateral still merges, the company slice is paid as exact YES/NO wrappers, and the holder later
-  redeems the winner and consumes the loser. Survivor settlement plus final exit conserves both
-  base assets within five wei. A fifth run faults the canonical collateral-side CTF merge after
+  wrapper independently afterward. A fourth run first faults the second proportional adapter
+  removal after the first official-v4 unwind and proves shares, both positions, the spot identity,
+  and all six holder/manager/PoolManager balances roll back. Its identical retry then faults the
+  canonical company-side CTF merge: collateral still merges, the company slice is paid as exact
+  YES/NO wrappers, and the holder later redeems the winner and consumes the loser. Survivor
+  settlement plus final exit conserves both base assets within five wei. A fifth run faults the
+  canonical collateral-side CTF merge after
   both v4 removals and company merge/winner recovery. The failed sync restores the captured
   binding/accounting, adapter positions, PoolManager balances, CTF collateral/underlying custody,
   wrapper supply/custody, and allowances; the identical retry and final exit then succeed.
@@ -203,7 +206,8 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 | First conditional pool/add | The same full binding test injects first-add and post-add accounting failures and proves the created pool, split wrappers, and spot removal all roll back. |
 | Second conditional pool | `test_activation_rolls_back_first_pool_when_second_pool_is_precreated` proves the newly created first pool disappears while the adversarial second pool remains. |
 | First or second official mainnet v4 initialization/liquidity | `testFork_firstRealV4InitializeFailureRollsBackAndRetrySucceeds`, `testFork_firstRealV4LiquidityFailureRollsBackAndRetrySucceeds`, `testFork_secondRealV4InitializeFailureRollsBackAndRetrySucceeds`, and `testFork_secondRealV4LiquidityFailureRollsBackAndRetrySucceeds` fault each deployed PoolManager boundary, prove prior live-stack effects and any pool initialization disappear, and retry the identical activation. |
-| Canonical mainnet CTF merge during redemption | `testFork_realCompanyMergeFailurePaysExactInKindAndRemainsRedeemable` faults the company merge, proves collateral still merges and exact YES/NO company wrappers are paid in kind, then redeems/consumes those wrappers after resolution and conserves both assets through survivor settlement and final exit. |
+| Second conditional removal during proportional redemption | `testFork_lateRemovalRollbackThenCompanyMergeFailureRemainsRedeemable` completes the proportional YES removal before faulting the NO adapter boundary, then proves LP shares, both positions, spot identity, and all six holder/manager/PoolManager balances roll back. |
+| Canonical mainnet CTF merge during redemption | The identical retry in `testFork_lateRemovalRollbackThenCompanyMergeFailureRemainsRedeemable` faults the company merge, proves collateral still merges and exact YES/NO company wrappers are paid in kind, then redeems/consumes those wrappers after resolution and conserves both assets through survivor settlement and final exit. |
 | Late canonical mainnet CTF merge during settlement | `testFork_lateRealSettlementMergeFailureRollsBackAndRetrySucceeds` proves both v4 removals and company merge/winner redemption execute before the collateral fault, compares captured binding/accounting plus actual protocol custody and positions, then completes the identical settlement after clearing the fault. |
 | Second conditional removal during emergency unwind | `testFork_outsiderEmergencyExitRollsBackSettlesAndPreservesAllShares` executes the first official-v4 removal before faulting the second adapter boundary, proves both positions, PoolManager/manager custody, accounting, shares, and the emergency flag roll back, then completes the identical outsider retry and source-independent settlement. |
 | AMM create, initialize, or first mint | `test_freshAddPoolCreateAndInitializeFailuresRollBack`, `test_freshAddFirstMintFailureRollsBackPoolAndCustody`, and `test_firstLiquidityFailureRollsBackInitializationAndCustody`. |

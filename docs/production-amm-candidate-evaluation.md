@@ -129,11 +129,13 @@ with its own Foundry configuration and Solidity 0.8.26:
   base payout. A third run moves the YES-company-only donation before the unresolved one-third
   exit: the redeemer receives its floor-rounded fee share in kind within four wei, its base balance
   stays fixed through settlement, and it can redeem the winning wrapper independently afterward.
-- a canonical company-side CTF merge failure during the same one-third exit is isolated from the
-  collateral underlying: collateral still merges to base, the exact company YES/NO slice is paid
-  in kind, and after resolution the holder independently redeems the winner and consumes the loser.
-  Survivor settlement and final exit leave aggregate company and collateral recovery within five
-  wei. The fault-path redemption costs 1,417,015 gas under the same conservative accounting.
+- a late second-position removal failure during the same one-third exit occurs after the
+  proportional first official-v4 unwind. LP shares, both positions, spot identity, and all six
+  holder/manager/PoolManager balances restore exactly. The identical retry then faults the
+  canonical company-side CTF merge: collateral still merges to base, the exact company YES/NO
+  slice is paid in kind, and after resolution the holder independently redeems the winner and
+  consumes the loser. Survivor settlement and final exit leave aggregate recovery within five wei.
+  The merge-fault redemption remains below the documented 1,417,015-gas conservative bound.
 - a late canonical collateral-side CTF merge failure during settlement is injected only after both
   v4 positions are removed and company merge plus winner redemption have executed. The revert
   restores the captured manager binding/accounting, both adapter positions, PoolManager balances,
