@@ -173,8 +173,13 @@ contract V4ConditionalLiquidityAdapter is
         );
     }
 
-    function poolByPair(address token0, address token1) external view returns (address pool) {
-        bytes32 key = _pairKey(token0, token1);
+    function poolByPair(address tokenA, address tokenB) external view returns (address pool) {
+        if (tokenA == address(0) || tokenB == address(0) || tokenA == tokenB) {
+            revert InvalidTokenOrder();
+        }
+        bytes32 key = tokenA < tokenB
+            ? keccak256(abi.encode(tokenA, tokenB))
+            : keccak256(abi.encode(tokenB, tokenA));
         if (positionLiquidity[key] != 0) pool = address(POOL_MANAGER);
     }
 

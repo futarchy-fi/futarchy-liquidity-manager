@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {
     IV4PoolManagerMinimal,
@@ -18,7 +17,8 @@ import {
     V4FutarchyLiquidityManagerFactory
 } from "../../src/factories/V4FutarchyLiquidityManagerFactory.sol";
 import {
-    IFutarchyConditionalTokens
+    IFutarchyConditionalTokens,
+    IFutarchyWrapped1155Factory
 } from "../../src/interfaces/IFutarchyConditionalDependencies.sol";
 import {IFutarchyConditionalRouter} from "../../src/interfaces/IFutarchyConditionalRouter.sol";
 import {IPoolStabilityGuard} from "../../src/interfaces/IPoolStabilityGuard.sol";
@@ -29,7 +29,6 @@ import {FutarchyConditionalRouter} from "../../src/routers/FutarchyConditionalRo
 import {FutarchyOfficialProposalSource} from "../../src/sources/FutarchyOfficialProposalSource.sol";
 import {MockFutarchyProposalLike} from "../mocks/MockFutarchyProposalLike.sol";
 import {MockMintableERC20} from "../mocks/MockMintableERC20.sol";
-import {MockRouterWrapped1155Factory} from "../mocks/MockRouterWrapped1155Factory.sol";
 import {
     MockUniswapV3NonfungiblePositionManager
 } from "../mocks/MockUniswapV3NonfungiblePositionManager.sol";
@@ -77,6 +76,9 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
     address private constant CONDITIONAL_TOKENS = 0xC59b0e4De5F1248C1140964E0fF287B192407E0C;
     bytes32 private constant CONDITIONAL_TOKENS_CODEHASH =
         0x710326c6e1e66bc95ad81734a3c08448d7aa9fd0636c4477003fdababc3d1c1c;
+    address private constant WRAPPED_1155_FACTORY = 0xD194319D1804C1051DD21Ba1Dc931cA72410B79f;
+    bytes32 private constant WRAPPED_1155_FACTORY_CODEHASH =
+        0x792e0ae192d66bc58541831991b449cd2ba502fe0053507d6c4493d8865371b6;
 
     function testFork_factoryBundleCompletesRealCtfTwoPoolLifecycle() public {
         if (!vm.envOr("RUN_MAINNET_FORK_TESTS", false)) return;
@@ -85,9 +87,11 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         );
         assertEq(POOL_MANAGER.codehash, POOL_MANAGER_CODEHASH);
         assertEq(CONDITIONAL_TOKENS.codehash, CONDITIONAL_TOKENS_CODEHASH);
+        assertEq(WRAPPED_1155_FACTORY.codehash, WRAPPED_1155_FACTORY_CODEHASH);
 
         IMainnetConditionalTokens ctf = IMainnetConditionalTokens(CONDITIONAL_TOKENS);
-        MockRouterWrapped1155Factory wrapperFactory = new MockRouterWrapped1155Factory();
+        IFutarchyWrapped1155Factory wrapperFactory =
+            IFutarchyWrapped1155Factory(WRAPPED_1155_FACTORY);
         FutarchyConditionalRouter router = new FutarchyConditionalRouter(ctf, wrapperFactory);
         MockMintableERC20 company = new MockMintableERC20("Company", "COMP");
         MockMintableERC20 collateral = new MockMintableERC20("Collateral", "COLL");
@@ -245,7 +249,7 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
 
     function _wrapper(
         IMainnetConditionalTokens ctf,
-        MockRouterWrapped1155Factory factory,
+        IFutarchyWrapped1155Factory factory,
         address collateral,
         bytes32 conditionId,
         uint256 indexSet

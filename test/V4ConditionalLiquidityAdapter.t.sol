@@ -208,6 +208,7 @@ contract V4ConditionalLiquidityAdapterTest is Test {
             address(token0), address(token1), AMOUNT, AMOUNT, Q96
         );
         assertEq(pool, address(poolManager));
+        assertEq(adapter.poolByPair(address(token1), address(token0)), address(poolManager));
         assertEq(liquidity, AMOUNT);
         assertEq(used0, AMOUNT);
         assertEq(used1, AMOUNT);

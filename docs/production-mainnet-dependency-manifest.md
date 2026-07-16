@@ -1,0 +1,48 @@
+# Draft Ethereum mainnet dependency manifest
+
+This is evidence for the selected mainnet architecture, not deployment authorization. All on-chain
+observations below are pinned to Ethereum block `25,542,490` and reproduced by the fork tests or
+with `cast` against an archival mainnet RPC. Final token, role, configuration, salt, and deployed
+bundle fields remain intentionally unresolved.
+
+## Pinned external deployments
+
+| Dependency | Address | Runtime code hash | Evidence and disposition |
+| --- | --- | --- | --- |
+| Uniswap v4 PoolManager | `0x000000000004444c5dc75cB358380D2e3dE08A90` | `0x785f1014552b7ce7d5fb7d0c970ca60edee94fd00425d7ca21609acac7ce1293` | Official Ethereum deployment; exercised by all three mainnet fork suites. |
+| Conditional Tokens Framework | `0xC59b0e4De5F1248C1140964E0fF287B192407E0C` | `0x710326c6e1e66bc95ad81734a3c08448d7aa9fd0636c4477003fdababc3d1c1c` | Canonical Ethereum deployment; exercised by the full activation and settlement fork. |
+| Wrapped1155Factory | `0xD194319D1804C1051DD21Ba1Dc931cA72410B79f` | `0x792e0ae192d66bc58541831991b449cd2ba502fe0053507d6c4493d8865371b6` | Ethereum artifact in `seer-pm/demo` commit `cb0eff50b301ff715a7e41b7e164f2478670e0bc`; exercised by the full fork. External review still required. |
+| Uniswap v3 NonfungiblePositionManager | `0xC36442b4a4522E871399CD717aBDD847Ab11FE88` | `0x692e658b31cbe3407682854806658d315d61a58c7e4933a2f91d383dc00736c6` | Candidate final spot manager. At the pinned block `factory()` and `WETH9()` return the entries below. Exact-token spot lifecycle is not yet exercised. |
+| Uniswap v3 factory | `0x1F98431c8aD98523631AE4a59f267346ea31F984` | `0x4d7b8525cd5d14343fa67a732fba5b24cddba11620ca88392f4ec6c52f91fd69` | Returned by the candidate spot position manager. |
+| WETH9 | `0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2` | `0xd0a06b12ac47863b5c7be4185c2deaad1c61557033f56c7d4ea74429cbb25e23` | Returned by the candidate spot position manager; this does not select WETH as FAO collateral. |
+
+The wrapper source file declares `LGPL-3.0-or-later`, while the containing repository has an MIT
+root license and the source header lists no auditors. Legal provenance and independent contract
+review are therefore unresolved real-funds gates even though the deployed integration works in the
+pinned lifecycle fixture.
+
+## Local bundle dependencies
+
+The production bundle is intended to deploy the selector-frozen
+`V4FutarchyLiquidityManagerFactory` children atomically: initialization gate, proposal source,
+Uniswap v3 spot adapter, v4 conditional adapter, and manager. The factory must pin the reviewed
+creation-code hashes and the PoolManager runtime hash above. Its creator-bound CREATE2 salt must be
+mined and reproduced for the final Safe sender; no relay may substitute for that sender.
+
+## Unresolved deployment fields
+
+Do not render or sign a production batch until one reviewed manifest revision fixes and verifies:
+
+- company token and collateral token addresses, decimals, code hashes, and issuer/upgrade powers;
+- the exact v3 spot tick range, initial price, existing-pool rejection behavior, and token ordering;
+- owner Safe, lifecycle coordinator, bootstrap recipient, official proposer, and emergency process;
+- proposal validation stack, Reality/CTF identifiers and bounds, and final router configuration;
+- raw hook salt, effective creator-bound salt, predicted hook and all five child addresses;
+- factory address and runtime hash, child creation/runtime hashes, constructor arguments, and
+  verified-source/license records;
+- exact deployment calldata, Safe batch hash, simulation block, gas bounds, and independent
+  reproduction sign-off.
+
+Until those fields are fixed, the v3 spot position manager remains a pinned candidate rather than
+a production selection, and the full fixture correctly uses deterministic spot tokens, guard, and
+position manager while using the real PoolManager, CTF, and Wrapped1155Factory.

@@ -100,11 +100,13 @@ with its own Foundry configuration and Solidity 0.8.26:
 - a full pinned-mainnet fixture deploys the caller-bound factory bundle, uses canonical Ethereum
   Conditional Tokens to split both base assets through the real router, atomically activates the
   real source and manager into two official-PoolManager positions, resolves through CTF, and removes
-  and redeems both positions with at most one wei of v4 rounding. The spot position manager and
-  Wrapped1155 factory remain deterministic stand-ins pending final production selection.
+  and redeems both positions with at most one wei of v4 rounding. It uses the deployed Ethereum
+  Wrapped1155 factory; only the spot tokens, guard, and position manager remain deterministic
+  stand-ins pending final production selection.
 
 These fixtures validate the singleton and full outer-transaction architecture, but not the final
-spot manager, Wrapped1155 factory, deployment addresses, calldata, or Safe batch. Deterministic
+spot manager, deployment addresses, calldata, or Safe batch. The pinned dependency evidence and
+unresolved fields are recorded in `production-mainnet-dependency-manifest.md`. Deterministic
 tests remain the exhaustive failure-path rollback evidence until the exact production dependency
 fixture is selected.
 
@@ -140,7 +142,7 @@ legal review remains a real-funds gate; this document is an engineering analysis
 2. Pin and independently verify the official Ethereum PoolManager runtime hash and every imported
    upstream file/license; complete legal review before real funds.
 3. Run every adversarial, conservation, rollback, gas, bytecode, configuration, and batch gate in
-   `production-amm-successor.md` against the final spot/wrapper dependencies and deployment config;
+   `production-amm-successor.md` against the final spot dependency and deployment config;
    repeat the now-passing source/CTF/two-pool manager lifecycle with those exact addresses.
 4. Complete independent contract and role review before funding.
 

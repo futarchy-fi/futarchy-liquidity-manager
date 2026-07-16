@@ -109,12 +109,17 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   irreversible bindings, mutated-code rejection, and rollback of the mined hook plus every earlier
   child when the final manager deployment fails. A pinned fork then drives the factory-deployed
   source, canonical Ethereum CTF, router, manager, and both conditional positions through atomic
-  activation and settlement against the official PoolManager. The final spot-position-manager and
-  Wrapped1155-factory addresses, exact production config, and manifest remain unbuilt.
+  activation and settlement against the official PoolManager and deployed Ethereum Wrapped1155
+  factory. That live factory exposed a semantic-order lookup failure when deterministic wrapper
+  addresses sort opposite the proposal pair; the adapter's read-only lookup now canonicalizes
+  either order while mutation entry points remain strictly ordered. The candidate spot position
+  manager and pinned dependency evidence are recorded in
+  `production-mainnet-dependency-manifest.md`; final tokens, roles, exact config, salt, batch, and
+  independent review remain unresolved.
 
 ## Required before any funded deployment
 
-- Promote the implemented v4 successor only after its final spot/periphery dependencies and exact
+- Promote the implemented v4 successor only after its final spot dependency and exact
   deployment configuration satisfy every requirement in `production-amm-successor.md`, including
   immutable burn liveness and materially larger gas headroom.
 - Re-run the complete unit and invariant suite, then run a deeper invariant pass:
