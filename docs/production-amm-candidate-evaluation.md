@@ -134,6 +134,11 @@ with its own Foundry configuration and Solidity 0.8.26:
   in kind, and after resolution the holder independently redeems the winner and consumes the loser.
   Survivor settlement and final exit leave aggregate company and collateral recovery within five
   wei. The fault-path redemption costs 1,417,015 gas under the same conservative accounting.
+- a late canonical collateral-side CTF merge failure during settlement is injected only after both
+  v4 positions are removed and company merge plus winner redemption have executed. The revert
+  restores the captured manager binding/accounting, both adapter positions, PoolManager balances,
+  CTF collateral and underlying custody, wrapper supply/custody, and router allowances. Clearing
+  the fault lets the identical permissionless settlement and final exit succeed.
 - at pinned block gas limit 60,000,000, conservative transaction accounting charges 21,000 base
   gas and 16 gas for every calldata byte. The atomic five-child bundle costs 12,125,922 gas,
   source/CTF/two-pool activation costs 2,343,088 gas, the symmetric donated-fee partial

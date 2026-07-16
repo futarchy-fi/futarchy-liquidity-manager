@@ -77,6 +77,12 @@ still merges normally; the company slice is paid as exact YES/NO wrappers. After
 holder redeems the winner and consumes the loser independently, the survivor settles and exits,
 and aggregate recovery of both base assets remains within five wei.
 
+A settlement rollback run faults the canonical collateral-side CTF merge only after the company
+merge and winner redemption have executed. The failed permissionless sync restores both v4
+positions, captured manager binding/accounting, PoolManager balances, CTF collateral/underlying
+custody, wrapper supply/custody, and allowances. Clearing the fault lets the identical sync and
+final exit complete.
+
 Nine rollback variants fault official-v3 spot principal removal, each canonical CTF split, wrapper
 conversion on each underlying, and each official-PoolManager initialization and first-liquidity
 call. Each failed outer proposal write restores the empty source registry, actual spot NFT and

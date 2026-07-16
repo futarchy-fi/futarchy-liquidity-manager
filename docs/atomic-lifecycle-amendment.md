@@ -389,7 +389,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | Resolved wrappers are donated after settlement but before the next activation | The stored winner and durable wrapper snapshot convert them before a later spot sync, deposit, redemption, or activation; pricing and payout include the value, and activation cannot orphan it by replacing pointers. |
 | Fees, donations, deposits, redemptions, settlement, and emergency actions are repeatedly interleaved | Every successful deposit and redemption preserves existing-holder value per share; issued assets stay in known custody, zero supply leaves no managed residue, settlement remains callable during emergency mode, and emergency execution leaves no position liquidity. |
 | Merge router is unavailable or maliciously reverts | Withdrawing outcome slice is paid in kind. The pinned-mainnet fixture faults the canonical company-side CTF merge, proves collateral still merges, then independently redeems/consumes the exact company wrappers after resolution and conserves both assets through final exit. |
-| Settlement router reverts, partially consumes, or underpays | The whole settlement reverts; active positions and the captured binding remain intact. |
+| Settlement router reverts, partially consumes, or underpays | The whole settlement reverts; active positions and the captured binding remain intact. The pinned-mainnet late-fault run executes both v4 removals and company merge/winner redemption before the collateral CTF merge reverts, compares protocol custody and positions, then completes the identical settlement after the fault is cleared. |
 | Rounding across sequential redemptions | No overpayment; survivor ratio never falls; final holder receives dust. |
 | Bundle, activation, or conditional redemption approaches the Ethereum block limit | The pinned mainnet fork charges base gas plus worst-case nonzero calldata, compares each transaction to the block's actual 60,000,000 gas limit, and requires more than half a block of headroom. |
 | Direct native transfer bypasses the six-token accounting model | Reverts; native currency is accepted only from the immutable wrapped-collateral contract during an unwrap. Unavoidable forced native currency is not a supported deposit or donation and remains sweepable only after share supply reaches zero. |
@@ -440,6 +440,9 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 - settle correctly after one or many partial redemptions;
 - consume explicitly any losing-token residue when the losing balance exceeds the winner, including
   settlement after the final unresolved redemption has reduced FLM supply to zero; and
+- on the pinned full mainnet stack, fault a late canonical CTF settlement call after prior
+  cross-protocol recovery, compare binding/accounting and actual custody/positions, then retry the
+  identical permissionless settlement; and
 - repeat partial fee-bearing removal on a real Algebra fork with a gas bound.
 
 ### Math and bytecode

@@ -38,6 +38,9 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   production guard. A canonical company-side CTF merge fault also proves per-underlying isolation:
   collateral still merges, the company slice is paid as exact YES/NO wrappers, and those wrappers
   remain independently redeemable/consumable after resolution without breaking final conservation.
+  A late collateral-side CTF merge fault after company merge/winner recovery also proves that both
+  removed v4 positions, the captured binding, protocol custody, wrapper supply, and allowances roll
+  back before an identical permissionless settlement succeeds.
   Its direct adapter fork additionally proves that the pinned owner's maximum
   protocol-fee configuration and a third party's otherwise identical position cannot block or
   consume the FLM position's partial or final removal.

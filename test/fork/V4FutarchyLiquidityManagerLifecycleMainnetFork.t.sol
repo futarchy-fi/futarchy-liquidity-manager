@@ -107,7 +107,11 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
     }
 
     function testFork_realCompanyMergeFailurePaysExactInKindAndRemainsRedeemable() public {
-        _runLifecycle(true, false, ActivationFault.None, true);
+        _runLifecycle(true, false, ActivationFault.None, true, false);
+    }
+
+    function testFork_lateRealSettlementMergeFailureRollsBackAndRetrySucceeds() public {
+        _runLifecycle(true, false, ActivationFault.None, false, true);
     }
 
     function testFork_spotRemovalFailureRollsBackAndRetrySucceeds() public {
@@ -149,14 +153,15 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
     function _runLifecycle(bool yesWins, bool singleLegBeforeExit, ActivationFault activationFault)
         private
     {
-        _runLifecycle(yesWins, singleLegBeforeExit, activationFault, false);
+        _runLifecycle(yesWins, singleLegBeforeExit, activationFault, false, false);
     }
 
     function _runLifecycle(
         bool yesWins,
         bool singleLegBeforeExit,
         ActivationFault activationFault,
-        bool companyMergeFault
+        bool companyMergeFault,
+        bool settlementMergeFault
     ) private {
         if (!vm.envOr("RUN_MAINNET_FORK_TESTS", false)) return;
         vm.createSelectFork(
@@ -537,6 +542,95 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         payouts[yesWins ? 0 : 1] = 1;
         ctf.reportPayouts(questionId, payouts);
         source.clearOfficialProposal();
+        if (settlementMergeFault) {
+            uint128 yesPositionBefore =
+                conditional.positionLiquidity(_pairKey(yesCompany, yesCollateral));
+            uint128 noPositionBefore =
+                conditional.positionLiquidity(_pairKey(noCompany, noCollateral));
+            uint256 companyManagerBefore = company.balanceOf(address(manager));
+            uint256 collateralManagerBefore = collateral.balanceOf(address(manager));
+            uint256 companyCtfBefore = company.balanceOf(CONDITIONAL_TOKENS);
+            uint256 collateralCtfBefore = collateral.balanceOf(CONDITIONAL_TOKENS);
+            address[4] memory settlementOutcomes =
+                [yesCompany, noCompany, yesCollateral, noCollateral];
+            uint256[4] memory suppliesBefore;
+            uint256[4] memory managerBalancesBefore;
+            uint256[4] memory poolManagerBalancesBefore;
+            uint256[4] memory factoryUnderlyingBefore;
+            uint256[4] memory routerAllowancesBefore;
+            for (uint256 i; i < settlementOutcomes.length; ++i) {
+                address outcome = settlementOutcomes[i];
+                suppliesBefore[i] = IERC20(outcome).totalSupply();
+                managerBalancesBefore[i] = IERC20(outcome).balanceOf(address(manager));
+                poolManagerBalancesBefore[i] = IERC20(outcome).balanceOf(POOL_MANAGER);
+                routerAllowancesBefore[i] =
+                    IERC20(outcome).allowance(address(manager), address(router));
+                factoryUnderlyingBefore[i] =
+                    ctf.balanceOf(WRAPPED_1155_FACTORY, ICanonicalWrapped1155(outcome).tokenId());
+            }
+
+            bytes memory settlementFaultData =
+                abi.encodeWithSignature("Error(string)", "injected settlement fault");
+            vm.mockCallRevert(
+                CONDITIONAL_TOKENS,
+                abi.encodePacked(
+                    IFutarchyConditionalTokens.mergePositions.selector,
+                    bytes32(uint256(uint160(address(collateral))))
+                ),
+                settlementFaultData
+            );
+            vm.expectCall(
+                CONDITIONAL_TOKENS,
+                abi.encodePacked(
+                    IFutarchyConditionalTokens.mergePositions.selector,
+                    bytes32(uint256(uint160(address(company))))
+                )
+            );
+            vm.expectCall(
+                CONDITIONAL_TOKENS,
+                abi.encodePacked(
+                    IFutarchyConditionalTokens.redeemPositions.selector,
+                    bytes32(uint256(uint160(address(company))))
+                )
+            );
+            vm.expectRevert(settlementFaultData);
+            manager.sync();
+
+            assertTrue(manager.inConditionalMode());
+            assertEq(manager.activeProposal(), address(proposal));
+            assertEq(manager.activeConditionId(), conditionId);
+            assertEq(manager.conditionalYesLiquidity(), yesPositionBefore);
+            assertEq(manager.conditionalNoLiquidity(), noPositionBefore);
+            assertEq(
+                conditional.positionLiquidity(_pairKey(yesCompany, yesCollateral)),
+                yesPositionBefore
+            );
+            assertEq(
+                conditional.positionLiquidity(_pairKey(noCompany, noCollateral)), noPositionBefore
+            );
+            assertEq(company.balanceOf(address(manager)), companyManagerBefore);
+            assertEq(collateral.balanceOf(address(manager)), collateralManagerBefore);
+            assertEq(company.balanceOf(CONDITIONAL_TOKENS), companyCtfBefore);
+            assertEq(collateral.balanceOf(CONDITIONAL_TOKENS), collateralCtfBefore);
+            FutarchyOfficialProposalSource.OfficialProposal memory clearedOfficial =
+                source.currentOfficialProposal();
+            assertFalse(clearedOfficial.exists);
+            for (uint256 i; i < settlementOutcomes.length; ++i) {
+                address outcome = settlementOutcomes[i];
+                assertEq(IERC20(outcome).totalSupply(), suppliesBefore[i]);
+                assertEq(IERC20(outcome).balanceOf(address(manager)), managerBalancesBefore[i]);
+                assertEq(IERC20(outcome).balanceOf(POOL_MANAGER), poolManagerBalancesBefore[i]);
+                assertEq(
+                    IERC20(outcome).allowance(address(manager), address(router)),
+                    routerAllowancesBefore[i]
+                );
+                assertEq(
+                    ctf.balanceOf(WRAPPED_1155_FACTORY, ICanonicalWrapped1155(outcome).tokenId()),
+                    factoryUnderlyingBefore[i]
+                );
+            }
+            vm.clearMockedCalls();
+        }
         assertEq(
             uint256(manager.sync()), uint256(FutarchyLiquidityManager.SyncAction.MigratedBackToSpot)
         );
