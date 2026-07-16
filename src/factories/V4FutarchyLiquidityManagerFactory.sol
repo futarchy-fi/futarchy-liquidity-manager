@@ -119,7 +119,7 @@ contract V4FutarchyLiquidityManagerFactory {
                 || address(poolStabilityGuard) == address(0) || address(wrappedNative) == address(0)
         ) revert ZeroAddress();
         if (
-            address(spotPositionManager).code.length == 0
+            address(spotPositionManager).code.length == 0 || address(v4PoolManager).code.length == 0
                 || address(v4PoolManager).codehash != v4PoolManagerCodehash
                 || address(conditionalRouter).code.length == 0
                 || address(poolStabilityGuard).code.length == 0

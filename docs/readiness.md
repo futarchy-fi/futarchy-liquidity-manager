@@ -28,7 +28,8 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   factory tests prove the invalid two-bucket configuration cannot persist.
 - Manager and factory construction reject code-less token, router, adapter, guard, and AMM
   dependencies; direct tests and a failed permissionless bundle prove the invalid wiring cannot
-  persist.
+  persist. The v4 factory rejects a code-less PoolManager even when its supplied expected hash
+  matches the empty account's code hash.
 - Strict deployment preflight independently rejects that identical pair and requires the frozen
   validation policy's proposal/collateral tokens to equal the manager pair. The deployment script
   also requires code at every configured token, AMM, router, and guard address before broadcast.
@@ -142,12 +143,15 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   manager accounting/custody invariants runs 256 times at depth 500 (128,000 calls each), while the
   two UniV3 invariants retain their stricter inline 256-by-512 configuration (131,072 calls each).
   The final candidate must re-run this gate after its exact configuration is fixed.
-- The current 234-test suite also passes Foundry's coverage profile with `--ir-minimum` (required
-  because unoptimized instrumentation exceeds Solidity's stack limit). The manager reports 92.50%
+- The current 236-test instrumented suite also passes Foundry's coverage profile with `--ir-minimum`
+  after excluding the production-profile-only artifact-hash assertion (coverage deliberately
+  recompiles different bytecode). This flag is required because unoptimized instrumentation
+  exceeds Solidity's stack limit. The manager reports 92.50%
   line, 90.91% statement, 68.63% branch, and 98.61% function coverage. Production compilation
   independently confirms a 24,171-byte manager runtime, 405 bytes below EIP-170.
-- The current 236-test normal suite adds artifact-drift and permissionless interleaving checks; the
-  latter proves all five precomputed CREATE2 addresses survive an unrelated bundle deployment.
+- The current 237-test normal suite adds artifact-drift, permissionless interleaving, and code-less
+  PoolManager checks; the interleaving test proves all five precomputed CREATE2 addresses survive
+  an unrelated bundle deployment.
 - The current compiler profile and bare creation-code hashes for the v4 factory and all five
   children are pinned in `production-mainnet-dependency-manifest.md`; an executable drift test
   requires an explicit manifest update whenever any artifact changes.

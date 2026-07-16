@@ -218,7 +218,7 @@ contract V4FutarchyLiquidityManagerFactoryTest is Test {
         );
         assertEq(
             keccak256(type(V4FutarchyLiquidityManagerFactory).creationCode),
-            0x05f8e6f496c81090d5d14773d99ccc5710fef674eaf0f6e5519c632a3eef27c6
+            0x1cda82794a379f634d9b889b9c9bc914c80685da0673296633c00e0d36caab3a
         );
     }
 
@@ -226,6 +226,17 @@ contract V4FutarchyLiquidityManagerFactoryTest is Test {
         vm.expectRevert(V4FutarchyLiquidityManagerFactory.InvalidDependency.selector);
         _newFactoryWith(
             bytes32(uint256(1)),
+            stabilityGuard,
+            keccak256(type(FutarchyLiquidityManager).creationCode)
+        );
+    }
+
+    function test_constructorRejectsCodeLessPoolManagerEvenWhenHashMatches() public {
+        vm.etch(address(v4PoolManager), "");
+
+        vm.expectRevert(V4FutarchyLiquidityManagerFactory.InvalidDependency.selector);
+        _newFactoryWith(
+            address(v4PoolManager).codehash,
             stabilityGuard,
             keccak256(type(FutarchyLiquidityManager).creationCode)
         );
