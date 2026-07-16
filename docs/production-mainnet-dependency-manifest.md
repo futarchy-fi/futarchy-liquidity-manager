@@ -100,9 +100,10 @@ manager/adapter/v3-pool/NPM balances, share supply, and the unexecuted emergency
 identical outsider retry receives no shares or tokens, and final shareholder redemption recovers
 both bootstrap assets within two wei.
 
-Nine rollback variants fault official-v3 spot principal removal, each canonical CTF split, wrapper
-conversion on each underlying, and each official-PoolManager initialization and first-liquidity
-call. Each failed outer proposal write restores the empty source registry, actual spot NFT and
+Ten rollback variants fault official-v3 spot principal removal, each canonical CTF split, wrapper
+conversion on each underlying, each official-PoolManager initialization and first-liquidity call,
+and source capture verification after the real activation completes. Each failed outer proposal
+write restores the empty source registry, actual spot NFT and
 liquidity, base custody and allowances, CTF underlying custody, wrapper supplies and custody,
 PoolManager balances, and absent YES/NO adapter positions. Clearing the fault lets the identical
 proposal activate, so no failed initialization or later first-liquidity call leaves a latent

@@ -129,9 +129,10 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   the first mint so the initialization observation survives. Pinned dependency evidence is
   recorded in `production-mainnet-dependency-manifest.md`; final tokens, roles, exact config, salt,
   batch, and independent review remain unresolved.
-  Nine full-stack fault runs inject a revert at official-v3 spot principal removal, each canonical
-  CTF split, wrapper conversion on each underlying, and each official-PoolManager initialization
-  and first-liquidity call. Each failed outer proposal write restores the empty registry, actual
+  Ten full-stack fault runs inject a revert at official-v3 spot principal removal, each canonical
+  CTF split, wrapper conversion on each underlying, each official-PoolManager initialization and
+  first-liquidity call, and source capture verification after activation completes. Each failed
+  outer proposal write restores the empty registry, actual
   spot NFT and liquidity, base custody and allowances, CTF underlying custody, wrapper supplies
   and custody, PoolManager balances, and both absent conditional positions. Clearing the injected
   fault then lets the identical proposal activate, proving the failed attempt left no live-pool
@@ -183,13 +184,13 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   across nine randomized actions, while the two UniV3 invariants retain their stricter inline
   256-by-512 configuration (131,072 calls each). The final candidate must re-run this gate after
   its exact configuration is fixed.
-- The current 253-test instrumented suite also passes Foundry's coverage profile with `--ir-minimum`
+- The current 254-test instrumented suite also passes Foundry's coverage profile with `--ir-minimum`
   after excluding the production-profile-only artifact-hash assertion (coverage deliberately
   recompiles different bytecode). This flag is required because unoptimized instrumentation
   exceeds Solidity's stack limit. The manager reports 93.06%
   line, 91.20% statement, 67.65% branch, and 98.61% function coverage. Production compilation
   independently confirms a 24,171-byte manager runtime, 405 bytes below EIP-170.
-- The current 254-test normal suite includes direct emergency-handler reachability, nine
+- The current 255-test normal suite includes direct emergency-handler reachability, ten
   pinned-mainnet activation rollback cases, and a fifth invariant that requires executed emergency
   mode to leave every manager position at zero liquidity. Artifact drift, permissionless bundle
   interleaving, code-less PoolManager, and immutable spot-tick-policy checks remain green.
@@ -220,7 +221,7 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 | Second conditional removal during emergency unwind | `testFork_outsiderEmergencyRollbackKeepsUnresolvedRedemptionLive` executes the first official-v4 removal before faulting the second adapter boundary, proves both positions, PoolManager/manager custody, accounting, shares, and the emergency flag roll back, then completes the identical outsider retry, unresolved shareholder redemption, and source-independent survivor settlement. |
 | Official-v3 spot emergency unwind | `testFork_outsiderSpotEmergencyRollbackPreservesSharesAndAssets` faults principal removal after fee collection; `testFork_outsiderSpotEmergencyBurnRollbackPreservesSharesAndAssets` faults NFT burn after fee collection, full principal removal, and principal collection. Both prove the NFT/liquidity, manager/adapter/v3-pool/NPM balances, shares, and emergency flag restore, then let the same outsider retry with zero gain and recover both bootstrap assets within two wei. |
 | AMM create, initialize, or first mint | `test_freshAddPoolCreateAndInitializeFailuresRollBack`, `test_freshAddFirstMintFailureRollsBackPoolAndCustody`, and `test_firstLiquidityFailureRollsBackInitializationAndCustody`. |
-| Outer lifecycle step after successful activation | `test_atomic_activation_uses_captured_source_snapshot` forces its resolver step to revert and compares the complete source, manager, spot, CTF, router, wrapper, pool, balance, and allowance envelope. |
+| Outer lifecycle step after successful activation | `test_atomic_activation_uses_captured_source_snapshot` covers the complete mock envelope. `testFork_postActivationVerificationFailureRollsBackAndRetrySucceeds` faults the source capture read only after the real manager activation completes, restores the source, spot NFT, CTF/wrapper custody, and both official-v4 positions, then retries the identical proposal. |
 | Atomic bundle deployment/wiring | `test_lateManagerFailureRollsBackHookAndEveryCreate`, `test_sameTokenManagerFailureAlsoRollsBackMinedHook`, and the empty-runtime/initcode/hash fault cases. |
 
 ## Required before any funded deployment

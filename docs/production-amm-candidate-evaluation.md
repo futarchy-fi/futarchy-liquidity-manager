@@ -111,9 +111,10 @@ with its own Foundry configuration and Solidity 0.8.26:
   Wrapped1155 factory. Combined v3/v4 rounding leaves at most two wei per base asset; only the spot
   tokens remain deterministic stand-ins. The production v3 guard passes after the fixture raises
   observation cardinality before the first mint and waits its full 30-minute history window.
-- nine fault variants of that full fixture revert official-v3 spot principal removal, each
-  canonical CTF split, wrapper conversion on each underlying, and each official-v4 initialization
-  and first-liquidity call. Each restores the empty source registry, actual spot NFT/liquidity,
+- ten fault variants of that full fixture revert official-v3 spot principal removal, each
+  canonical CTF split, wrapper conversion on each underlying, each official-v4 initialization and
+  first-liquidity call, and source capture verification after activation completes. Each restores
+  the empty source registry, actual spot NFT/liquidity,
   base custody and allowances, CTF underlying custody, wrapper supply and custody, PoolManager
   balances, and absent conditional positions. After clearing the fault, the identical proposal
   activates successfully.

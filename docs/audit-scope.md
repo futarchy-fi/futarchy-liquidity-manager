@@ -53,9 +53,10 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   bindings before returning. Final-address deployment configuration and production dependency
   selection remain outside the implemented surface. The full-stack fork also faults official-v3
   spot removal, both canonical CTF splits, wrapper conversion on each underlying, and each
-  official-PoolManager initialization and first-liquidity boundary independently. It verifies the
-  complete source, protocol-custody, spot-NFT, wrapper, and conditional-position rollback envelope
-  and proves an identical retry succeeds.
+  official-PoolManager initialization and first-liquidity boundary independently. A final fault at
+  the source capture read occurs only after manager activation completes. Each verifies the complete
+  source, protocol-custody, spot-NFT, wrapper, and conditional-position rollback envelope and proves
+  an identical retry succeeds.
 
 ## External Dependencies
 

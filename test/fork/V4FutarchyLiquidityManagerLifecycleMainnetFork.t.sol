@@ -66,7 +66,8 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         FirstV4Initialize,
         FirstV4Liquidity,
         SecondV4Initialize,
-        SecondV4Liquidity
+        SecondV4Liquidity,
+        PostActivationVerification
     }
 
     uint256 private constant FORK_BLOCK = 25_542_490;
@@ -161,6 +162,10 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
 
     function testFork_secondRealV4LiquidityFailureRollsBackAndRetrySucceeds() public {
         _runLifecycle(true, false, ActivationFault.SecondV4Liquidity);
+    }
+
+    function testFork_postActivationVerificationFailureRollsBackAndRetrySucceeds() public {
+        _runLifecycle(true, false, ActivationFault.PostActivationVerification);
     }
 
     function _runLifecycle(bool yesWins, bool singleLegBeforeExit, ActivationFault activationFault)
@@ -1183,6 +1188,12 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
                     _v4PoolKey(conditional, outcomes[1], outcomes[3]),
                     uint160(1 << 96)
                 ),
+                faultData
+            );
+        } else if (fault == ActivationFault.PostActivationVerification) {
+            vm.mockCallRevert(
+                address(manager),
+                FutarchyLiquidityManager.capturedOfficialProposal.selector,
                 faultData
             );
         } else {
