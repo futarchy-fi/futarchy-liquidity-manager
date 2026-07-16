@@ -103,7 +103,8 @@ with its own Foundry configuration and Solidity 0.8.26:
   and redeems both positions. It also creates a spot pool, mints its NFT, and removes the migration
   slice through the deployed mainnet Uniswap v3 position manager, while using the deployed Ethereum
   Wrapped1155 factory. Combined v3/v4 rounding leaves at most two wei per base asset; only the spot
-  tokens and guard remain deterministic stand-ins pending final production selection.
+  tokens remain deterministic stand-ins. The production v3 guard passes after the fixture raises
+  observation cardinality before the first mint and waits its full 30-minute history window.
 
 These fixtures validate the singleton and full outer-transaction architecture, but not the final
 spot manager, deployment addresses, calldata, or Safe batch. The pinned dependency evidence and

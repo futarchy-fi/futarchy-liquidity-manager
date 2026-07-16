@@ -29,6 +29,12 @@ Uniswap v3 spot adapter, v4 conditional adapter, and manager. The factory must p
 creation-code hashes and the PoolManager runtime hash above. Its creator-bound CREATE2 salt must be
 mined and reproduced for the final Safe sender; no relay may substitute for that sender.
 
+The full fork also deploys the production `UniV3PoolStabilityGuard` against the official v3 factory.
+It raises the fresh spot pool's observation cardinality to two before the first mint, preserves the
+initial observation, waits the full 30-minute window, and proves both bootstrap and activation
+checks. Without that second observation slot, the first mint overwrites the only observation and
+the later TWAP correctly reverts `OLD`.
+
 ## Unresolved deployment fields
 
 Do not render or sign a production batch until one reviewed manifest revision fixes and verifies:
@@ -44,5 +50,6 @@ Do not render or sign a production batch until one reviewed manifest revision fi
   reproduction sign-off.
 
 Until those fields are fixed, the v3 spot position manager remains a pinned candidate rather than
-a production selection. The full fixture correctly uses deterministic spot tokens and guard while
-using the real v3 position manager, v4 PoolManager, CTF, and Wrapped1155Factory.
+a production selection. The full fixture correctly uses deterministic spot tokens while using the
+production spot guard implementation, real v3 position manager, v4 PoolManager, CTF, and
+Wrapped1155Factory.

@@ -114,9 +114,11 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   addresses sort opposite the proposal pair; the adapter's read-only lookup now canonicalizes
   either order while mutation entry points remain strictly ordered. The candidate spot position
   manager is now codehash-pinned and exercised through spot pool creation, bootstrap mint, and
-  activation removal in that same fork. Its pinned dependency evidence is recorded in
-  `production-mainnet-dependency-manifest.md`; final tokens, roles, exact config, salt, batch, and
-  independent review remain unresolved.
+  activation removal in that same fork. The production v3 guard also enforces its real 30-minute
+  history and price checks there; the fixture proves observation cardinality must be raised before
+  the first mint so the initialization observation survives. Pinned dependency evidence is
+  recorded in `production-mainnet-dependency-manifest.md`; final tokens, roles, exact config, salt,
+  batch, and independent review remain unresolved.
 
 ## Required before any funded deployment
 

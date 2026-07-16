@@ -21,10 +21,11 @@ import {
     IFutarchyWrapped1155Factory
 } from "../../src/interfaces/IFutarchyConditionalDependencies.sol";
 import {IFutarchyConditionalRouter} from "../../src/interfaces/IFutarchyConditionalRouter.sol";
-import {IPoolStabilityGuard} from "../../src/interfaces/IPoolStabilityGuard.sol";
+import {IUniswapV3FactoryLike} from "../../src/interfaces/IUniswapV3FactoryLike.sol";
 import {
     IUniswapV3NonfungiblePositionManager
 } from "../../src/interfaces/IUniswapV3NonfungiblePositionManager.sol";
+import {UniV3PoolStabilityGuard} from "../../src/oracles/UniV3PoolStabilityGuard.sol";
 import {FutarchyConditionalRouter} from "../../src/routers/FutarchyConditionalRouter.sol";
 import {FutarchyOfficialProposalSource} from "../../src/sources/FutarchyOfficialProposalSource.sol";
 import {MockFutarchyProposalLike} from "../mocks/MockFutarchyProposalLike.sol";
@@ -41,22 +42,8 @@ interface IMainnetConditionalTokens is IFutarchyConditionalTokens {
     function reportPayouts(bytes32 questionId, uint256[] calldata payouts) external;
 }
 
-contract MainnetLifecycleSpotGuard is IPoolStabilityGuard {
-    address public immutable FACTORY;
-    uint24 public constant FEE = 500;
-    uint160 private constant Q96 = 1 << 96;
-
-    constructor(address factory) {
-        FACTORY = factory;
-    }
-
-    function assertStable(address) external pure {}
-
-    function assertStablePair(address, address) external pure {}
-
-    function assertStablePairAndGetSqrtPrice(address, address) external pure returns (uint160) {
-        return Q96;
-    }
+interface IMainnetUniV3Pool {
+    function increaseObservationCardinalityNext(uint16 observationCardinalityNext) external;
 }
 
 contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
@@ -110,7 +97,10 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
             spotToken0, spotToken1, 500, uint160(1 << 96)
         );
         assertGt(spotPool.code.length, 0);
-        MainnetLifecycleSpotGuard guard = new MainnetLifecycleSpotGuard(SPOT_FACTORY);
+        IMainnetUniV3Pool(spotPool).increaseObservationCardinalityNext(2);
+        vm.warp(block.timestamp + 30 minutes + 1);
+        UniV3PoolStabilityGuard guard =
+            new UniV3PoolStabilityGuard(IUniswapV3FactoryLike(SPOT_FACTORY), 500);
 
         V4FutarchyLiquidityManagerFactory factory = new V4FutarchyLiquidityManagerFactory(
             spotPositionManager,
