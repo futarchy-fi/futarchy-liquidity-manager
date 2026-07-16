@@ -4,6 +4,41 @@
 > pool precreation, mutable Algebra liquidity cooldown, and near-block-limit activation remain
 > unresolved. The commands below are retained for deterministic simulation and artifact review.
 
+## Ethereum-mainnet v4 factory
+
+The reviewed successor has a separate, mainnet-only factory deployment script. It deliberately
+deploys no child bundle and selects no FAO token, Safe, lifecycle role, validation policy, or salt.
+Start from the placeholder config and fill only independently reviewed values:
+
+```sh
+cp config/mainnet-v4-factory.example.json config/mainnet-v4-factory.production.json
+tools/validate-configs.sh --v4-factory config/mainnet-v4-factory.production.json
+```
+
+The config pins the conditional router and its CTF/Wrapped1155 dependencies, the v3 stability
+guard, the collateral token, their runtime code hashes, and the immutable spot ticks. The script
+also hard-pins the official Ethereum v3 NonfungiblePositionManager and v4 PoolManager addresses and
+runtime code hashes recorded in `production-mainnet-dependency-manifest.md`. It rejects any runtime
+drift and verifies that the router's immutable dependencies match the reviewed config before
+broadcast:
+
+```sh
+PRIVATE_KEY=... \
+FLM_V4_FACTORY_CONFIG=config/mainnet-v4-factory.production.json \
+FLM_V4_FACTORY_DEPLOY_OUTPUT=deployments/flm.v4.factory.mainnet.json \
+forge script script/DeployV4MainnetFactory.s.sol:DeployV4MainnetFactory \
+  --rpc-url "$MAINNET_RPC_URL" \
+  --broadcast \
+  --verify
+```
+
+The output records the input-file hash, factory creation/runtime hashes, every external dependency
+and runtime hash, both ticks, and all five child creation-code hashes. Treat it as factory evidence,
+not authorization to create or fund a bundle. Bundle prediction/deployment remains intentionally
+unimplemented until the unresolved fields in the mainnet dependency manifest are fixed.
+
+## Historical Gnosis/Algebra prototype
+
 Deployments are configured from JSON so addresses and bounds are reviewable before broadcasting.
 Do not edit addresses directly inside scripts for a real deployment.
 

@@ -6,12 +6,14 @@ cd "$ROOT"
 
 ALLOW_PLACEHOLDERS=false
 DEPLOY_FILES=()
+V4_FACTORY_FILES=()
 BATCH_FILES=()
 
 usage() {
   cat >&2 <<'USAGE'
 Usage:
-  tools/validate-configs.sh [--allow-placeholders] --deploy <file> [--batch <file> ...]
+  tools/validate-configs.sh [--allow-placeholders] [--deploy <file>] \
+    [--v4-factory <file>] [--batch <file> ...]
 
 Examples:
   tools/validate-configs.sh --allow-placeholders \
@@ -21,6 +23,9 @@ Examples:
   tools/validate-configs.sh \
     --deploy config/gnosis.production.json \
     --batch config/batches/bootstrap.production.json
+
+  tools/validate-configs.sh \
+    --v4-factory config/mainnet-v4-factory.production.json
 USAGE
 }
 
@@ -33,6 +38,11 @@ while [[ $# -gt 0 ]]; do
     --deploy)
       [[ $# -ge 2 ]] || { usage; exit 64; }
       DEPLOY_FILES+=("$2")
+      shift 2
+      ;;
+    --v4-factory)
+      [[ $# -ge 2 ]] || { usage; exit 64; }
+      V4_FACTORY_FILES+=("$2")
       shift 2
       ;;
     --batch)
@@ -52,7 +62,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ ${#DEPLOY_FILES[@]} -eq 0 && ${#BATCH_FILES[@]} -eq 0 ]]; then
+if [[ ${#DEPLOY_FILES[@]} -eq 0 && ${#V4_FACTORY_FILES[@]} -eq 0 && ${#BATCH_FILES[@]} -eq 0 ]]; then
   usage
   exit 64
 fi
@@ -173,6 +183,49 @@ deploy_strict_filter='
     else true
     end
   )
+'
+
+v4_factory_schema_filter='
+  def address: type == "string" and test("^0x[0-9a-fA-F]{40}$");
+  def bytes32: type == "string" and test("^0x[0-9a-fA-F]{64}$");
+  type == "object"
+  and (.chainId | type == "number" and . == 1)
+  and (.conditionalRouter | address)
+  and (.conditionalRouterCodeHash | bytes32)
+  and (.conditionalTokens | address)
+  and (.conditionalTokensCodeHash | bytes32)
+  and (.wrapped1155Factory | address)
+  and (.wrapped1155FactoryCodeHash | bytes32)
+  and (.poolStabilityGuard | address)
+  and (.poolStabilityGuardCodeHash | bytes32)
+  and (.wrappedNative | address)
+  and (.wrappedNativeCodeHash | bytes32)
+  and (.spotTickLower | type == "number")
+  and (.spotTickUpper | type == "number")
+'
+
+v4_factory_strict_filter='
+  def address: type == "string" and test("^0x[0-9a-fA-F]{40}$");
+  def bytes32: type == "string" and test("^0x[0-9a-fA-F]{64}$");
+  def zero: "0x0000000000000000000000000000000000000000";
+  def zero32: "0x0000000000000000000000000000000000000000000000000000000000000000";
+  def nzaddress: address and (ascii_downcase != zero);
+  def nzbytes32: bytes32 and (ascii_downcase != zero32);
+  (.conditionalRouter | nzaddress)
+  and (.conditionalRouterCodeHash | nzbytes32)
+  and (.conditionalTokens | nzaddress)
+  and (.conditionalTokensCodeHash | nzbytes32)
+  and (.wrapped1155Factory | nzaddress)
+  and (.wrapped1155FactoryCodeHash | nzbytes32)
+  and (.poolStabilityGuard | nzaddress)
+  and (.poolStabilityGuardCodeHash | nzbytes32)
+  and (.wrappedNative | nzaddress)
+  and (.wrappedNativeCodeHash | nzbytes32)
+  and (.spotTickLower >= -887272)
+  and (.spotTickUpper <= 887272)
+  and (.spotTickLower < .spotTickUpper)
+  and ((.spotTickLower % 10) == 0)
+  and ((.spotTickUpper % 10) == 0)
 '
 
 batch_schema_filter='
@@ -330,6 +383,17 @@ if [[ ${#DEPLOY_FILES[@]} -gt 0 ]]; then
         "strict deployment config must use nonzero production addresses and enabled proposal validation"
     fi
     echo "deployment config validation passed: $file"
+  done
+fi
+
+if [[ ${#V4_FACTORY_FILES[@]} -gt 0 ]]; then
+  for file in "${V4_FACTORY_FILES[@]}"; do
+    require_jq "$file" "$v4_factory_schema_filter" "v4 mainnet factory config schema is invalid"
+    if [[ "$ALLOW_PLACEHOLDERS" == false ]]; then
+      require_jq "$file" "$v4_factory_strict_filter" \
+        "strict v4 factory config must pin code-bearing dependencies and aligned spot ticks"
+    fi
+    echo "v4 mainnet factory config validation passed: $file"
   done
 fi
 

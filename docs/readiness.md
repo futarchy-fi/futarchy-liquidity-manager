@@ -158,6 +158,10 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 - The current compiler profile and bare creation-code hashes for the v4 factory and all five
   children are pinned in `production-mainnet-dependency-manifest.md`; an executable drift test
   requires an explicit manifest update whenever any artifact changes.
+- The mainnet-only factory deployment handoff reads a reviewable config, refuses any dependency
+  runtime-codehash drift or router dependency mismatch, hard-pins the official v3 position manager
+  and v4 PoolManager, and emits a config-linked factory artifact. It deliberately cannot create a
+  bundle or select unresolved roles, tokens, validation, salt, or funding.
 
 ## Atomic rollback evidence map
 

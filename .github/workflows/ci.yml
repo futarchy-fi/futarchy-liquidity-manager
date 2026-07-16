@@ -44,6 +44,7 @@ jobs:
           done
           bash tools/validate-configs.sh --allow-placeholders \
             --deploy config/gnosis.example.json \
+            --v4-factory config/mainnet-v4-factory.example.json \
             "${batch_args[@]}"
 
       - name: Batch template generation
@@ -59,4 +60,6 @@ jobs:
         run: forge test
 
       - name: Coverage summary
-        run: forge coverage --ir-minimum --report summary
+        run: >-
+          forge coverage --ir-minimum --report summary
+          --no-match-test test_candidateCreationCodeHashesMatchMainnetManifest

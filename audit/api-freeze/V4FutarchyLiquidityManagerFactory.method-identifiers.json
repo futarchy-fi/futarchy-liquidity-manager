@@ -16,5 +16,6 @@
   "WRAPPED_NATIVE()": "d999984d",
   "createLiquidityManager((address,address,address,address,address,address,string,string,bytes,bytes32),(bytes,bytes,bytes,bytes,bytes))": "d652fae8",
   "effectiveHookSalt(address,bytes32)": "d745533b",
+  "predictBundleAddresses(address,(address,address,address,address,address,address,string,string,bytes,bytes32),(bytes,bytes,bytes,bytes,bytes))": "cd6b1872",
   "predictHookAddress(address,bytes32,bytes)": "19c9bb3e"
 }

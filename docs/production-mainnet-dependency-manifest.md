@@ -48,6 +48,13 @@ hash. Under that exact profile, the bare creation-code hashes are:
 candidate build identities, not deployed-address or audit approval claims; any reviewed source or
 compiler change must deliberately update both the test and this table.
 
+`DeployV4MainnetFactory.s.sol` is the executable factory-only handoff for this manifest. It accepts
+a reviewed `mainnet-v4-factory` config, requires Ethereum chain ID 1, rechecks the official v3 and
+v4 addresses and runtime hashes above, verifies every selected router/CTF/wrapper/guard/collateral
+runtime hash plus the router's immutable dependency binding, and records the config hash, deployed
+factory creation/runtime hashes, and all five child creation-code hashes. It cannot create a child
+bundle, choose a raw salt, or move funds.
+
 The full fork also deploys the production `UniV3PoolStabilityGuard` against the official v3 factory.
 It raises the fresh spot pool's observation cardinality to two before the first mint, preserves the
 initial observation, waits the full 30-minute window, and proves both bootstrap and activation
