@@ -137,13 +137,17 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   2,343,088 gas for source/CTF/two-pool activation, 1,460,745 gas for symmetric donated-fee partial
   redemption, and 1,487,553 gas for asymmetric in-kind redemption. The fork asserts each remains
   below half a block, leaving more than 30,000,000 gas of explicit headroom.
+- At commit `7b1ff9d`, the prescribed deep invariant command passes with zero reverts: each of four
+  manager accounting/custody invariants runs 256 times at depth 500 (128,000 calls each), while the
+  two UniV3 invariants retain their stricter inline 256-by-512 configuration (131,072 calls each).
+  The final candidate must re-run this gate after its exact configuration is fixed.
 
 ## Required before any funded deployment
 
 - Promote the implemented v4 successor only after its final spot dependency and exact
   deployment configuration satisfy every requirement in `production-amm-successor.md`, including
   immutable burn liveness and materially larger gas headroom.
-- Re-run the complete unit and invariant suite, then run a deeper invariant pass:
+- Re-run the complete unit and invariant suite on the final candidate, then repeat the deeper pass:
 
   ```sh
   FOUNDRY_INVARIANT_RUNS=256 FOUNDRY_INVARIANT_DEPTH=500 \

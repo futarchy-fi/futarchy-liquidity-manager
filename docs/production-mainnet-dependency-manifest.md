@@ -53,6 +53,11 @@ redemption after symmetric live v4 donations is `1,460,745` gas; the asymmetric 
 `1,487,553` gas. The fork asserts each stays below half the block limit. These are fixture bounds,
 not estimates for still-unknown final token or coordinator calldata.
 
+At commit `7b1ff9d`, the required deep invariant command also passes: four manager invariants each
+execute 256 runs at depth 500 (128,000 calls) and two UniV3 invariants retain their stricter inline
+256-by-512 setting (131,072 calls), with zero reverts throughout. Re-run it after fixing every
+deployment field below.
+
 ## Unresolved deployment fields
 
 Do not render or sign a production batch until one reviewed manifest revision fixes and verifies:
