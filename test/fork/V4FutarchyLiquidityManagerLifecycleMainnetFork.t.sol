@@ -106,6 +106,10 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         _runLifecycle(true, true, ActivationFault.None);
     }
 
+    function testFork_realCompanyMergeFailurePaysExactInKindAndRemainsRedeemable() public {
+        _runLifecycle(true, false, ActivationFault.None, true);
+    }
+
     function testFork_spotRemovalFailureRollsBackAndRetrySucceeds() public {
         _runLifecycle(true, false, ActivationFault.SpotRemoval);
     }
@@ -145,6 +149,15 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
     function _runLifecycle(bool yesWins, bool singleLegBeforeExit, ActivationFault activationFault)
         private
     {
+        _runLifecycle(yesWins, singleLegBeforeExit, activationFault, false);
+    }
+
+    function _runLifecycle(
+        bool yesWins,
+        bool singleLegBeforeExit,
+        ActivationFault activationFault,
+        bool companyMergeFault
+    ) private {
         if (!vm.envOr("RUN_MAINNET_FORK_TESTS", false)) return;
         vm.createSelectFork(
             vm.envOr("MAINNET_RPC_URL", string("https://rpc.mevblocker.io")), FORK_BLOCK
@@ -365,6 +378,16 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         bytes memory redemptionCalldata = abi.encodeWithSelector(
             FutarchyLiquidityManager.redeem.selector, partialShares, partialHolder, false
         );
+        if (companyMergeFault) {
+            vm.mockCallRevert(
+                CONDITIONAL_TOKENS,
+                abi.encodePacked(
+                    IFutarchyConditionalTokens.mergePositions.selector,
+                    bytes32(uint256(uint160(address(company))))
+                ),
+                abi.encodeWithSignature("Error(string)", "injected merge fault")
+            );
+        }
         vm.prank(partialHolder);
         gasBefore = gasleft();
         (uint256 partialCompanyOut, uint256 partialCollateralOut) =
@@ -380,15 +403,7 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
             "partial redemption has less than half-block headroom"
         );
 
-        assertEq(company.balanceOf(partialHolder), partialCompanyOut);
-        assertEq(collateral.balanceOf(partialHolder), partialCollateralOut);
         uint256 expectedPartialOut = (AMOUNT + DONATION) * partialShares / supplyBeforePartial;
-        assertApproxEqAbs(
-            partialCompanyOut, expectedPartialOut, 4, "company fees were not paid pro rata"
-        );
-        assertApproxEqAbs(
-            partialCollateralOut, expectedPartialOut, 4, "collateral fees were not paid pro rata"
-        );
         assertEq(manager.totalSupply(), supplyBeforePartial - partialShares);
         assertEq(
             manager.spotLiquidity(),
@@ -411,6 +426,67 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
             "partial redemption replaced spot NFT"
         );
         uint256 partialYesCompany = IERC20(yesCompany).balanceOf(partialHolder);
+        if (companyMergeFault) {
+            uint256 partialNoCompany = IERC20(noCompany).balanceOf(partialHolder);
+            assertGt(partialYesCompany, 0);
+            assertEq(partialNoCompany, partialYesCompany);
+            assertEq(company.balanceOf(partialHolder), partialCompanyOut);
+            assertEq(collateral.balanceOf(partialHolder), partialCollateralOut);
+            assertLt(partialCompanyOut, expectedPartialOut);
+            assertApproxEqAbs(partialCompanyOut + partialYesCompany, expectedPartialOut, 4);
+            assertApproxEqAbs(partialCollateralOut, expectedPartialOut, 4);
+            assertEq(IERC20(yesCollateral).balanceOf(partialHolder), 0);
+            assertEq(IERC20(noCollateral).balanceOf(partialHolder), 0);
+
+            vm.clearMockedCalls();
+            uint256[] memory mergeFaultPayouts = new uint256[](2);
+            mergeFaultPayouts[0] = 1;
+            ctf.reportPayouts(questionId, mergeFaultPayouts);
+            source.clearOfficialProposal();
+            assertEq(
+                uint256(manager.sync()),
+                uint256(FutarchyLiquidityManager.SyncAction.MigratedBackToSpot)
+            );
+
+            vm.startPrank(partialHolder);
+            IERC20(yesCompany).approve(address(router), partialYesCompany);
+            router.redeemPositions(
+                address(company), conditionId, yesCompany, noCompany, partialYesCompany
+            );
+            IERC20(noCompany).approve(address(router), partialNoCompany);
+            router.consumeLosingPositions(
+                address(company), conditionId, yesCompany, noCompany, partialNoCompany
+            );
+            vm.stopPrank();
+            assertEq(IERC20(yesCompany).balanceOf(partialHolder), 0);
+            assertEq(IERC20(noCompany).balanceOf(partialHolder), 0);
+            assertEq(company.balanceOf(partialHolder), partialCompanyOut + partialYesCompany);
+
+            manager.redeem(manager.balanceOf(address(this)), address(this), false);
+            assertEq(manager.totalSupply(), 0);
+            assertEq(manager.spotLiquidity(), 0);
+            assertEq(spot.getPositionTokenId(address(company), address(collateral)), 0);
+            assertApproxEqAbs(
+                company.balanceOf(address(this)) + company.balanceOf(partialHolder),
+                AMOUNT + DONATION,
+                5
+            );
+            assertApproxEqAbs(
+                collateral.balanceOf(address(this)) + collateral.balanceOf(partialHolder),
+                AMOUNT + DONATION,
+                5
+            );
+            return;
+        }
+
+        assertEq(company.balanceOf(partialHolder), partialCompanyOut);
+        assertEq(collateral.balanceOf(partialHolder), partialCollateralOut);
+        assertApproxEqAbs(
+            partialCompanyOut, expectedPartialOut, 4, "company fees were not paid pro rata"
+        );
+        assertApproxEqAbs(
+            partialCollateralOut, expectedPartialOut, 4, "collateral fees were not paid pro rata"
+        );
         if (singleLegBeforeExit) {
             assertApproxEqAbs(
                 partialYesCompany,

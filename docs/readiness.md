@@ -148,24 +148,28 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   manager, so no losing fee is converted into base value. A third run places the single-leg fee
   before the unresolved exit: the redeemer receives its floor-rounded YES-company share in kind
   within four wei, retains the same base balance through settlement, and can redeem the winning
-  wrapper independently afterward.
+  wrapper independently afterward. A fourth run faults the canonical company-side CTF merge:
+  collateral still merges, the company slice is paid as exact YES/NO wrappers, and the holder later
+  redeems the winner and consumes the loser. Survivor settlement plus final exit conserves both
+  base assets within five wei.
 - The pinned block's actual gas limit is 60,000,000. Charging 21,000 base gas plus the worst-case
   16 gas for every calldata byte yields 12,125,922 gas for the atomic bundle transaction,
   2,343,088 gas for source/CTF/two-pool activation, 1,460,745 gas for symmetric donated-fee partial
-  redemption, and 1,487,553 gas for asymmetric in-kind redemption. The fork asserts each remains
-  below half a block, leaving more than 30,000,000 gas of explicit headroom.
+  redemption, 1,487,553 gas for asymmetric in-kind redemption, and 1,417,015 gas for the
+  canonical-merge-failure fallback. The fork asserts each remains below half a block, leaving more
+  than 30,000,000 gas of explicit headroom.
 - The expanded prescribed deep invariant command passes with zero reverts: each of five manager
   accounting, custody, and emergency invariants runs 256 times at depth 500 (128,000 calls each)
   across nine randomized actions, while the two UniV3 invariants retain their stricter inline
   256-by-512 configuration (131,072 calls each). The final candidate must re-run this gate after
   its exact configuration is fixed.
-- The current 248-test instrumented suite also passes Foundry's coverage profile with `--ir-minimum`
+- The current 249-test instrumented suite also passes Foundry's coverage profile with `--ir-minimum`
   after excluding the production-profile-only artifact-hash assertion (coverage deliberately
   recompiles different bytecode). This flag is required because unoptimized instrumentation
   exceeds Solidity's stack limit. The manager reports 93.06%
   line, 91.20% statement, 67.65% branch, and 98.61% function coverage. Production compilation
   independently confirms a 24,171-byte manager runtime, 405 bytes below EIP-170.
-- The current 249-test normal suite includes direct emergency-handler reachability, nine
+- The current 250-test normal suite includes direct emergency-handler reachability, nine
   pinned-mainnet activation rollback cases, and a fifth invariant that requires executed emergency
   mode to leave every manager position at zero liquidity. Artifact drift, permissionless bundle
   interleaving, code-less PoolManager, and immutable spot-tick-policy checks remain green.
@@ -190,6 +194,7 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 | First conditional pool/add | The same full binding test injects first-add and post-add accounting failures and proves the created pool, split wrappers, and spot removal all roll back. |
 | Second conditional pool | `test_activation_rolls_back_first_pool_when_second_pool_is_precreated` proves the newly created first pool disappears while the adversarial second pool remains. |
 | First or second official mainnet v4 initialization/liquidity | `testFork_firstRealV4InitializeFailureRollsBackAndRetrySucceeds`, `testFork_firstRealV4LiquidityFailureRollsBackAndRetrySucceeds`, `testFork_secondRealV4InitializeFailureRollsBackAndRetrySucceeds`, and `testFork_secondRealV4LiquidityFailureRollsBackAndRetrySucceeds` fault each deployed PoolManager boundary, prove prior live-stack effects and any pool initialization disappear, and retry the identical activation. |
+| Canonical mainnet CTF merge during redemption | `testFork_realCompanyMergeFailurePaysExactInKindAndRemainsRedeemable` faults the company merge, proves collateral still merges and exact YES/NO company wrappers are paid in kind, then redeems/consumes those wrappers after resolution and conserves both assets through survivor settlement and final exit. |
 | AMM create, initialize, or first mint | `test_freshAddPoolCreateAndInitializeFailuresRollBack`, `test_freshAddFirstMintFailureRollsBackPoolAndCustody`, and `test_firstLiquidityFailureRollsBackInitializationAndCustody`. |
 | Outer lifecycle step after successful activation | `test_atomic_activation_uses_captured_source_snapshot` forces its resolver step to revert and compares the complete source, manager, spot, CTF, router, wrapper, pool, balance, and allowance envelope. |
 | Atomic bundle deployment/wiring | `test_lateManagerFailureRollsBackHookAndEveryCreate`, `test_sameTokenManagerFailureAlsoRollsBackMinedHook`, and the empty-runtime/initcode/hash fault cases. |

@@ -129,12 +129,17 @@ with its own Foundry configuration and Solidity 0.8.26:
   base payout. A third run moves the YES-company-only donation before the unresolved one-third
   exit: the redeemer receives its floor-rounded fee share in kind within four wei, its base balance
   stays fixed through settlement, and it can redeem the winning wrapper independently afterward.
+- a canonical company-side CTF merge failure during the same one-third exit is isolated from the
+  collateral underlying: collateral still merges to base, the exact company YES/NO slice is paid
+  in kind, and after resolution the holder independently redeems the winner and consumes the loser.
+  Survivor settlement and final exit leave aggregate company and collateral recovery within five
+  wei. The fault-path redemption costs 1,417,015 gas under the same conservative accounting.
 - at pinned block gas limit 60,000,000, conservative transaction accounting charges 21,000 base
   gas and 16 gas for every calldata byte. The atomic five-child bundle costs 12,125,922 gas,
   source/CTF/two-pool activation costs 2,343,088 gas, the symmetric donated-fee partial
-  redemption costs 1,460,745 gas, and the asymmetric in-kind case costs 1,487,553 gas by that upper
-  bound. Each is asserted below half the actual block limit, leaving more than 30,000,000 gas of
-  explicit headroom.
+  redemption costs 1,460,745 gas, the asymmetric in-kind case costs 1,487,553 gas, and the
+  canonical-merge-failure fallback costs 1,417,015 gas by that upper bound. Each is asserted below
+  half the actual block limit, leaving more than 30,000,000 gas of explicit headroom.
 - the expanded deep invariant command passes with five manager invariants executing 128,000 calls
   each across deposit, activation, fee, donation, redemption, settlement, and emergency actions;
   two UniV3 invariants execute 131,072 calls each. All complete with zero reverts. This is current

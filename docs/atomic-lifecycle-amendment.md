@@ -388,7 +388,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | Fees or donations arrive after a partial redemption | Only the then-current share supply owns the new value; exited holders gain no retroactive claim. The live v4/CTF fixture donates again after exit and proves the exited base balances stay fixed through final settlement. |
 | Resolved wrappers are donated after settlement but before the next activation | The stored winner and durable wrapper snapshot convert them before a later spot sync, deposit, redemption, or activation; pricing and payout include the value, and activation cannot orphan it by replacing pointers. |
 | Fees, donations, deposits, redemptions, settlement, and emergency actions are repeatedly interleaved | Every successful deposit and redemption preserves existing-holder value per share; issued assets stay in known custody, zero supply leaves no managed residue, settlement remains callable during emergency mode, and emergency execution leaves no position liquidity. |
-| Merge router is unavailable or maliciously reverts | Withdrawing outcome slice is paid in kind. |
+| Merge router is unavailable or maliciously reverts | Withdrawing outcome slice is paid in kind. The pinned-mainnet fixture faults the canonical company-side CTF merge, proves collateral still merges, then independently redeems/consumes the exact company wrappers after resolution and conserves both assets through final exit. |
 | Settlement router reverts, partially consumes, or underpays | The whole settlement reverts; active positions and the captured binding remain intact. |
 | Rounding across sequential redemptions | No overpayment; survivor ratio never falls; final holder receives dust. |
 | Bundle, activation, or conditional redemption approaches the Ethereum block limit | The pinned mainnet fork charges base gas plus worst-case nonzero calldata, compares each transaction to the block's actual 60,000,000 gas limit, and requires more than half a block of headroom. |
@@ -435,6 +435,8 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 - prove per-token conservation across arbitrary sequential redemptions;
 - prove adapter-add and guard call counts remain zero during redemption;
 - test divergent YES/NO prices and liquidity, merge failure, and unmatched in-kind payout;
+- on the pinned full mainnet stack, fault one canonical CTF merge, prove the other underlying still
+  merges, and redeem/consume the exact in-kind slice after resolution;
 - settle correctly after one or many partial redemptions;
 - consume explicitly any losing-token residue when the losing balance exceeds the winner, including
   settlement after the final unresolved redemption has reduced FLM supply to zero; and

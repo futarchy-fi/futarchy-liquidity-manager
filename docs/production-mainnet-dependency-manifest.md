@@ -72,6 +72,11 @@ A separate run moves the YES-company-only donation before the unresolved one-thi
 redeemer receives its floor-rounded fee share as an unmatched wrapper within four wei, keeps the
 same base balance through settlement, and redeems the winning wrapper independently afterward.
 
+Another run faults the canonical company-side CTF merge during that unresolved exit. Collateral
+still merges normally; the company slice is paid as exact YES/NO wrappers. After resolution the
+holder redeems the winner and consumes the loser independently, the survivor settles and exits,
+and aggregate recovery of both base assets remains within five wei.
+
 Nine rollback variants fault official-v3 spot principal removal, each canonical CTF split, wrapper
 conversion on each underlying, and each official-PoolManager initialization and first-liquidity
 call. Each failed outer proposal write restores the empty source registry, actual spot NFT and
@@ -84,8 +89,9 @@ At this block the actual gas limit is `60,000,000`. Conservative transaction est
 base gas and charge all calldata bytes at the nonzero rate of 16 gas: the atomic bundle is
 `12,125,922` gas, source/CTF/two-pool activation is `2,343,088` gas, and partial real-stack
 redemption after symmetric live v4 donations is `1,460,745` gas; the asymmetric in-kind case is
-`1,487,553` gas. The fork asserts each stays below half the block limit. These are fixture bounds,
-not estimates for still-unknown final token or coordinator calldata.
+`1,487,553` gas and the canonical-merge-failure fallback is `1,417,015` gas. The fork asserts each
+stays below half the block limit. These are fixture bounds, not estimates for still-unknown final
+token or coordinator calldata.
 
 The expanded required deep invariant command passes: five manager invariants each execute 256 runs
 at depth 500 (128,000 calls) across nine actions, including emergency arm, disarm, execution, and
