@@ -23,8 +23,12 @@ SIMULATED_DEPLOY_CONFIG="$OUT_DIR/deploy-simulated.json"
 DEPLOYMENT_OUTPUT="$OUT_DIR/deployment-output.json"
 BATCH_CONFIG="$OUT_DIR/bootstrap.json"
 BAD_BATCH_CONFIG="$OUT_DIR/bootstrap-bad-manager.json"
+BAD_PAIR_CONFIG="$OUT_DIR/deploy-identical-base.json"
+BAD_VALIDATION_CONFIG="$OUT_DIR/deploy-bad-validation-pair.json"
 LOG_FILE="$OUT_DIR/no-proposal.log"
 BAD_LINK_LOG_FILE="$OUT_DIR/bad-link.log"
+BAD_PAIR_LOG_FILE="$OUT_DIR/identical-base.log"
+BAD_VALIDATION_LOG_FILE="$OUT_DIR/bad-validation-pair.log"
 EOA_COORDINATOR_LOG_FILE="$OUT_DIR/eoa-coordinator.log"
 
 jq '
@@ -38,8 +42,8 @@ jq '
   | .poolStabilityGuard = "0x4545454545454545454545454545454545454545"
   | .deployDeadlineProxy = false
   | .validation.enabled = true
-  | .validation.expectedProposalToken = "0x5555555555555555555555555555555555555555"
-  | .validation.expectedCollateralToken = "0x6666666666666666666666666666666666666666"
+  | .validation.expectedProposalToken = "0x3333333333333333333333333333333333333333"
+  | .validation.expectedCollateralToken = .wrappedNative
   | .validation.trustedOracle = "0x7777777777777777777777777777777777777777"
   | .validation.realitio = "0x8888888888888888888888888888888888888888"
   | .validation.trustedArbitrator = "0x9999999999999999999999999999999999999999"
@@ -102,6 +106,30 @@ jq '
 
 jq '.manager = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"' \
   "$BATCH_CONFIG" > "$BAD_BATCH_CONFIG"
+
+jq '
+  .companyToken = .wrappedNative
+  | .validation.expectedProposalToken = .wrappedNative
+' "$DEPLOY_CONFIG" > "$BAD_PAIR_CONFIG"
+
+jq '.validation.expectedProposalToken = "0x5555555555555555555555555555555555555555"' \
+  "$DEPLOY_CONFIG" > "$BAD_VALIDATION_CONFIG"
+
+if bash tools/validate-configs.sh --deploy "$BAD_PAIR_CONFIG" \
+  >"$BAD_PAIR_LOG_FILE" 2>&1; then
+  echo "limited preflight check failed: config accepted identical base tokens" >&2
+  exit 1
+fi
+
+grep -q 'strict deployment config' "$BAD_PAIR_LOG_FILE"
+
+if bash tools/validate-configs.sh --deploy "$BAD_VALIDATION_CONFIG" \
+  >"$BAD_VALIDATION_LOG_FILE" 2>&1; then
+  echo "limited preflight check failed: config accepted mismatched validation tokens" >&2
+  exit 1
+fi
+
+grep -q 'strict deployment config' "$BAD_VALIDATION_LOG_FILE"
 
 FLM_BATCH_TEMPLATE_CHECK_OUT="$OUT_DIR/generated" \
   bash tools/preflight-limited-deploy.sh \

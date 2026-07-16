@@ -198,6 +198,17 @@ contract DeployFutarchyLiquidityManager is Script {
         _requireNonzero(cfg.algebraFactory, "algebraFactory");
         _requireNonzero(cfg.poolStabilityGuard, "poolStabilityGuard");
         _requireNonzero(cfg.futarchyRouter, "futarchyRouter");
+        require(cfg.companyToken != cfg.wrappedNative, "identical base tokens");
+        if (cfg.validation.enabled) {
+            require(
+                cfg.validation.expectedProposalToken == cfg.companyToken,
+                "validation proposal token"
+            );
+            require(
+                cfg.validation.expectedCollateralToken == cfg.wrappedNative,
+                "validation collateral token"
+            );
+        }
         require(cfg.tickLower < cfg.tickUpper, "bad ticks");
 
         if (cfg.deployDeadlineProxy) {

@@ -72,8 +72,12 @@
       "status": "ready-to-audit",
       "evidence": [
         {
-          "description": "Core manager tests cover independent rejection of every outcome-to-outcome and outcome-to-base alias before spot movement, every independent base/YES/NO token-ordering parity, proportional principal/fee/idle accounting with adversarial receipt-label misclassification, exact two-phase adapter-removal deltas with spot and conditional overreport rollback, divergent YES/NO liquidity and post-swap principal composition, sequential six-token conservation and nondecreasing survivor value per share, exact settlement after randomized one-to-four partial exits, donation-resistant deposit pricing, spot and conditional six-token post-exit fee/donation ownership, rejection of direct native transfers outside that accounting model while wrapper unwrapping remains live, second-pool activation rollback, per-underlying conditional merge isolation with approval-failure, partial-consumption, and underpayment fallback, exact-delta merge and winner underconsumption/underpayment, late second-underlying rollback of prior recovery, losing-wrapper settlement rollback including after zero-supply final redemption, owner-authorized delayed permissionless non-custodial emergency exit, and permissionless settlement while emergency mode is armed or executed.",
+          "description": "Core manager tests cover constructor rejection of an identical company/collateral token, independent rejection of every outcome-to-outcome and outcome-to-base alias before spot movement, every independent base/YES/NO token-ordering parity, proportional principal/fee/idle accounting with adversarial receipt-label misclassification, exact two-phase adapter-removal deltas with spot and conditional overreport rollback, divergent YES/NO liquidity and post-swap principal composition, sequential six-token conservation and nondecreasing survivor value per share, exact settlement after randomized one-to-four partial exits, donation-resistant deposit pricing, spot and conditional six-token post-exit fee/donation ownership, rejection of direct native transfers outside that accounting model while wrapper unwrapping remains live, second-pool activation rollback, per-underlying conditional merge isolation with approval-failure, partial-consumption, and underpayment fallback, exact-delta merge and winner underconsumption/underpayment, late second-underlying rollback of prior recovery, losing-wrapper settlement rollback including after zero-supply final redemption, owner-authorized delayed permissionless non-custodial emergency exit, and permissionless settlement while emergency mode is armed or executed.",
           "path": "test/FutarchyLiquidityManager.t.sol"
+        },
+        {
+          "description": "The permissionless bundle factory test proves an identical company/collateral token fails manager construction and rolls back deployment.",
+          "path": "test/FutarchyLiquidityManagerFactory.t.sol"
         },
         {
           "description": "The production router test proves exact CTF split receipts and exact wrapper mint deltas.",
@@ -166,7 +170,7 @@
           "path": ".github/workflows/ci.yml"
         },
         {
-          "description": "CI exercises the limited deploy preflight wrapper and checks that fork preflight cannot run without a selected final proposal.",
+          "description": "CI exercises the limited deploy preflight wrapper; rejects identical base tokens and validation-policy token mismatches; and checks that fork preflight cannot run without a selected final proposal.",
           "path": "tools/check-preflight-limited-deploy.sh",
           "ciStep": "Limited preflight guard"
         }
@@ -191,7 +195,7 @@
           "path": "config/gnosis.example.json"
         },
         {
-          "description": "Strict deploy config validation rejects placeholder addresses and disabled validation for production inputs.",
+          "description": "Strict deploy config validation rejects placeholder addresses, disabled validation, identical company/collateral tokens, and validation-policy tokens that differ from the manager pair.",
           "path": "tools/validate-configs.sh"
         },
         {
@@ -269,7 +273,7 @@
           "path": "tools/preflight-limited-deploy.sh"
         },
         {
-          "description": "Preflight guard checks strict validation, artifact rendering, and final-proposal enforcement for fork preflight.",
+          "description": "Preflight guard checks strict validation including base/policy token consistency, artifact rendering, and final-proposal enforcement for fork preflight.",
           "path": "tools/check-preflight-limited-deploy.sh",
           "ciStep": "Limited preflight guard"
         },

@@ -356,6 +356,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | Post-activation resolver binding reverts | The enclosing lifecycle transaction restores resolver/coordinator state, source write, CTF splits, positions, pools, and manager binding. |
 | Source cleared or replaced after activation | Stored proposal and condition still settle normally. |
 | Replayed activation or second live proposal | Reverts without changing positions or binding. |
+| Company token and collateral are the same ERC-20 | Manager construction reverts, including through the permissionless bundle factory, before any contract bundle can persist. |
 | An outcome wrapper aliases either base asset | Source admission and manager activation independently reject before spot movement, preserving six distinct accounting buckets. |
 | Adapter reports removal assets it did not transfer | The entire operation reverts before survivor-owned idle balances can fund the discrepancy. |
 | Adapter preserves receipt totals but swaps principal/fee field labels | The manager ignores labels and classifies exact deltas by the zero-liquidity and nonzero phases. |

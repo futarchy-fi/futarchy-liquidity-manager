@@ -96,6 +96,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     error AlreadyInitialized();
     error NotInitialized();
     error ZeroAddress();
+    error InvalidTokenPair();
     error InvalidProposalConfig();
     error EmergencyModeActive();
     error EmergencyExitAlreadyArmed();
@@ -199,6 +200,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         ) {
             revert ZeroAddress();
         }
+        if (address(companyToken) == address(wrappedNative)) revert InvalidTokenPair();
 
         BOOTSTRAP_RECIPIENT = bootstrapRecipient;
         COMPANY_TOKEN = companyToken;

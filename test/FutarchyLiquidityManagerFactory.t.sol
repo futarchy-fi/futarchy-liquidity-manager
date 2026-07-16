@@ -188,6 +188,15 @@ contract FutarchyLiquidityManagerFactoryTest is Test {
         factory.createLiquidityManager(params, _creationCodes());
     }
 
+    function test_revertsOnSameCompanyAndCollateralToken() public {
+        FutarchyLiquidityManagerFactory.CreateParams memory params =
+            _createParams(_defaultValidationConfigData());
+        params.companyToken = wrappedNative;
+
+        vm.expectRevert(FutarchyLiquidityManagerFactory.DeploymentFailed.selector);
+        factory.createLiquidityManager(params, _creationCodes());
+    }
+
     function test_revertsOnMutatedCreationCode() public {
         FutarchyLiquidityManagerFactory.CreationCodes memory codes = _creationCodes();
         codes.manager[0] = bytes1(uint8(codes.manager[0]) ^ 1);

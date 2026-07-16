@@ -31,7 +31,8 @@ The thin factory pins immutable hashes of the proposal source, adapter, and mana
 code. Any account can supply those exact blobs and organization-specific parameters. The factory
 appends constructor arguments itself, deploys the source, two adapters, and manager sequentially,
 then irreversibly binds both adapters in the same transaction. Hash mismatches, oversized EIP-3860
-initcode, failed creation, or failed binding revert the entire bundle.
+initcode, failed creation, or failed binding revert the entire bundle. The manager constructor
+rejects an identical company/collateral token before the bundle can persist.
 
 The blobs stay in transaction calldata rather than factory runtime so the factory remains below the
 EIP-170 limit. A child implementation change requires a new factory; there is no hash updater,

@@ -130,6 +130,7 @@ deploy_strict_filter='
   and (.companyToken | nzaddress)
   and (.officialProposer | nzaddress)
   and (.wrappedNative | nzaddress)
+  and ((.companyToken | ascii_downcase) != (.wrappedNative | ascii_downcase))
   and (.positionManager | nzaddress)
   and (.algebraFactory | nzaddress)
   and (.poolStabilityGuard | nzaddress)
@@ -137,6 +138,14 @@ deploy_strict_filter='
   and (.validation.enabled == true)
   and (.validation.expectedProposalToken | nzaddress)
   and (.validation.expectedCollateralToken | nzaddress)
+  and (
+    (.validation.expectedProposalToken | ascii_downcase)
+    == (.companyToken | ascii_downcase)
+  )
+  and (
+    (.validation.expectedCollateralToken | ascii_downcase)
+    == (.wrappedNative | ascii_downcase)
+  )
   and (.validation.conditionalTokens | nzaddress)
   and (
     if .deployDeadlineProxy == true

@@ -28,7 +28,8 @@ Required organization-specific fields:
   manager does not change that coordinator.
 - `bootstrapRecipient`: account allowed to call `initializeFromBootstrap`; for FAO this should be
   the integration contract or Safe that initially funds liquidity.
-- `companyToken`: the token paired against the configured collateral token.
+- `companyToken`: the token paired against the configured collateral token. It must differ from
+  `wrappedNative`; validation's expected proposal/collateral tokens must equal this pair exactly.
 - `officialProposer`: the only proposal creator whose official proposal can trigger migration.
 - `lpTokenName` and `lpTokenSymbol`: ERC20 metadata for FLM shares.
 

@@ -24,6 +24,10 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   coordinator state, CTF collateral, wrapper total supply and custody, base custody, and manager
   router allowances. After successful activation, both an exact replay and a different proposal ID
   revert without changing the registry, captured binding, pools, or liquidity.
+- Manager construction rejects an identical company/collateral ERC-20; direct and permissionless
+  factory tests prove the invalid two-bucket configuration cannot persist.
+- Strict deployment preflight independently rejects that identical pair and requires the frozen
+  validation policy's proposal/collateral tokens to equal the manager pair before broadcast.
 - The manager stores the CTF condition and wrapper binding used for settlement rather than rereading
   mutable proposal state.
 - The deadline proxy relays a finalized Reality result even when its fallback path is called after
