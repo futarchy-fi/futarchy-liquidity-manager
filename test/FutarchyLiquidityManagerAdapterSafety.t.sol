@@ -14,13 +14,23 @@ import {MockWrappedNative} from "./mocks/MockWrappedNative.sol";
 import {OverusingFutarchyLiquidityAdapter} from "./mocks/OverusingFutarchyLiquidityAdapter.sol";
 
 contract FeeOnTransferToken is ERC20 {
+    address public feeRecipient;
+
     constructor() ERC20("Fee token", "FEE") {}
 
     function mint(address to, uint256 amount) external {
         _mint(to, amount);
     }
 
+    function setFeeRecipient(address recipient) external {
+        feeRecipient = recipient;
+    }
+
     function _transfer(address from, address to, uint256 amount) internal override {
+        if (to != feeRecipient) {
+            super._transfer(from, to, amount);
+            return;
+        }
         uint256 fee = amount / 100;
         super._transfer(from, to, amount - fee);
         _burn(from, fee);
@@ -86,11 +96,53 @@ contract FutarchyLiquidityManagerAdapterSafetyTest is Test {
             FutarchyLiquidityManager.LpTokenMetadata({name: "Futarchy LP", symbol: "fLP"})
         );
         feeToken.mint(bootstrapRecipient, 10 ether);
+        feeToken.setFeeRecipient(address(feeManager));
 
         vm.startPrank(bootstrapRecipient);
         feeToken.approve(address(feeManager), type(uint256).max);
         vm.expectRevert(FutarchyLiquidityManager.InvalidAssetTransfer.selector);
         feeManager.initializeFromBootstrap{value: 1 ether}(1 ether);
         vm.stopPrank();
+    }
+
+    function test_redemption_rejects_late_transfer_fee_without_burning_shares() public {
+        FeeOnTransferToken feeToken = new FeeOnTransferToken();
+        MockFutarchyLiquidityAdapter spotAdapter = new MockFutarchyLiquidityAdapter();
+        FutarchyLiquidityManager feeManager = new FutarchyLiquidityManager(
+            bootstrapRecipient,
+            feeToken,
+            IWrappedNative(address(wrappedNative)),
+            source,
+            spotAdapter,
+            conditionalAdapter,
+            router,
+            new MockPoolStabilityGuard(),
+            address(this),
+            FutarchyLiquidityManager.LpTokenMetadata({name: "Futarchy LP", symbol: "fLP"})
+        );
+        feeToken.mint(bootstrapRecipient, 10 ether);
+        vm.startPrank(bootstrapRecipient);
+        feeToken.approve(address(feeManager), type(uint256).max);
+        feeManager.initializeFromBootstrap{value: 1 ether}(1 ether);
+        vm.stopPrank();
+
+        feeToken.setFeeRecipient(bootstrapRecipient);
+        vm.prank(bootstrapRecipient);
+        vm.expectRevert(FutarchyLiquidityManager.InvalidAssetTransfer.selector);
+        feeManager.redeem(1 ether, bootstrapRecipient, false);
+
+        assertEq(feeManager.totalSupply(), 1 ether);
+        assertEq(feeManager.balanceOf(bootstrapRecipient), 1 ether);
+        assertEq(feeManager.spotLiquidity(), 1 ether);
+        assertEq(spotAdapter.totalLiquidity(), 1 ether);
+        assertEq(feeToken.balanceOf(bootstrapRecipient), 9 ether);
+
+        feeToken.setFeeRecipient(address(0));
+        vm.prank(bootstrapRecipient);
+        feeManager.redeem(1 ether, bootstrapRecipient, false);
+
+        assertEq(feeManager.totalSupply(), 0);
+        assertEq(feeToken.balanceOf(bootstrapRecipient), 10 ether);
+        assertEq(wrappedNative.balanceOf(bootstrapRecipient), 1 ether);
     }
 }

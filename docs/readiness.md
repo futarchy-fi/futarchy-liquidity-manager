@@ -65,6 +65,10 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   deltas. The manager derives fee/principal classification from separate zero/nonzero removal
   phases rather than trusting returned labels. Misclassification cannot change payouts, and an
   overreport cannot consume survivor-owned idle balances; the complete operation reverts.
+- Every ERC20 payout and zero-supply sweep requires the recipient's balance to increase by exactly
+  the reported amount. A regression enables a company-token recipient fee only after bootstrap,
+  proves redemption restores shares and liquidity instead of silently underpaying, then disables
+  the fee and completes the identical exit.
 - The native receive boundary rejects direct transfers and accepts only immutable-wrapper unwrap
   proceeds, preventing ordinary native transfers from bypassing the six-token redemption model.
 - Partial redemption removes proportional spot, YES, and NO liquidity; accounts for principal,
@@ -198,13 +202,14 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   across nine randomized actions, while the two UniV3 invariants retain their stricter inline
   256-by-512 configuration (131,072 calls each). The final candidate must re-run this gate after
   its exact configuration is fixed.
-- The current 257-test instrumented suite also passes Foundry's coverage profile with `--ir-minimum`
+- The current 258-test instrumented suite also passes Foundry's coverage profile with `--ir-minimum`
   after excluding the production-profile-only artifact-hash assertion (coverage deliberately
   recompiles different bytecode). This flag is required because unoptimized instrumentation
-  exceeds Solidity's stack limit. The manager reports 93.06%
-  line, 91.20% statement, 67.65% branch, and 98.61% function coverage. Production compilation
-  independently confirms a 24,171-byte manager runtime, 405 bytes below EIP-170.
-- The current 258-test normal suite includes direct emergency-handler reachability, ten
+  exceeds Solidity's stack limit. The manager reports 93.12%
+  line, 91.29% statement, 67.96% branch, and 98.63% function coverage. Production compilation
+  independently confirms a 24,399-byte manager runtime, 177 bytes below EIP-170 and 49 bytes below
+  the repository's stricter ceiling.
+- The current 259-test normal suite includes direct emergency-handler reachability, ten
   pinned-mainnet activation rollback cases, and a fifth invariant that requires executed emergency
   mode to leave every manager position at zero liquidity. Artifact drift, permissionless bundle
   interleaving, code-less PoolManager, and immutable spot-tick-policy checks remain green.
@@ -231,6 +236,7 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 | First or second official mainnet v4 initialization/liquidity | `testFork_firstRealV4InitializeFailureRollsBackAndRetrySucceeds`, `testFork_firstRealV4LiquidityFailureRollsBackAndRetrySucceeds`, `testFork_secondRealV4InitializeFailureRollsBackAndRetrySucceeds`, and `testFork_secondRealV4LiquidityFailureRollsBackAndRetrySucceeds` fault each deployed PoolManager boundary, prove prior live-stack effects and any pool initialization disappear, and retry the identical activation. |
 | Second conditional removal during proportional redemption | `testFork_lateRemovalRollbackThenCompanyMergeFailureRemainsRedeemable` completes the proportional YES removal before faulting the NO adapter boundary, then proves LP shares, both positions, spot identity, and all six holder/manager/PoolManager balances roll back. |
 | Canonical mainnet CTF merge during redemption | The identical retry in `testFork_lateRemovalRollbackThenCompanyMergeFailureRemainsRedeemable` faults the company merge, proves collateral still merges and exact YES/NO company wrappers are paid in kind, then redeems/consumes those wrappers after resolution and conserves both assets through survivor settlement and final exit. |
+| Successful ERC20 call underpays its recipient | `test_redemption_rejects_late_transfer_fee_without_burning_shares` enables a company-token recipient fee only after bootstrap. The exact recipient-delta check restores shares and liquidity, and the identical redemption succeeds after the fee is disabled. |
 | Any in-kind outcome transfer during proportional redemption | `test_each_in_kind_outcome_transfer_failure_rolls_back_complete_redemption` forces both merges into fallback, then independently faults each of the four exact wrapper transfers. Every case restores shares, spot/YES/NO liquidity, removal counters, managed/router custody, and any preceding wrapper payments before the identical retry pays the exact base and four-wrapper slice. |
 | Each final recipient payout path during proportional redemption | `test_each_final_payout_failure_rolls_back_complete_conditional_redemption` independently faults the exact company-token transfer, wrapped-collateral transfer, and native delivery after unwrap. Each occurs after spot/YES/NO removal, share burn, and both complete-set merges; the later faults occur after company payment, and native delivery also occurs after WETH withdrawal. Every case restores shares, liquidity, removal counters, and token/native custody before the identical native retry succeeds. |
 | Native recipient reenters redemption during payout | `test_native_payout_blocks_reentrant_redemption_without_blocking_outer_exit` gives the recipient remaining shares and forwards native payout gas to its callback. The nested redemption is rejected while the outer proportional burn, liquidity reduction, and exact company/native payment complete. |

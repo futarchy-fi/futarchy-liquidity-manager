@@ -82,7 +82,9 @@ the withdrawing slice's matched complete sets and transfers unmatched outcomes i
 merge reverts, that underlying's complete sets are transferred in kind too, so router availability
 cannot block conditional withdrawal. In spot mode, any late donation to the durable last resolved
 wrapper snapshot is converted before the redemption snapshot. The final holder receives all
-rounding residue.
+rounding residue. Every ERC20 payout and zero-supply sweep also requires the recipient's balance to
+increase by the exact amount; a token that later enables a transfer fee reverts the complete
+operation instead of silently underpaying after shares burn.
 
 If a nonfinal redemption's share of every active position floors to zero liquidity, it reverts
 without burning shares. The holder must combine or transfer shares until at least one liquidity

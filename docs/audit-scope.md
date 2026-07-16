@@ -183,8 +183,10 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   interactions still require adapter review. NFT-adapter adds independently enforce exact input
   balance deltas, reconcile reported use to refunds, restore pre-call token custody, and clear
   downstream position-manager allowances.
-- Deposits require exact ERC20 balance deltas; fee-on-transfer assets are rejected. Rebasing assets
-  are not a supported company-token or collateral configuration.
+- Deposits, adapter receipts, every ERC20 recipient payout, and zero-supply sweeps require exact
+  balance deltas. Fee-on-transfer behavior therefore reverts without burning shares, including if
+  enabled only after bootstrap. Rebasing assets are not a supported company-token or collateral
+  configuration.
 - Native collateral is wrapped during payable deposits. The manager rejects direct native
   transfers and accepts unwrap proceeds only from its immutable wrapped-collateral contract.
   Unavoidable forced native currency is outside the six-token accounting model and remains

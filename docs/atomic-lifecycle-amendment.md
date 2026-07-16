@@ -298,6 +298,11 @@ fee deposits from the adapter are never retroactively counted as pre-existing id
 remainder of each idle and fee bucket stays manager-idle and share-owned; the final redeemer
 receives it. Rounding the removed liquidity down favors survivors:
 
+Each ERC20 transfer must increase the recipient's balance by its exact computed payout. If token
+behavior later applies a transfer fee or otherwise reports success without that delta, the whole
+redemption reverts and the share burn plus all liquidity and custody changes restore. Rebasing
+tokens remain outside the supported accounting model.
+
 $$
 \frac{L-\lfloor Ls/S\rfloor}{S-s}\geq\frac{L}{S}.
 $$
@@ -369,6 +374,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | The factory is configured with an out-of-range or misaligned immutable v3 spot tick | Factory construction reverts under the same bounds and 10-tick alignment enforced by its pinned spot adapter; an unusable factory cannot persist. |
 | An outcome wrapper aliases either base asset | Source admission and manager activation independently reject before spot movement, preserving six distinct accounting buckets. |
 | Adapter reports removal assets it did not transfer | The entire operation reverts before survivor-owned idle balances can fund the discrepancy. |
+| Company, collateral, or outcome token later underpays a successful transfer | Exact recipient balance deltas revert the complete payout. A regression enables a company-token recipient fee only after bootstrap, proves shares/liquidity restore, then disables it and completes the identical exit. |
 | Adapter preserves receipt totals but swaps principal/fee field labels | The manager ignores labels and classifies exact deltas by the zero-liquidity and nonzero phases. |
 | Adapter's zero-liquidity call removes principal or leaves realized fees owed | The adapter violates the audited phase contract; deterministic and real-fork fixtures must prove unchanged liquidity and an immediately fee-free principal phase for the pinned bytecode. |
 | A caller initializes a predictable v4 conditional pool before activation | The initialization-only hook rejects every origin except its irreversibly bound adapter; a failed first position reverts that initialization in the same transaction. |

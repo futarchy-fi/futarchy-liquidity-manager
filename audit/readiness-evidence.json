@@ -92,6 +92,10 @@
           "path": "test/FutarchyLiquidityManager.t.sol"
         },
         {
+          "description": "Adapter-safety tests require exact recipient deltas for ERC20 payouts, including rollback without a share burn when a company token enables a recipient fee only after bootstrap and successful identical retry after the fee is disabled.",
+          "path": "test/FutarchyLiquidityManagerAdapterSafety.t.sol"
+        },
+        {
           "description": "Factory tests prove constructor rejection of code-less shared dependencies and that identical or code-less company-token manager wiring rolls back the permissionless bundle.",
           "path": "test/FutarchyLiquidityManagerFactory.t.sol"
         },

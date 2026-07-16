@@ -11,7 +11,9 @@ The redemption entry point stays enabled in spot, conditional, and emergency mod
 removes only its proportional liquidity, principal, fee, and idle slices; it never redeploys
 survivor assets. A nonfinal call reverts without burning shares if every active-position liquidity
 slice floors to zero; the holder must combine or transfer shares until at least one liquidity unit
-is withdrawable. Callers supply no adapter ticks, slippage, deadlines, or initialization prices.
+is withdrawable. Every ERC20 payout must increase the recipient's balance by the exact reported
+amount, so later transfer-fee behavior reverts without burning shares. Callers supply no adapter
+ticks, slippage, deadlines, or initialization prices.
 
 The current Swapr Algebra path is a no-funds prototype because permissionless pool precreation and
 a mutable burn cooldown violate the production threat model. See

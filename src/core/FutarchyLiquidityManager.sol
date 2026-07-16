@@ -980,16 +980,16 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
 
     function _transferOutcomeAmounts(address recipient, OutcomeAmounts memory amounts) internal {
         if (amounts.yesCompany > 0) {
-            IERC20(_capturedYesCompanyToken).safeTransfer(recipient, amounts.yesCompany);
+            _transferExact(IERC20(_capturedYesCompanyToken), recipient, amounts.yesCompany);
         }
         if (amounts.noCompany > 0) {
-            IERC20(_capturedNoCompanyToken).safeTransfer(recipient, amounts.noCompany);
+            _transferExact(IERC20(_capturedNoCompanyToken), recipient, amounts.noCompany);
         }
         if (amounts.yesCurrency > 0) {
-            IERC20(_capturedYesCurrencyToken).safeTransfer(recipient, amounts.yesCurrency);
+            _transferExact(IERC20(_capturedYesCurrencyToken), recipient, amounts.yesCurrency);
         }
         if (amounts.noCurrency > 0) {
-            IERC20(_capturedNoCurrencyToken).safeTransfer(recipient, amounts.noCurrency);
+            _transferExact(IERC20(_capturedNoCurrencyToken), recipient, amounts.noCurrency);
         }
     }
 
@@ -1107,7 +1107,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
             IERC20 token = IERC20(tokens[i]);
             if (address(token) != address(0)) {
                 uint256 balance = token.balanceOf(address(this));
-                if (balance != 0) token.safeTransfer(recipient, balance);
+                if (balance != 0) _transferExact(token, recipient, balance);
             }
             unchecked {
                 ++i;
@@ -1211,14 +1211,25 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         bool unwrapNative
     ) internal {
         if (companyOut > 0) {
-            COMPANY_TOKEN.safeTransfer(recipient, companyOut);
+            _transferExact(COMPANY_TOKEN, recipient, companyOut);
         }
         if (collateralOut > 0) {
             if (unwrapNative) {
                 WRAPPED_NATIVE.withdraw(collateralOut);
                 payable(recipient).sendValue(collateralOut);
             } else {
-                IERC20(address(WRAPPED_NATIVE)).safeTransfer(recipient, collateralOut);
+                _transferExact(IERC20(address(WRAPPED_NATIVE)), recipient, collateralOut);
+            }
+        }
+    }
+
+    function _transferExact(IERC20 token, address recipient, uint256 amount) internal {
+        uint256 balanceBefore = token.balanceOf(recipient);
+        token.safeTransfer(recipient, amount);
+        unchecked {
+            // A valid ERC20 balance plus a transfer cannot exceed its total supply.
+            if (token.balanceOf(recipient) != balanceBefore + amount) {
+                revert InvalidAssetTransfer();
             }
         }
     }
@@ -1235,7 +1246,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
 
         companySentToBootstrap = COMPANY_TOKEN.balanceOf(address(this));
         if (companySentToBootstrap > 0) {
-            COMPANY_TOKEN.safeTransfer(BOOTSTRAP_RECIPIENT, companySentToBootstrap);
+            _transferExact(COMPANY_TOKEN, BOOTSTRAP_RECIPIENT, companySentToBootstrap);
         }
 
         uint256 collateralBalance = WRAPPED_NATIVE.balanceOf(address(this));
@@ -1243,7 +1254,9 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
             if (unwrapNative) {
                 WRAPPED_NATIVE.withdraw(collateralBalance);
             } else {
-                IERC20(address(WRAPPED_NATIVE)).safeTransfer(BOOTSTRAP_RECIPIENT, collateralBalance);
+                _transferExact(
+                    IERC20(address(WRAPPED_NATIVE)), BOOTSTRAP_RECIPIENT, collateralBalance
+                );
                 collateralSentToBootstrap = collateralBalance;
             }
         }

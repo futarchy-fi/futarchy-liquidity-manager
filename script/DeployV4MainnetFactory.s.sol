@@ -47,7 +47,7 @@ contract DeployV4MainnetFactory is Script {
     bytes32 internal constant CONDITIONAL_ADAPTER_CREATION_CODE_HASH =
         0xba940a9f090ff9120797bb258c48717d0c508bbbc23d9379eb8c10bebcc4fc53;
     bytes32 internal constant MANAGER_CREATION_CODE_HASH =
-        0x7accf3e36923467479f9a697e2ae81b5e2da0a8ab31031d61901f04cc253550c;
+        0x530508cbc317688dadfc8711e4bfff2fb23a0b9b5f378eb613c0ca570157e846;
     bytes32 internal constant FACTORY_CREATION_CODE_HASH =
         0xe6df50aabe5258cd3d084046eb8b3573cad874c50e7aa721257e033374497440;
 

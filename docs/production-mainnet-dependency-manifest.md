@@ -41,7 +41,7 @@ hash. Under that exact profile, the bare creation-code hashes are:
 | `UniswapV3LiquidityAdapter` | `0xc2f01cca15a3dc38280b20c05dcce401b71abd0f017fa04abe32550dc18e9a2b` |
 | `V4InitializationGate` | `0x56052e89d8d3305ab4d3c35922882faee512c39fe45102cc0dec86bf7e57f75f` |
 | `V4ConditionalLiquidityAdapter` | `0xba940a9f090ff9120797bb258c48717d0c508bbbc23d9379eb8c10bebcc4fc53` |
-| `FutarchyLiquidityManager` | `0x7accf3e36923467479f9a697e2ae81b5e2da0a8ab31031d61901f04cc253550c` |
+| `FutarchyLiquidityManager` | `0x530508cbc317688dadfc8711e4bfff2fb23a0b9b5f378eb613c0ca570157e846` |
 | `V4FutarchyLiquidityManagerFactory` | `0xe6df50aabe5258cd3d084046eb8b3573cad874c50e7aa721257e033374497440` |
 
 `test_candidateCreationCodeHashesMatchMainnetManifest` fails on any artifact drift. These are
@@ -127,7 +127,8 @@ below.
 
 Do not render or sign a production batch until one reviewed manifest revision fixes and verifies:
 
-- company token and collateral token addresses, decimals, code hashes, and issuer/upgrade powers;
+- company token and collateral token addresses, decimals, code hashes, issuer/upgrade powers, and
+  evidence that fee, rebase, pause, blacklist, or proxy-admin behavior cannot break funded exits;
 - the exact v3 spot tick range, initial price, existing-pool rejection behavior, and token ordering;
 - owner Safe, lifecycle coordinator, bootstrap recipient, official proposer, and emergency process;
 - proposal validation stack, Reality/CTF identifiers and bounds, and final router configuration;
