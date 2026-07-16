@@ -303,7 +303,13 @@ contract UniswapV3LiquidityAdapter is IFutarchyLiquidityAdapter {
         if (asset.allowance(address(this), address(POSITION_MANAGER)) != 0) {
             asset.safeApprove(address(POSITION_MANAGER), 0);
         }
-        if (refund > 0) asset.safeTransfer(msg.sender, refund);
+        if (refund > 0) {
+            uint256 recipientBefore = asset.balanceOf(msg.sender);
+            asset.safeTransfer(msg.sender, refund);
+            if (asset.balanceOf(msg.sender) != recipientBefore + refund) {
+                revert InvalidAssetTransfer();
+            }
+        }
         if (asset.balanceOf(address(this)) != balanceBefore) revert InvalidAssetTransfer();
     }
 

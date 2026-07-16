@@ -68,8 +68,10 @@ with the final redeemer receiving all rounding dust.
 
 The NFT adapters enforce the same custody envelope on both existing-position and fresh-position
 adds: each input pull must match the adapter balance delta exactly, reported use plus refund must
-equal that input, adapter token balances must return to their pre-call values, and downstream
-position-manager allowances must be zero before the call returns.
+equal that input, every refund must increase the manager's balance by its exact amount, adapter
+token balances must return to their pre-call values, and downstream position-manager allowances
+must be zero before the call returns. The conditional router likewise verifies that CTF receives
+the full split collateral and that merge or redemption callers receive the full returned amount.
 
 Redemption does not consolidate or restore survivor positions. It snapshots the six possible idle
 balances, removes only the caller's floor-rounded share of each active position, adds proportional

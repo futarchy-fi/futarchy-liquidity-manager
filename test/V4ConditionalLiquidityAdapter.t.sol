@@ -22,6 +22,26 @@ interface IV4UnlockCallback {
     function unlockCallback(bytes calldata data) external returns (bytes memory);
 }
 
+contract V4LateRecipientFeeToken is MockMintableERC20 {
+    address public feeRecipient;
+
+    constructor() MockMintableERC20("Fee outcome", "FOUT") {}
+
+    function setFeeRecipient(address recipient) external {
+        feeRecipient = recipient;
+    }
+
+    function _transfer(address from, address to, uint256 amount) internal override {
+        if (to != feeRecipient) {
+            super._transfer(from, to, amount);
+            return;
+        }
+        uint256 fee = amount / 100;
+        super._transfer(from, to, amount - fee);
+        _burn(from, fee);
+    }
+}
+
 contract MockV4AdapterPoolManager is IV4PoolManagerMinimal {
     using SafeERC20 for IERC20;
 
@@ -264,6 +284,37 @@ contract V4ConditionalLiquidityAdapterTest is Test {
         assertEq(token1.balanceOf(address(this)), 0);
         assertEq(token0.balanceOf(address(adapter)), 0);
         assertEq(token1.balanceOf(address(adapter)), 0);
+    }
+
+    function test_prefundedRefundRejectsLateTransferFeeAndRollsBackPosition() public {
+        V4LateRecipientFeeToken feeToken = new V4LateRecipientFeeToken();
+        MockMintableERC20 normalToken = new MockMintableERC20("Normal outcome", "NOUT");
+        (address first, address second) = address(feeToken) < address(normalToken)
+            ? (address(feeToken), address(normalToken))
+            : (address(normalToken), address(feeToken));
+        uint256 feeAmount = AMOUNT + AMOUNT / 200;
+        uint256 amount0 = first == address(feeToken) ? feeAmount : AMOUNT;
+        uint256 amount1 = second == address(feeToken) ? feeAmount : AMOUNT;
+        feeToken.mint(address(adapter), feeAmount);
+        normalToken.mint(address(adapter), AMOUNT);
+        feeToken.setFeeRecipient(address(this));
+
+        vm.expectRevert(V4ConditionalLiquidityAdapter.InvalidAssetTransfer.selector);
+        adapter.addPrefundedFreshFullRangeLiquidity(first, second, amount0, amount1, Q96);
+
+        assertEq(feeToken.balanceOf(address(adapter)), feeAmount);
+        assertEq(normalToken.balanceOf(address(adapter)), AMOUNT);
+        assertEq(feeToken.balanceOf(address(this)), 0);
+        assertEq(adapter.poolByPair(first, second), address(0));
+
+        feeToken.setFeeRecipient(address(0));
+        (, uint128 liquidity,,) =
+            adapter.addPrefundedFreshFullRangeLiquidity(first, second, amount0, amount1, Q96);
+
+        assertEq(liquidity, AMOUNT);
+        assertEq(feeToken.balanceOf(address(this)), AMOUNT / 200);
+        assertEq(feeToken.balanceOf(address(adapter)), 0);
+        assertEq(normalToken.balanceOf(address(adapter)), 0);
     }
 
     function test_firstLiquidityFailureRollsBackInitializationAndCustody() public {

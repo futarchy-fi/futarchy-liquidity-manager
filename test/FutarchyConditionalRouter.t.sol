@@ -21,6 +21,26 @@ contract FutarchyConditionalRouterDeployer {
     }
 }
 
+contract LateRecipientFeeToken is MockMintableERC20 {
+    address public feeRecipient;
+
+    constructor() MockMintableERC20("Company", "COMP") {}
+
+    function setFeeRecipient(address recipient) external {
+        feeRecipient = recipient;
+    }
+
+    function _transfer(address from, address to, uint256 amount) internal override {
+        if (to != feeRecipient) {
+            super._transfer(from, to, amount);
+            return;
+        }
+        uint256 fee = amount / 100;
+        super._transfer(from, to, amount - fee);
+        _burn(from, fee);
+    }
+}
+
 contract MalformedMetadataWrapper {
     address public immutable factory;
     address public immutable multiToken;
@@ -53,7 +73,7 @@ contract FutarchyConditionalRouterTest is Test {
     bytes32 private constant CONDITION_ID = keccak256("condition");
     address private constant DEAD = 0x000000000000000000000000000000000000dEaD;
 
-    MockMintableERC20 private company;
+    LateRecipientFeeToken private company;
     MockMintableERC20 private collateral;
     MockRouterConditionalTokens private conditionalTokens;
     MockRouterWrapped1155Factory private wrapped1155Factory;
@@ -64,7 +84,7 @@ contract FutarchyConditionalRouterTest is Test {
 
     function setUp() public {
         user = makeAddr("user");
-        company = new MockMintableERC20("Company", "COMP");
+        company = new LateRecipientFeeToken();
         collateral = new MockMintableERC20("Collateral", "COLL");
         conditionalTokens = new MockRouterConditionalTokens();
         wrapped1155Factory = new MockRouterWrapped1155Factory();
@@ -84,6 +104,54 @@ contract FutarchyConditionalRouterTest is Test {
     function test_split_and_merge_both_collaterals_preserves_complete_sets() public {
         _assertSplitAndMerge(address(company), 0);
         _assertSplitAndMerge(address(collateral), 2);
+        _assertNoRouterDust();
+    }
+
+    function test_split_rejects_late_ctf_transfer_fee_without_minting_wrappers() public {
+        company.setFeeRecipient(address(conditionalTokens));
+
+        vm.expectRevert(FutarchyConditionalRouter.InvalidBalanceDelta.selector);
+        vm.prank(user);
+        router.splitPosition(address(company), CONDITION_ID, wrappers[0], wrappers[1], AMOUNT);
+
+        assertEq(company.balanceOf(user), 100 ether);
+        assertEq(company.balanceOf(address(conditionalTokens)), 0);
+        assertEq(IERC20(wrappers[0]).balanceOf(user), 0);
+        assertEq(IERC20(wrappers[1]).balanceOf(user), 0);
+        _assertNoRouterDust();
+
+        company.setFeeRecipient(address(0));
+        _split(address(company));
+
+        assertEq(company.balanceOf(user), 90 ether);
+        assertEq(company.balanceOf(address(conditionalTokens)), AMOUNT);
+        assertEq(IERC20(wrappers[0]).balanceOf(user), AMOUNT);
+        assertEq(IERC20(wrappers[1]).balanceOf(user), AMOUNT);
+        _assertNoRouterDust();
+    }
+
+    function test_merge_rejects_late_transfer_fee_without_consuming_wrappers() public {
+        _split(address(company));
+        _approveWrapper(0);
+        _approveWrapper(1);
+        company.setFeeRecipient(user);
+
+        vm.expectRevert(FutarchyConditionalRouter.InvalidBalanceDelta.selector);
+        vm.prank(user);
+        router.mergePositions(address(company), CONDITION_ID, wrappers[0], wrappers[1], AMOUNT);
+
+        assertEq(company.balanceOf(user), 90 ether);
+        assertEq(IERC20(wrappers[0]).balanceOf(user), AMOUNT);
+        assertEq(IERC20(wrappers[1]).balanceOf(user), AMOUNT);
+        _assertNoRouterDust();
+
+        company.setFeeRecipient(address(0));
+        vm.prank(user);
+        router.mergePositions(address(company), CONDITION_ID, wrappers[0], wrappers[1], AMOUNT);
+
+        assertEq(company.balanceOf(user), 100 ether);
+        assertEq(IERC20(wrappers[0]).balanceOf(user), 0);
+        assertEq(IERC20(wrappers[1]).balanceOf(user), 0);
         _assertNoRouterDust();
     }
 

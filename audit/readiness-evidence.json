@@ -108,7 +108,7 @@
           "path": "test/fork/V4FutarchyLiquidityManagerLifecycleMainnetFork.t.sol"
         },
         {
-          "description": "The production router test proves exact CTF split receipts and exact wrapper mint deltas.",
+          "description": "The production router test proves exact CTF collateral receipts and wrapper mint deltas, including complete split rollback when a late recipient fee underpays CTF and complete merge rollback when it underpays the caller, followed by identical fee-free retries.",
           "path": "test/FutarchyConditionalRouter.t.sol"
         },
         {
@@ -128,7 +128,7 @@
           "path": "test/FutarchyLiquidityManagerAdapterSafety.t.sol"
         },
         {
-          "description": "Deterministic Uniswap V3 adapter tests separate fee-only, partial-principal, and final-principal removal fields exactly; cover fresh create-initialize-first-mint ownership; reject uninitialized and initialized guarded/manipulated-price pre-existing pools before custody changes; and prove distinct pool-creation, initialization, and first-mint failures roll back pool creation, initialization, balances, and approvals.",
+          "description": "Deterministic Uniswap V3 adapter tests separate fee-only, partial-principal, and final-principal removal fields exactly; cover fresh create-initialize-first-mint ownership; reject uninitialized and initialized guarded/manipulated-price pre-existing pools before custody changes; prove distinct pool-creation, initialization, and first-mint failures roll back pool creation, initialization, balances, and approvals; and require exact manager refund receipts when token fee behavior changes after input custody.",
           "path": "test/UniswapV3LiquidityAdapter.t.sol"
         },
         {
@@ -136,7 +136,7 @@
           "path": "test/V4InitializationGate.t.sol"
         },
         {
-          "description": "The selector-frozen direct v4 adapter tests exact prefunded settlement, donation fees, sequential partial/final removal, atomic initialization rollback, PoolManager codehash drift, dishonest poke reports, second-phase fee leakage, and manager-only operation.",
+          "description": "The selector-frozen direct v4 adapter tests exact prefunded settlement and manager refunds, donation fees, sequential partial/final removal, atomic initialization rollback including late refund-fee behavior, PoolManager codehash drift, dishonest poke reports, second-phase fee leakage, and manager-only operation.",
           "path": "test/V4ConditionalLiquidityAdapter.t.sol"
         },
         {

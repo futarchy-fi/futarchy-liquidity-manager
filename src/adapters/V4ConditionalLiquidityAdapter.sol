@@ -357,7 +357,13 @@ contract V4ConditionalLiquidityAdapter is
                 || balanceAfter - balanceBefore != amountDesired - amountUsed
         ) revert InvalidAssetTransfer();
         uint256 refund = amountDesired - amountUsed;
-        if (refund != 0) asset.safeTransfer(MANAGER, refund);
+        if (refund != 0) {
+            uint256 recipientBefore = asset.balanceOf(MANAGER);
+            asset.safeTransfer(MANAGER, refund);
+            if (asset.balanceOf(MANAGER) != recipientBefore + refund) {
+                revert InvalidAssetTransfer();
+            }
+        }
         if (asset.balanceOf(address(this)) != balanceBefore) revert InvalidAssetTransfer();
     }
 

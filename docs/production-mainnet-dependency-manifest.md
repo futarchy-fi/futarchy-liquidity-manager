@@ -38,9 +38,9 @@ hash. Under that exact profile, the bare creation-code hashes are:
 | Candidate artifact | Bare creation-code hash |
 | --- | --- |
 | `FutarchyOfficialProposalSource` | `0xeec528405c315ae9de9317487b7ddaf26bf3748af830bb4dd95538ca09c2afbf` |
-| `UniswapV3LiquidityAdapter` | `0xc2f01cca15a3dc38280b20c05dcce401b71abd0f017fa04abe32550dc18e9a2b` |
+| `UniswapV3LiquidityAdapter` | `0xe4ede15bf37a793e628f367d45282a9df1241b3cc401e0d8ee896a055ac40843` |
 | `V4InitializationGate` | `0x56052e89d8d3305ab4d3c35922882faee512c39fe45102cc0dec86bf7e57f75f` |
-| `V4ConditionalLiquidityAdapter` | `0xba940a9f090ff9120797bb258c48717d0c508bbbc23d9379eb8c10bebcc4fc53` |
+| `V4ConditionalLiquidityAdapter` | `0x1333c00b08fb2d31f53d11465292f8b869455d8020bd0489059e3e7a3a7af2e3` |
 | `FutarchyLiquidityManager` | `0x530508cbc317688dadfc8711e4bfff2fb23a0b9b5f378eb613c0ca570157e846` |
 | `V4FutarchyLiquidityManagerFactory` | `0xe6df50aabe5258cd3d084046eb8b3573cad874c50e7aa721257e033374497440` |
 

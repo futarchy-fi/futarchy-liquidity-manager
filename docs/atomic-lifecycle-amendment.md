@@ -215,7 +215,7 @@ This manager-only call must:
   amount, using the same two-sided rule currently enforced by `MAX_SYNC_LEFTOVER_BPS`;
 - require the exact supplied-token balance delta, reconcile reported use plus refund to that input,
   and clear any downstream token allowance before returning;
-- refund unused assets only to the manager; and
+- refund unused assets only to the manager and require its exact recipient balance delta; and
 - return and verify that the created position and pool match the requested pair and fixed range.
 
 Freshness is enforced inside the manager-bound adapter because that adapter owns the AMM-specific
@@ -374,6 +374,8 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | The factory is configured with an out-of-range or misaligned immutable v3 spot tick | Factory construction reverts under the same bounds and 10-tick alignment enforced by its pinned spot adapter; an unusable factory cannot persist. |
 | An outcome wrapper aliases either base asset | Source admission and manager activation independently reject before spot movement, preserving six distinct accounting buckets. |
 | Adapter reports removal assets it did not transfer | The entire operation reverts before survivor-owned idle balances can fund the discrepancy. |
+| A split transfer underpays CTF while full wrappers are minted | The router requires CTF's collateral balance to increase by the full split amount, restoring the user's collateral and all wrapper/underlying state on mismatch. |
+| A spot or conditional adapter refund underpays the manager | The adapter requires the manager's exact recipient delta, reverting the position change and restoring all input custody before shares or lifecycle state can advance. |
 | Company, collateral, or outcome token later underpays a successful transfer | Exact recipient balance deltas revert the complete payout. A regression enables a company-token recipient fee only after bootstrap, proves shares/liquidity restore, then disables it and completes the identical exit. |
 | Adapter preserves receipt totals but swaps principal/fee field labels | The manager ignores labels and classifies exact deltas by the zero-liquidity and nonzero phases. |
 | Adapter's zero-liquidity call removes principal or leaves realized fees owed | The adapter violates the audited phase contract; deterministic and real-fork fixtures must prove unchanged liquidity and an immediately fee-free principal phase for the pinned bytecode. |

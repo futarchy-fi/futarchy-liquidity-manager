@@ -69,6 +69,9 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   the reported amount. A regression enables a company-token recipient fee only after bootstrap,
   proves redemption restores shares and liquidity instead of silently underpaying, then disables
   the fee and completes the identical exit.
+- CTF split collateral and every spot or conditional adapter refund also require exact recipient
+  deltas. Late-fee regressions prove an underpaid CTF split restores collateral and wrapper state,
+  and an underpaid refund restores the complete v3 NFT or v4 position change before exact retry.
 - The native receive boundary rejects direct transfers and accepts only immutable-wrapper unwrap
   proceeds, preventing ordinary native transfers from bypassing the six-token redemption model.
 - Partial redemption removes proportional spot, YES, and NO liquidity; accounts for principal,
@@ -202,14 +205,14 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   across nine randomized actions, while the two UniV3 invariants retain their stricter inline
   256-by-512 configuration (131,072 calls each). The final candidate must re-run this gate after
   its exact configuration is fixed.
-- The current 258-test instrumented suite also passes Foundry's coverage profile with `--ir-minimum`
+- The current 262-test instrumented suite also passes Foundry's coverage profile with `--ir-minimum`
   after excluding the production-profile-only artifact-hash assertion (coverage deliberately
   recompiles different bytecode). This flag is required because unoptimized instrumentation
   exceeds Solidity's stack limit. The manager reports 93.12%
   line, 91.29% statement, 67.96% branch, and 98.63% function coverage. Production compilation
   independently confirms a 24,399-byte manager runtime, 177 bytes below EIP-170 and 49 bytes below
   the repository's stricter ceiling.
-- The current 259-test normal suite includes direct emergency-handler reachability, ten
+- The current 263-test normal suite includes direct emergency-handler reachability, ten
   pinned-mainnet activation rollback cases, and a fifth invariant that requires executed emergency
   mode to leave every manager position at zero liquidity. Artifact drift, permissionless bundle
   interleaving, code-less PoolManager, and immutable spot-tick-policy checks remain green.
@@ -230,13 +233,16 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 | Either CTF split leg | `test_atomic_activation_uses_captured_source_snapshot` injects a receipt shortfall for company and collateral separately and checks source, spot, CTF, router, allowance, wrapper, and adapter state. |
 | Official mainnet v3 spot removal | `testFork_spotRemovalFailureRollsBackAndRetrySucceeds` faults principal removal after the real fee-collection phase, restores actual NFT liquidity and the outer envelope, then retries successfully. |
 | Both canonical mainnet CTF splits | `testFork_firstRealCtfSplitFailureRollsBackAndRetrySucceeds` and `testFork_secondRealCtfSplitFailureRollsBackAndRetrySucceeds` fault each deployed CTF call, including after the first underlying completed, compare base/CTF custody and allowances, then retry successfully. |
+| CTF receives less collateral than the wrappers minted | `test_split_rejects_late_ctf_transfer_fee_without_minting_wrappers` enables a fee only for the CTF recipient, proves user collateral plus wrapper/underlying state restore, then retries the identical split fee-free. |
 | Deployed wrapper conversion for either underlying | `testFork_firstRealWrapperMintFailureRollsBackAndRetrySucceeds` and `testFork_secondAssetRealWrapperMintFailureRollsBackAndRetrySucceeds` fault the canonical ERC1155-to-ERC20 conversion before the first and after the complete first underlying, restore CTF/wrapper custody and supply, then retry successfully. |
 | First conditional pool/add | The same full binding test injects first-add and post-add accounting failures and proves the created pool, split wrappers, and spot removal all roll back. |
 | Second conditional pool | `test_activation_rolls_back_first_pool_when_second_pool_is_precreated` proves the newly created first pool disappears while the adversarial second pool remains. |
 | First or second official mainnet v4 initialization/liquidity | `testFork_firstRealV4InitializeFailureRollsBackAndRetrySucceeds`, `testFork_firstRealV4LiquidityFailureRollsBackAndRetrySucceeds`, `testFork_secondRealV4InitializeFailureRollsBackAndRetrySucceeds`, and `testFork_secondRealV4LiquidityFailureRollsBackAndRetrySucceeds` fault each deployed PoolManager boundary, prove prior live-stack effects and any pool initialization disappear, and retry the identical activation. |
+| Spot or conditional adapter refund underpays the manager | `test_refundRejectsLateTransferFeeAndRollsBackPosition` and `test_prefundedRefundRejectsLateTransferFeeAndRollsBackPosition` enable fees only on the manager refund, restore the v3 NFT or fresh v4 position and all custody, then complete the identical add fee-free. |
 | Second conditional removal during proportional redemption | `testFork_lateRemovalRollbackThenCompanyMergeFailureRemainsRedeemable` completes the proportional YES removal before faulting the NO adapter boundary, then proves LP shares, both positions, spot identity, and all six holder/manager/PoolManager balances roll back. |
 | Canonical mainnet CTF merge during redemption | The identical retry in `testFork_lateRemovalRollbackThenCompanyMergeFailureRemainsRedeemable` faults the company merge, proves collateral still merges and exact YES/NO company wrappers are paid in kind, then redeems/consumes those wrappers after resolution and conserves both assets through survivor settlement and final exit. |
 | Successful ERC20 call underpays its recipient | `test_redemption_rejects_late_transfer_fee_without_burning_shares` enables a company-token recipient fee only after bootstrap. The exact recipient-delta check restores shares and liquidity, and the identical redemption succeeds after the fee is disabled. |
+| Router merge underpays its direct caller | `test_merge_rejects_late_transfer_fee_without_consuming_wrappers` enables a fee only for the caller, restores both complete-set wrappers and collateral custody, then completes the identical merge fee-free. |
 | Any in-kind outcome transfer during proportional redemption | `test_each_in_kind_outcome_transfer_failure_rolls_back_complete_redemption` forces both merges into fallback, then independently faults each of the four exact wrapper transfers. Every case restores shares, spot/YES/NO liquidity, removal counters, managed/router custody, and any preceding wrapper payments before the identical retry pays the exact base and four-wrapper slice. |
 | Each final recipient payout path during proportional redemption | `test_each_final_payout_failure_rolls_back_complete_conditional_redemption` independently faults the exact company-token transfer, wrapped-collateral transfer, and native delivery after unwrap. Each occurs after spot/YES/NO removal, share burn, and both complete-set merges; the later faults occur after company payment, and native delivery also occurs after WETH withdrawal. Every case restores shares, liquidity, removal counters, and token/native custody before the identical native retry succeeds. |
 | Native recipient reenters redemption during payout | `test_native_payout_blocks_reentrant_redemption_without_blocking_outer_exit` gives the recipient remaining shares and forwards native payout gas to its callback. The nested redemption is rejected while the outer proportional burn, liquidity reduction, and exact company/native payment complete. |

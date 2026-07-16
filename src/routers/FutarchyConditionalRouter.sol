@@ -122,6 +122,7 @@ contract FutarchyConditionalRouter is IFutarchyConditionalRouter, ERC1155Holder,
     ) private {
         IERC20 collateral = IERC20(collateralToken);
         uint256 collateralBefore = collateral.balanceOf(address(this));
+        uint256 ctfCollateralBefore = collateral.balanceOf(address(CONDITIONAL_TOKENS));
         uint256 yesUnderlyingBefore =
             CONDITIONAL_TOKENS.balanceOf(address(this), yesPosition.tokenId);
         uint256 noUnderlyingBefore = CONDITIONAL_TOKENS.balanceOf(address(this), noPosition.tokenId);
@@ -136,7 +137,10 @@ contract FutarchyConditionalRouter is IFutarchyConditionalRouter, ERC1155Holder,
         if (collateral.allowance(address(this), address(CONDITIONAL_TOKENS)) != 0) {
             collateral.safeApprove(address(CONDITIONAL_TOKENS), 0);
         }
-        if (collateral.balanceOf(address(this)) != collateralBefore) revert InvalidBalanceDelta();
+        if (
+            collateral.balanceOf(address(this)) != collateralBefore
+                || collateral.balanceOf(address(CONDITIONAL_TOKENS)) != ctfCollateralBefore + amount
+        ) revert InvalidBalanceDelta();
 
         _wrapAndSend(yesPosition, amount, recipient);
         _wrapAndSend(noPosition, amount, recipient);
@@ -184,7 +188,7 @@ contract FutarchyConditionalRouter is IFutarchyConditionalRouter, ERC1155Holder,
                     != noUnderlyingBefore
         ) revert InvalidBalanceDelta();
 
-        collateral.safeTransfer(msg.sender, amount);
+        _transferExact(collateral, msg.sender, amount);
         if (collateral.balanceOf(address(this)) != collateralBefore) revert InvalidBalanceDelta();
     }
 
@@ -227,7 +231,7 @@ contract FutarchyConditionalRouter is IFutarchyConditionalRouter, ERC1155Holder,
                 || CONDITIONAL_TOKENS.balanceOf(address(this), winningPosition.tokenId) != 0
         ) revert InvalidBalanceDelta();
 
-        collateral.safeTransfer(msg.sender, amount);
+        _transferExact(collateral, msg.sender, amount);
         if (collateral.balanceOf(address(this)) != collateralBefore) revert InvalidBalanceDelta();
     }
 
@@ -485,6 +489,12 @@ contract FutarchyConditionalRouter is IFutarchyConditionalRouter, ERC1155Holder,
         if (token.balanceOf(address(this)) != beforeBalance + amount) {
             revert InvalidBalanceDelta();
         }
+    }
+
+    function _transferExact(IERC20 token, address recipient, uint256 amount) private {
+        uint256 beforeBalance = token.balanceOf(recipient);
+        token.safeTransfer(recipient, amount);
+        if (token.balanceOf(recipient) != beforeBalance + amount) revert InvalidBalanceDelta();
     }
 
     function _expectBatch(uint256 tokenId0, uint256 tokenId1, uint256 amount) private {

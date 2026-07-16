@@ -41,11 +41,11 @@ contract DeployV4MainnetFactory is Script {
     bytes32 internal constant PROPOSAL_SOURCE_CREATION_CODE_HASH =
         0xeec528405c315ae9de9317487b7ddaf26bf3748af830bb4dd95538ca09c2afbf;
     bytes32 internal constant SPOT_ADAPTER_CREATION_CODE_HASH =
-        0xc2f01cca15a3dc38280b20c05dcce401b71abd0f017fa04abe32550dc18e9a2b;
+        0xe4ede15bf37a793e628f367d45282a9df1241b3cc401e0d8ee896a055ac40843;
     bytes32 internal constant INITIALIZATION_GATE_CREATION_CODE_HASH =
         0x56052e89d8d3305ab4d3c35922882faee512c39fe45102cc0dec86bf7e57f75f;
     bytes32 internal constant CONDITIONAL_ADAPTER_CREATION_CODE_HASH =
-        0xba940a9f090ff9120797bb258c48717d0c508bbbc23d9379eb8c10bebcc4fc53;
+        0x1333c00b08fb2d31f53d11465292f8b869455d8020bd0489059e3e7a3a7af2e3;
     bytes32 internal constant MANAGER_CREATION_CODE_HASH =
         0x530508cbc317688dadfc8711e4bfff2fb23a0b9b5f378eb613c0ca570157e846;
     bytes32 internal constant FACTORY_CREATION_CODE_HASH =

@@ -16,13 +16,23 @@ import {
 } from "./mocks/MockUniswapV3NonfungiblePositionManager.sol";
 
 contract AdapterFeeOnTransferToken is ERC20 {
+    address public feeRecipient;
+
     constructor() ERC20("Adapter fee token", "AFEE") {}
 
     function mint(address to, uint256 amount) external {
         _mint(to, amount);
     }
 
+    function setFeeRecipient(address recipient) external {
+        feeRecipient = recipient;
+    }
+
     function _transfer(address from, address to, uint256 amount) internal override {
+        if (to != feeRecipient) {
+            super._transfer(from, to, amount);
+            return;
+        }
         uint256 fee = amount / 100;
         super._transfer(from, to, amount - fee);
         _burn(from, fee);
@@ -317,12 +327,44 @@ contract UniswapV3LiquidityAdapterTest is Test {
         normalToken.mint(address(this), 2 ether);
         feeToken.approve(address(candidate), type(uint256).max);
         normalToken.approve(address(candidate), type(uint256).max);
+        feeToken.setFeeRecipient(address(candidate));
 
         vm.expectRevert(UniswapV3LiquidityAdapter.InvalidAssetTransfer.selector);
         candidate.addFullRangeLiquidity(first, second, 1 ether, 1 ether, "");
 
         assertEq(candidate.getPositionTokenId(first, second), 0);
         assertEq(positionManager.mintCalls(), 0);
+    }
+
+    function test_refundRejectsLateTransferFeeAndRollsBackPosition() public {
+        AdapterFeeOnTransferToken feeToken = new AdapterFeeOnTransferToken();
+        MockMintableERC20 normalToken = new MockMintableERC20("Normal", "NORM");
+        (address first, address second) = address(feeToken) < address(normalToken)
+            ? (address(feeToken), address(normalToken))
+            : (address(normalToken), address(feeToken));
+        UniswapV3LiquidityAdapter candidate = _newAdapter();
+        candidate.bindManager(address(this));
+        feeToken.mint(address(this), 100 ether);
+        normalToken.mint(address(this), 100 ether);
+        feeToken.approve(address(candidate), type(uint256).max);
+        normalToken.approve(address(candidate), type(uint256).max);
+        positionManager.setUsageBps(9975);
+        feeToken.setFeeRecipient(address(this));
+
+        vm.expectRevert(UniswapV3LiquidityAdapter.InvalidAssetTransfer.selector);
+        candidate.addFullRangeLiquidity(first, second, 100 ether, 100 ether, "");
+
+        assertEq(feeToken.balanceOf(address(this)), 100 ether);
+        assertEq(normalToken.balanceOf(address(this)), 100 ether);
+        assertEq(candidate.getPositionTokenId(first, second), 0);
+        assertEq(positionManager.mintCalls(), 0);
+
+        feeToken.setFeeRecipient(address(0));
+        candidate.addFullRangeLiquidity(first, second, 100 ether, 100 ether, "");
+
+        assertEq(feeToken.balanceOf(address(this)), 0.25 ether);
+        assertEq(normalToken.balanceOf(address(this)), 0.25 ether);
+        assertEq(candidate.getPositionTokenId(first, second), 1);
     }
 
     function test_partialThenFullRemovalCollectsAndBurnsThePosition() public {
