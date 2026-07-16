@@ -221,12 +221,12 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   across nine randomized actions, while the two UniV3 invariants retain their stricter inline
   256-by-512 configuration (131,072 calls each). The final candidate must re-run this gate after
   its exact configuration is fixed.
-- All 254 applicable non-invariant tests at `f5bb4c0` pass Foundry's coverage profile with
-  `--ir-minimum` after excluding the production-profile-only artifact-hash assertion (coverage
-  deliberately recompiles different bytecode) and the separately measured invariant suites. This
-  flag is required because unoptimized instrumentation exceeds Solidity's stack limit. The manager
-  reports 92.75% line, 91.29% statement, 68.93% branch, and 98.63% function coverage; IR-minimum
-  source mappings are informative rather than a production-bytecode identity check. Production
+- The exact CI coverage command passes 263 tests at `bee832c`: every normal-profile test except the
+  production-bytecode hash assertion, which coverage deliberately recompiles, including all
+  282,624 default invariant calls with zero reverts. `--ir-minimum` is required because unoptimized
+  instrumentation exceeds Solidity's stack limit. The manager reports 93.49% line, 91.87%
+  statement, 69.90% branch, and 98.63% function coverage; IR-minimum source mappings are informative
+  rather than a production-bytecode identity check. Production
   compilation independently confirms a 24,399-byte manager runtime, 177 bytes below EIP-170 and
   49 bytes below the repository's stricter ceiling.
 - The current 264-test normal suite includes direct emergency-handler reachability, ten
@@ -234,6 +234,10 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   mode to leave every manager position at zero liquidity. Its default invariant profile executes
   282,624 calls with zero reverts. Artifact drift, permissionless bundle interleaving, code-less
   PoolManager, and immutable spot-tick-policy checks remain green.
+- At `bee832c`, the remaining local CI matrix also passes: production build and format, shell
+  syntax, scope and API freeze, example deployment/v4-factory/batch schemas, every batch template,
+  readiness evidence, and the limited-deployment preflight. Network publication and final-config
+  fork repetition remain separate release gates.
 - The current compiler profile and bare creation-code hashes for the v4 factory and all five
   children are pinned in `production-mainnet-dependency-manifest.md`; an executable drift test
   requires an explicit manifest update whenever any artifact changes.
