@@ -23,8 +23,9 @@ The current candidate disposition and release blockers are recorded in
   redeploying survivor assets. The final holder receives deterministic rounding residue.
 - Pool and hook administration must be immutable or incapable of blocking initialization, removal,
   collection, and settlement. A privileged promise not to change configuration is insufficient.
-- Staged activation must retain materially more Gnosis block-gas headroom than the Algebra
-  prototype; the bound is measured from a committed fork fixture, including calldata overhead.
+- Staged activation must retain materially more Ethereum-mainnet block-gas headroom than the
+  Algebra prototype; the bound is measured from a pinned mainnet fork fixture, includes calldata
+  overhead, and is compared with that fork block's actual gas limit.
 
 ## Integration boundary
 

@@ -15,6 +15,11 @@ The current Swapr Algebra path is a no-funds prototype because permissionless po
 a mutable burn cooldown violate the production threat model. See
 [`docs/readiness.md`](docs/readiness.md).
 
+FAO production targets Ethereum mainnet. The selected successor uses the official Uniswap v4
+PoolManager plus an initialization-only hook; only that hook gate is implemented so far, and the
+repository remains unfundable until the adapter, atomic wiring, mainnet fork proofs, and external
+review are complete.
+
 ## Layout
 
 - `src/core/` - generic audited FLM state machine.
@@ -59,6 +64,13 @@ Run Gnosis fork checks explicitly:
 
 ```sh
 RUN_GNOSIS_FORK_TESTS=true forge test --match-path 'test/fork/*'
+```
+
+Run the selected successor's initialization gate against the official Ethereum PoolManager:
+
+```sh
+RUN_MAINNET_FORK_TESTS=true \
+  forge test --match-contract V4InitializationGateMainnetForkTest
 ```
 
 Generate a deployment from explicit JSON config:

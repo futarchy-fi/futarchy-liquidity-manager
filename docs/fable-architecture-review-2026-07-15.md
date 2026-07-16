@@ -11,6 +11,11 @@
 
 ## Decision
 
+Target-chain update, 2026-07-16: Kelvin selected Ethereum mainnet for FAO production. The official
+Ethereum v4 deployment removes this review's Gnosis-deployment and Gnosis-block-limit constraints;
+the hook-gated architecture, atomicity, removal-liveness, fork-proof, and external-review
+requirements remain in force.
+
 Fable approved the current Algebra implementation for a draft PR and bounded testnet/canary work,
 not production funding. Two independent production blockers remain:
 

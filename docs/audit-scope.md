@@ -24,6 +24,9 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   the established spot pool's current tick differs from its average by more than 50 ticks.
 - `FutarchyLiquidityManagerFactory`: permissionless atomic bundle deployer pinned to immutable bare
   creation-code hashes and shared protocol dependencies.
+- `V4InitializationGate`: partial Ethereum-mainnet successor seam. It reserves pool initialization
+  for one irreversibly bound adapter and deliberately exposes no liquidity callbacks. The v4
+  adapter and factory wiring remain outside the implemented surface.
 
 ## External Dependencies
 

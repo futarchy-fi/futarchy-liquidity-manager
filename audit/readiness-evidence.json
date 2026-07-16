@@ -46,6 +46,10 @@
           "path": "test/fork/UniswapV3SepoliaFork.t.sol"
         },
         {
+          "description": "A pinned Ethereum-mainnet fork verifies the official v4 PoolManager runtime code hash and proves the exact initialization-gate ABI rejects outsider preinitialization before accepting the bound adapter on the same pool key.",
+          "path": "test/fork/V4InitializationGateMainnetFork.t.sol"
+        },
+        {
           "description": "Real futarchy proposal, Reality question, and CTF condition wiring fork test.",
           "path": "test/fork/FutarchyProposalWiringFork.t.sol"
         },
@@ -102,6 +106,10 @@
         {
           "description": "Deterministic Uniswap V3 adapter tests separate fee-only, partial-principal, and final-principal removal fields exactly; cover fresh create-initialize-first-mint ownership; reject uninitialized and initialized guarded/manipulated-price pre-existing pools before custody changes; and prove distinct pool-creation, initialization, and first-mint failures roll back pool creation, initialization, balances, and approvals.",
           "path": "test/UniswapV3LiquidityAdapter.t.sol"
+        },
+        {
+          "description": "The selector-frozen v4 initialization gate enables only the before-initialize hook bit, binds once to a code-bearing adapter, rejects direct and wrong-key callbacks, prevents outsider preinitialization, and still lets the bound adapter initialize the same predictable key.",
+          "path": "test/V4InitializationGate.t.sol"
         },
         {
           "description": "Algebra guard tests cover inclusive 50-tick boundaries, signed TWAP rounding, and fail-closed history reads.",

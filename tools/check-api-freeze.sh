@@ -43,6 +43,9 @@ check_contract \
   "UniswapV3LiquidityAdapter" \
   "src/adapters/UniswapV3LiquidityAdapter.sol:UniswapV3LiquidityAdapter"
 check_contract \
+  "V4InitializationGate" \
+  "src/adapters/V4InitializationGate.sol:V4InitializationGate"
+check_contract \
   "UniV3PoolStabilityGuard" \
   "src/oracles/UniV3PoolStabilityGuard.sol:UniV3PoolStabilityGuard"
 check_contract \

@@ -91,6 +91,10 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   injects distinct pool-creation and initialization failures, and proves each failure plus a failed
   first mint rolls back pool creation, initialization, balances, and approvals.
 - Runtime-size checks retain an EIP-170 margin for the manager.
+- The v4 successor now has a selector-frozen initialization gate. Its exact-permission hook address,
+  one-time code-bearing adapter binding, PoolManager-only callback, original-sender check, and
+  self-referential pool key are unit tested. A pinned Ethereum-mainnet fork verifies the official
+  PoolManager code hash and exact hook ABI. The adapter and atomic bundle wiring remain unbuilt.
 
 ## Required before any funded deployment
 
