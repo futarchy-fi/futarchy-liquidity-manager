@@ -116,10 +116,12 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   emergency removal after the first official-v4 unwind and proves the whole attempt rolls back
   before an identical outsider retry succeeds, then proves a shareholder can redeem proportional
   base value with no outcome residue while canonical CTF is still unresolved.
-- The pinned-mainnet spot-mode emergency path arms before proposal activation, lets an unrelated
-  caller reach fee collection before faulting principal removal, and proves the NFT/liquidity,
-  manager/adapter/NPM balances, shares, and emergency flag restore. The identical retry has zero
-  caller gain and recovers both bootstrap assets within two wei through final shareholder redemption.
+- The pinned-mainnet spot-mode emergency paths arm before proposal activation and separately fault
+  principal removal after fee collection and NFT burn after fee collection, full principal
+  removal, and principal collection. Both prove the NFT/liquidity,
+  manager/adapter/v3-pool/NPM balances, shares, and emergency flag restore. Each identical retry
+  has zero caller gain and recovers both bootstrap assets within two wei through final shareholder
+  redemption.
 - Adapters cannot over-pull tokens from the manager.
 - Source-atomic conditional activation fails closed before persistent state changes if the shared
   spot-pool guard cannot read valid history or detects more than 50 ticks of deviation.

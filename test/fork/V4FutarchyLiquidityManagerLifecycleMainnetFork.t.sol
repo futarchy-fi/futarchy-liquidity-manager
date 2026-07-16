@@ -120,7 +120,11 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
     }
 
     function testFork_outsiderSpotEmergencyRollbackPreservesSharesAndAssets() public {
-        _runLifecycle(true, false, ActivationFault.None, false, false, false, true);
+        _runLifecycle(true, false, ActivationFault.None, false, false, false, true, false);
+    }
+
+    function testFork_outsiderSpotEmergencyBurnRollbackPreservesSharesAndAssets() public {
+        _runLifecycle(true, false, ActivationFault.None, false, false, false, true, true);
     }
 
     function testFork_spotRemovalFailureRollsBackAndRetrySucceeds() public {
@@ -197,6 +201,7 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
             companyMergeFault,
             settlementMergeFault,
             emergencyLifecycle,
+            false,
             false
         );
     }
@@ -208,7 +213,8 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         bool companyMergeFault,
         bool settlementMergeFault,
         bool emergencyLifecycle,
-        bool spotEmergencyLifecycle
+        bool spotEmergencyLifecycle,
+        bool spotEmergencyBurnFault
     ) private {
         if (!vm.envOr("RUN_MAINNET_FORK_TESTS", false)) return;
         vm.createSelectFork(
@@ -343,7 +349,9 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         collateral.approve(address(manager), AMOUNT);
         manager.initializeFromBootstrap(AMOUNT, AMOUNT);
         if (spotEmergencyLifecycle) {
-            _exerciseSpotEmergencyLifecycle(manager, spot, company, collateral);
+            _exerciseSpotEmergencyLifecycle(
+                manager, spot, company, collateral, spotEmergencyBurnFault
+            );
             return;
         }
         if (activationFault != ActivationFault.None) {
@@ -760,7 +768,8 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         FutarchyLiquidityManager manager,
         UniswapV3LiquidityAdapter spot,
         MockMintableERC20 company,
-        MockMintableERC20 collateral
+        MockMintableERC20 collateral,
+        bool burnFault
     ) private {
         address outsider = address(0xC0FFEE);
         uint256 supplyBefore = manager.totalSupply();
@@ -771,6 +780,10 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         uint256 managerCollateralBefore = collateral.balanceOf(address(manager));
         uint256 adapterCompanyBefore = company.balanceOf(address(spot));
         uint256 adapterCollateralBefore = collateral.balanceOf(address(spot));
+        address spotPool =
+            IUniswapV3FactoryLike(SPOT_FACTORY).getPool(address(company), address(collateral), 500);
+        uint256 poolCompanyBefore = company.balanceOf(spotPool);
+        uint256 poolCollateralBefore = collateral.balanceOf(spotPool);
         uint256 npmCompanyBefore = company.balanceOf(SPOT_POSITION_MANAGER);
         uint256 npmCollateralBefore = collateral.balanceOf(SPOT_POSITION_MANAGER);
         uint256 outsiderCompanyBefore = company.balanceOf(outsider);
@@ -784,7 +797,9 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         bytes memory faultData = abi.encodeWithSignature("Error(string)", "spot removal fault");
         vm.mockCallRevert(
             SPOT_POSITION_MANAGER,
-            IUniswapV3NonfungiblePositionManager.decreaseLiquidity.selector,
+            burnFault
+                ? IUniswapV3NonfungiblePositionManager.burn.selector
+                : IUniswapV3NonfungiblePositionManager.decreaseLiquidity.selector,
             faultData
         );
         vm.expectCall(
@@ -805,6 +820,8 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         assertEq(collateral.balanceOf(address(manager)), managerCollateralBefore);
         assertEq(company.balanceOf(address(spot)), adapterCompanyBefore);
         assertEq(collateral.balanceOf(address(spot)), adapterCollateralBefore);
+        assertEq(company.balanceOf(spotPool), poolCompanyBefore);
+        assertEq(collateral.balanceOf(spotPool), poolCollateralBefore);
         assertEq(company.balanceOf(SPOT_POSITION_MANAGER), npmCompanyBefore);
         assertEq(collateral.balanceOf(SPOT_POSITION_MANAGER), npmCollateralBefore);
         assertEq(company.balanceOf(outsider), outsiderCompanyBefore);

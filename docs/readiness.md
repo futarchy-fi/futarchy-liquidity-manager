@@ -166,11 +166,12 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   within five wei with no outcome residue. The captured proposal remains intact,
   source-independent settlement succeeds for the survivor, and aggregate final recovery remains
   within five wei per base asset.
-  A seventh run stops before proposal activation and arms emergency mode while the official-v3
-  spot NFT is live. After the fee-collection phase, a principal-removal fault restores the NFT and
-  its liquidity, manager/adapter/NPM balances, share supply, and the unexecuted emergency flag. The
-  identical outsider retry receives no shares or tokens, and final shareholder redemption recovers
-  both bootstrap assets within two wei.
+  Seventh and eighth runs stop before proposal activation and arm emergency mode while the
+  official-v3 spot NFT is live. One faults principal removal after fee collection; the other faults
+  NFT burn after fee collection, full principal removal, and principal collection. Each restores
+  the NFT/liquidity, manager/adapter/v3-pool/NPM balances, share supply, and the unexecuted emergency
+  flag. The identical outsider retry receives no shares or tokens, and final shareholder redemption
+  recovers both bootstrap assets within two wei.
 - The pinned block's actual gas limit is 60,000,000. Charging 21,000 base gas plus the worst-case
   16 gas for every calldata byte yields 12,125,922 gas for the atomic bundle transaction,
   2,343,088 gas for source/CTF/two-pool activation, 1,460,745 gas for symmetric donated-fee partial
@@ -182,13 +183,13 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   across nine randomized actions, while the two UniV3 invariants retain their stricter inline
   256-by-512 configuration (131,072 calls each). The final candidate must re-run this gate after
   its exact configuration is fixed.
-- The current 252-test instrumented suite also passes Foundry's coverage profile with `--ir-minimum`
+- The current 253-test instrumented suite also passes Foundry's coverage profile with `--ir-minimum`
   after excluding the production-profile-only artifact-hash assertion (coverage deliberately
   recompiles different bytecode). This flag is required because unoptimized instrumentation
   exceeds Solidity's stack limit. The manager reports 93.06%
   line, 91.20% statement, 67.65% branch, and 98.61% function coverage. Production compilation
   independently confirms a 24,171-byte manager runtime, 405 bytes below EIP-170.
-- The current 253-test normal suite includes direct emergency-handler reachability, nine
+- The current 254-test normal suite includes direct emergency-handler reachability, nine
   pinned-mainnet activation rollback cases, and a fifth invariant that requires executed emergency
   mode to leave every manager position at zero liquidity. Artifact drift, permissionless bundle
   interleaving, code-less PoolManager, and immutable spot-tick-policy checks remain green.
@@ -217,7 +218,7 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 | Canonical mainnet CTF merge during redemption | The identical retry in `testFork_lateRemovalRollbackThenCompanyMergeFailureRemainsRedeemable` faults the company merge, proves collateral still merges and exact YES/NO company wrappers are paid in kind, then redeems/consumes those wrappers after resolution and conserves both assets through survivor settlement and final exit. |
 | Late canonical mainnet CTF merge during settlement | `testFork_lateRealSettlementMergeFailureRollsBackAndRetrySucceeds` proves both v4 removals and company merge/winner redemption execute before the collateral fault, compares captured binding/accounting plus actual protocol custody and positions, then completes the identical settlement after clearing the fault. |
 | Second conditional removal during emergency unwind | `testFork_outsiderEmergencyRollbackKeepsUnresolvedRedemptionLive` executes the first official-v4 removal before faulting the second adapter boundary, proves both positions, PoolManager/manager custody, accounting, shares, and the emergency flag roll back, then completes the identical outsider retry, unresolved shareholder redemption, and source-independent survivor settlement. |
-| Official-v3 spot emergency unwind | `testFork_outsiderSpotEmergencyRollbackPreservesSharesAndAssets` arms before proposal activation, faults principal removal after the official fee-collection phase, proves the NFT/liquidity, manager/adapter/NPM balances, shares, and emergency flag restore, then lets the same outsider retry with zero gain and recovers both bootstrap assets within two wei. |
+| Official-v3 spot emergency unwind | `testFork_outsiderSpotEmergencyRollbackPreservesSharesAndAssets` faults principal removal after fee collection; `testFork_outsiderSpotEmergencyBurnRollbackPreservesSharesAndAssets` faults NFT burn after fee collection, full principal removal, and principal collection. Both prove the NFT/liquidity, manager/adapter/v3-pool/NPM balances, shares, and emergency flag restore, then let the same outsider retry with zero gain and recover both bootstrap assets within two wei. |
 | AMM create, initialize, or first mint | `test_freshAddPoolCreateAndInitializeFailuresRollBack`, `test_freshAddFirstMintFailureRollsBackPoolAndCustody`, and `test_firstLiquidityFailureRollsBackInitializationAndCustody`. |
 | Outer lifecycle step after successful activation | `test_atomic_activation_uses_captured_source_snapshot` forces its resolver step to revert and compares the complete source, manager, spot, CTF, router, wrapper, pool, balance, and allowance envelope. |
 | Atomic bundle deployment/wiring | `test_lateManagerFailureRollsBackHookAndEveryCreate`, `test_sameTokenManagerFailureAlsoRollsBackMinedHook`, and the empty-runtime/initcode/hash fault cases. |
