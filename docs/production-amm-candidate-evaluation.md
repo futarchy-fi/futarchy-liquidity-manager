@@ -4,10 +4,10 @@
 
 FAO production now targets Ethereum mainnet, not Gnosis Chain. Ethereum has an official Uniswap v4
 deployment, so the prior missing-deployment blocker is superseded. Uniswap v4 with an immutable
-initialization-only hook is selected for implementation, but it is not yet a production successor:
-the repository currently contains only the initialization gate, not the manager-bound liquidity
-adapter, atomic bundle wiring, full-lifecycle mainnet fork proof, or external review. Do not sign a
-deployment batch or fund this path until those gates pass.
+initialization-only hook is selected for implementation. The repository now contains the gate and
+manager-bound direct conditional adapter, but not atomic bundle wiring, a full-lifecycle mainnet
+fork proof, or external review. Do not sign a deployment batch or fund this path until those gates
+pass.
 
 ## Candidate decision
 
@@ -57,6 +57,13 @@ key and the bound adapter can still initialize it afterward.
 This keeps the existing manager-facing fresh-add and detailed-removal interfaces. V4 pool keys,
 unlock accounting, and hook permissions remain adapter-local.
 
+The committed direct adapter implements that boundary without a v4 periphery dependency. It pins
+the PoolManager runtime hash, fixes fee 500, tick spacing 10, full-range ticks, hook, and zero salt,
+and derives a conservative liquidity request from the guarded price. Exact returned deltas are
+capped by the prefunded assets and must consume at least 99.5% of both legs. Its removal unlock
+pokes and takes real fee deltas before removing principal, requires the second fee report to be
+zero, and sends both phases directly to the bound manager.
+
 ## Upstream validation
 
 The technical seam was checked against
@@ -72,6 +79,9 @@ with its own Foundry configuration and Solidity 0.8.26:
 - a pinned Ethereum fork at block 25,542,490 verifies the official PoolManager runtime code hash
   and proves the exact committed gate ABI rejects an outsider before accepting the bound adapter on
   the same pool key.
+- the same pinned fork proves the committed adapter initializes and adds through the official
+  PoolManager, realizes a third-party pool donation as shareholder fees, removes one third, then
+  removes the exact remainder without adapter residue.
 
 These measurements validate the singleton's architectural shape only. They do not replace the
 required full outer-transaction Ethereum-mainnet fork fixture with both positions, CTF work,
@@ -104,13 +114,13 @@ legal review remains a real-funds gate; this document is an engineering analysis
 
 ## Release blockers
 
-1. Implement the manager-bound v4 liquidity adapter and atomic factory wiring, including mined hook
-   deployment, one-time adapter binding, exact unlock-delta settlement, fee realization, and
-   proportional removal.
+1. Implement atomic factory wiring for mined hook deployment, adapter deployment, both irreversible
+   bindings, and manager/source creation in one transaction.
 2. Pin and independently verify the official Ethereum PoolManager runtime hash and every imported
    upstream file/license; complete legal review before real funds.
 3. Run every adversarial, conservation, rollback, gas, bytecode, configuration, and batch gate in
-   `production-amm-successor.md` on a pinned Ethereum-mainnet fork and the final deployment config.
+   `production-amm-successor.md`, including the full source/CTF/two-pool manager lifecycle, on a
+   pinned Ethereum-mainnet fork and the final deployment config.
 4. Complete independent contract and role review before funding.
 
 Until then, both the committed Algebra path and the partial v4 path remain no-funds prototypes.

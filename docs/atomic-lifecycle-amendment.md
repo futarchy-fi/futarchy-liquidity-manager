@@ -369,6 +369,11 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | Adapter reports removal assets it did not transfer | The entire operation reverts before survivor-owned idle balances can fund the discrepancy. |
 | Adapter preserves receipt totals but swaps principal/fee field labels | The manager ignores labels and classifies exact deltas by the zero-liquidity and nonzero phases. |
 | Adapter's zero-liquidity call removes principal or leaves realized fees owed | The adapter violates the audited phase contract; deterministic and real-fork fixtures must prove unchanged liquidity and an immediately fee-free principal phase for the pinned bytecode. |
+| A caller initializes a predictable v4 conditional pool before activation | The initialization-only hook rejects every origin except its irreversibly bound adapter; a failed first position reverts that initialization in the same transaction. |
+| A third party uses the same v4 pool, ticks, and salt | PoolManager position identity also includes `msg.sender`; the third party creates a separate position and cannot change the adapter-owned liquidity. |
+| A v4 fee report is inflated or disagrees with realizable value | A zero-liquidity poke must return identical caller and fee deltas, and only the caller delta is taken. Principal removal follows an internal poke and requires its own fee report to be zero. Any mismatch reverts the unlock. |
+| The selected PoolManager runtime or hook binding changes | The adapter pins and rechecks the PoolManager code hash and the hook's PoolManager/adapter binding before every operation. The hook has no proxy, owner setter, or add/remove-liquidity permission. |
+| An arbitrary contract calls the adapter unlock callback | Only the pinned PoolManager is accepted; manager-facing add/remove entry points remain restricted to the irreversible manager binding. |
 | One redeemer manipulates or removes TWAP history | Redemption still succeeds; no guard is consulted. |
 | First partial redeemer attempts to take all NFT fees | Pre-collect/decrease/post-collect separation limits payout to its share. |
 | Fees or donations arrive after a partial redemption | Only the then-current share supply owns the new value; exited holders gain no retroactive claim. |
@@ -384,7 +389,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | Arbitration remains pending at the hard deadline | The bounded policy reports NO rather than giving arbitration an unbounded veto. |
 | Finalized Reality metadata exists but the normal result read fails | The deadline path fails closed without reporting payouts; only pending or canonically unresolved state may use forced NO. |
 | Bad fair-join quote or changed spot state | Entire join reverts or leaves inventory idle; no donation. |
-| Conditional pool precreation used only for griefing | Funds remain in spot; liveness may fail but custody does not. |
+| Legacy Algebra conditional pool precreation used only for griefing | Funds remain in spot and custody is safe, but liveness fails; this is why that path remains unfundable. The selected v4 gate rejects outsider initialization instead. |
 
 ## Verification gates
 
@@ -402,7 +407,10 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
   EOA, and unbound calls revert;
 - prove production configs and scripts contain no pre-existing-pool admission mode;
 - prove the first pool liquidity belongs only to the FLM; and
-- cover fresh create-initialize-mint against real Algebra and Uniswap V3 deployments.
+- cover fresh create-initialize-mint against real Algebra and Uniswap V3 deployments; and
+- on the pinned official Ethereum v4 PoolManager, prove outsider initialization rejection,
+  adapter-only initialization plus first liquidity, donation-fee realization, partial removal, and
+  final removal.
 
 ### Proportional redemption
 

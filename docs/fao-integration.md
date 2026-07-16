@@ -2,8 +2,9 @@
 
 The current Swapr Algebra implementation is a no-funds prototype. FAO must not route treasury or LP
 assets into it: permissionless pool precreation, mutable liquidity-cooldown griefing, and activation
-gas fragility remain unresolved. The integration flow below specifies interfaces, not deployment
-approval.
+gas fragility remain unresolved. The Ethereum-mainnet v4 successor has a gate and direct adapter,
+but lacks atomic factory wiring and a full source/CTF/manager fork proof. The integration flow below
+specifies interfaces, not deployment approval.
 
 FAO should consume this package as a generic liquidity module. This repository should not import
 FAO sale, arbitration, SnapshotX, frontend, or SDK contracts.

@@ -22,6 +22,10 @@
           "path": "audit/api-freeze/FutarchyLiquidityManager.method-identifiers.json"
         },
         {
+          "description": "Frozen selector manifest for the direct v4 conditional adapter.",
+          "path": "audit/api-freeze/V4ConditionalLiquidityAdapter.method-identifiers.json"
+        },
+        {
           "description": "Audit scope documents core boundaries and out-of-scope FAO/SnapshotX behavior.",
           "path": "docs/audit-scope.md"
         }
@@ -48,6 +52,10 @@
         {
           "description": "A pinned Ethereum-mainnet fork verifies the official v4 PoolManager runtime code hash and proves the exact initialization-gate ABI rejects outsider preinitialization before accepting the bound adapter on the same pool key.",
           "path": "test/fork/V4InitializationGateMainnetFork.t.sol"
+        },
+        {
+          "description": "A pinned Ethereum-mainnet fork proves the direct v4 adapter initializes and adds through the official PoolManager, realizes a third-party donation as fees, and performs sequential proportional and final removal without residue.",
+          "path": "test/fork/V4ConditionalLiquidityAdapterMainnetFork.t.sol"
         },
         {
           "description": "Real futarchy proposal, Reality question, and CTF condition wiring fork test.",
@@ -110,6 +118,10 @@
         {
           "description": "The selector-frozen v4 initialization gate enables only the before-initialize hook bit, binds once to a code-bearing adapter, rejects direct and wrong-key callbacks, prevents outsider preinitialization, and still lets the bound adapter initialize the same predictable key.",
           "path": "test/V4InitializationGate.t.sol"
+        },
+        {
+          "description": "The selector-frozen direct v4 adapter tests exact prefunded settlement, donation fees, sequential partial/final removal, atomic initialization rollback, PoolManager codehash drift, dishonest poke reports, second-phase fee leakage, and manager-only operation.",
+          "path": "test/V4ConditionalLiquidityAdapter.t.sol"
         },
         {
           "description": "Algebra guard tests cover inclusive 50-tick boundaries, signed TWAP rounding, and fail-closed history reads.",

@@ -1,0 +1,20 @@
+{
+  "BPS_DENOMINATOR()": "e1a45218",
+  "FEE()": "c57981b5",
+  "INITIALIZATION_GATE()": "318d3a6d",
+  "MANAGER()": "1b2df850",
+  "MIN_USAGE_BPS()": "e1af7944",
+  "POOL_MANAGER()": "62308e85",
+  "POOL_MANAGER_CODEHASH()": "fe9970c0",
+  "TICK_LOWER()": "47377d92",
+  "TICK_SPACING()": "46ca626b",
+  "TICK_UPPER()": "239f3af7",
+  "addFreshFullRangeLiquidity(address,address,uint256,uint256,uint160)": "da87b159",
+  "addFullRangeLiquidity(address,address,uint256,uint256,bytes)": "de2e6c74",
+  "addPrefundedFreshFullRangeLiquidity(address,address,uint256,uint256,uint160)": "ee47a750",
+  "bindManager(address)": "3c72b923",
+  "poolByPair(address,address)": "d9a641e1",
+  "positionLiquidity(bytes32)": "ee9e6520",
+  "removeLiquidityDetailed(address,address,uint128)": "1f660058",
+  "unlockCallback(bytes)": "91dd7346"
+}

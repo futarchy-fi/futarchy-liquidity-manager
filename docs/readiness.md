@@ -94,7 +94,14 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 - The v4 successor now has a selector-frozen initialization gate. Its exact-permission hook address,
   one-time code-bearing adapter binding, PoolManager-only callback, original-sender check, and
   self-referential pool key are unit tested. A pinned Ethereum-mainnet fork verifies the official
-  PoolManager code hash and exact hook ABI. The adapter and atomic bundle wiring remain unbuilt.
+  PoolManager code hash and exact hook ABI.
+- The selector-frozen v4 conditional adapter pins that runtime hash, binds irreversibly to one
+  manager, owns one unsalted full-range position per pair, and uses no add/remove hook callbacks.
+  Unit tests cover atomic first-liquidity rollback, dependency drift, donation fees, dishonest fee
+  reports, second-phase fee leakage, and sequential partial/final removal. A pinned mainnet fork
+  proves the same direct add, donation-fee collection, and proportional removal against the
+  official PoolManager. Atomic bundle wiring and the full source/CTF/manager mainnet fixture remain
+  unbuilt.
 
 ## Required before any funded deployment
 

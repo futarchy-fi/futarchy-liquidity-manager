@@ -16,9 +16,9 @@ a mutable burn cooldown violate the production threat model. See
 [`docs/readiness.md`](docs/readiness.md).
 
 FAO production targets Ethereum mainnet. The selected successor uses the official Uniswap v4
-PoolManager plus an initialization-only hook; only that hook gate is implemented so far, and the
-repository remains unfundable until the adapter, atomic wiring, mainnet fork proofs, and external
-review are complete.
+PoolManager plus an initialization-only hook and a direct manager-bound conditional adapter. The
+repository remains unfundable until atomic factory wiring, a full-lifecycle mainnet fork, and
+external review are complete.
 
 ## Layout
 
@@ -71,6 +71,13 @@ Run the selected successor's initialization gate against the official Ethereum P
 ```sh
 RUN_MAINNET_FORK_TESTS=true \
   forge test --match-contract V4InitializationGateMainnetForkTest
+```
+
+Run its direct add, donation-fee collection, and proportional-removal lifecycle:
+
+```sh
+RUN_MAINNET_FORK_TESTS=true \
+  forge test --match-contract V4ConditionalLiquidityAdapterMainnetForkTest
 ```
 
 Generate a deployment from explicit JSON config:
