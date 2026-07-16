@@ -124,4 +124,29 @@ contract DeadlineBoundedRealityProxyTest is Test {
         assertEq(conditionalTokens.payoutNumerators(conditionId, 0), 0);
         assertEq(conditionalTokens.payoutNumerators(conditionId, 1), 1);
     }
+
+    function test_force_fail_reports_no_for_answer_still_inside_challenge_window() public {
+        uint32 finalizeTs = openingTs + 3 days + 1;
+        realitio.setQuestionState(questionId, finalizeTs, false);
+        realitio.setBestAnswer(questionId, bytes32(0));
+        vm.warp(uint256(finalizeTs) - 1);
+
+        proxy.forceFailByDeadline(address(proposal));
+
+        assertEq(conditionalTokens.payoutDenominator(conditionId), 1);
+        assertEq(conditionalTokens.payoutNumerators(conditionId, 0), 0);
+        assertEq(conditionalTokens.payoutNumerators(conditionId, 1), 1);
+    }
+
+    function test_force_fail_reports_no_while_arbitration_is_pending() public {
+        realitio.setQuestionState(questionId, openingTs + 1, true);
+        realitio.setBestAnswer(questionId, bytes32(0));
+        vm.warp(uint256(openingTs) + MAX_QUESTION_DURATION);
+
+        proxy.forceFailByDeadline(address(proposal));
+
+        assertEq(conditionalTokens.payoutDenominator(conditionId), 1);
+        assertEq(conditionalTokens.payoutNumerators(conditionId, 0), 0);
+        assertEq(conditionalTokens.payoutNumerators(conditionId, 1), 1);
+    }
 }

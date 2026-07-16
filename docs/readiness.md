@@ -29,7 +29,9 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   the deadline; it forces NO only while Reality remains unresolved, so delayed CTF relay cannot
   overturn a finalized YES answer. If Reality metadata says a normal answer is already final but
   the result read fails, the fallback now fails closed instead of misclassifying the read failure
-  as an unresolved question; the canonical unresolved-answer sentinel retains the bounded NO path.
+  as an unresolved question. Explicit tests also prove that a normal answer still inside its
+  challenge window and an arbitration-pending answer take the bounded NO path, as does the
+  canonical unresolved-answer sentinel.
 - Settlement requires exact collateral and outcome-token balance deltas from complete-set merges,
   winner redemption, and losing-token consumption. A merge or winner redemption that pays exact
   collateral while consuming too few wrappers rolls back positions and binding, as do router

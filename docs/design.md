@@ -122,7 +122,9 @@ Reality opening timestamp + maxQuestionDuration
 ```
 
 The fallback first relays any finalized Reality result, so a caller cannot race a finalized YES
-answer with forced NO. It reports NO only if Reality is still unresolved at the deadline.
+answer with forced NO. It reports NO only if Reality is still unresolved at the deadline. A normal
+answer still inside its challenge window and an arbitration-pending answer are both unresolved for
+this hard-deadline policy; each becomes NO rather than extending the deadline.
 
 This cannot retrofit deadlines onto conditions created with a different oracle address.
 
