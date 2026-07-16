@@ -541,14 +541,14 @@ contract FutarchyLiquidityManagerTest is Test {
             address(company),
             address(nextYesCompany),
             address(nextNoCompany),
-            true
+            false
         );
         router.setOutcomeConfig(
             address(nextProposal),
             address(wrappedNative),
             address(nextYesCurrency),
             address(nextNoCurrency),
-            true
+            false
         );
         router.setPayouts(0, 0, 0);
 
@@ -558,6 +558,17 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(manager.activeProposal(), address(nextProposal));
         assertEq(yesCompany.balanceOf(address(manager)), 0);
         assertEq(company.balanceOf(address(manager)), 87 ether);
+
+        router.setPayouts(1, 0, 1);
+        manager.sync();
+        nextNoCompany.mint(address(manager), 4 ether);
+        company.mint(address(router), 4 ether);
+
+        FutarchyLiquidityManager.SyncAction action = manager.sync();
+
+        assertEq(uint256(action), uint256(FutarchyLiquidityManager.SyncAction.None));
+        assertEq(nextNoCompany.balanceOf(address(manager)), 0);
+        assertEq(company.balanceOf(address(manager)), 107 ether);
     }
 
     function test_settlement_losing_underconsumption_rolls_back_positions_and_binding() public {

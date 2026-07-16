@@ -78,7 +78,7 @@ contract FutarchyLiquidityManagerHandler is Test {
         uint256 supplyBefore = manager.totalSupply();
         if (supplyBefore == 0) return;
         uint256[3] memory liquidityBefore = _activeLiquidity();
-        uint256[6] memory balancesBefore = _managedBalances();
+        uint256[6] memory balancesBefore = _accountingBalances();
         uint256 companyAmount = bound(uint256(companySeed), 1e9, 50 ether);
         uint256 nativeAmount = bound(uint256(nativeSeed), 1e9, 50 ether);
 
@@ -90,7 +90,7 @@ contract FutarchyLiquidityManagerHandler is Test {
             successfulDeposits++;
             uint256 supplyAfter = manager.totalSupply();
             uint256[3] memory liquidityAfter = _activeLiquidity();
-            uint256[6] memory balancesAfter = _managedBalances();
+            uint256[6] memory balancesAfter = _accountingBalances();
             for (uint256 i; i < liquidityBefore.length; ++i) {
                 assertGe(
                     uint256(liquidityAfter[i]) * supplyBefore,
@@ -115,12 +115,12 @@ contract FutarchyLiquidityManagerHandler is Test {
         uint256 shares = bound(uint256(sharesSeed), 1, balance);
         uint256 supplyBefore = manager.totalSupply();
         uint256[3] memory liquidityBefore = _activeLiquidity();
-        uint256[6] memory balancesBefore = _managedBalances();
+        uint256[6] memory balancesBefore = _accountingBalances();
         try manager.redeem(shares, address(this), false) {
             successfulRedemptions++;
             uint256 supplyAfter = manager.totalSupply();
             uint256[3] memory liquidityAfter = _activeLiquidity();
-            uint256[6] memory balancesAfter = _managedBalances();
+            uint256[6] memory balancesAfter = _accountingBalances();
             for (uint256 i; i < liquidityBefore.length; ++i) {
                 assertGe(
                     uint256(liquidityAfter[i]) * supplyBefore,
@@ -141,9 +141,19 @@ contract FutarchyLiquidityManagerHandler is Test {
     function donate(uint8 tokenSeed, uint96 amountSeed) external {
         if (manager.totalSupply() == 0) return;
         uint256 tokenIndex = uint256(tokenSeed) % 6;
-        if (!manager.inConditionalMode() && tokenIndex > 1) tokenIndex %= 2;
+        bool lateOutcome = !manager.inConditionalMode() && settlements != 0 && tokenIndex > 1;
+        if (!manager.inConditionalMode() && !lateOutcome) tokenIndex %= 2;
         MockMintableERC20 token = _tokens()[tokenIndex];
-        token.mint(address(manager), bound(uint256(amountSeed), 1, 10 ether));
+        uint256 amount = bound(uint256(amountSeed), 1, 10 ether);
+        token.mint(address(manager), amount);
+        if (lateOutcome) {
+            bool isYes = tokenIndex == 2 || tokenIndex == 4;
+            if (isYes == winnerIsYes) {
+                MockMintableERC20 backing =
+                    tokenIndex < 4 ? company : MockMintableERC20(address(wrappedNative));
+                backing.mint(address(router), amount);
+            }
+        }
         donations++;
     }
 
@@ -233,12 +243,19 @@ contract FutarchyLiquidityManagerHandler is Test {
         ];
     }
 
-    function _managedBalances() internal view returns (uint256[6] memory balances) {
+    function _accountingBalances() internal view returns (uint256[6] memory balances) {
         MockMintableERC20[6] memory tokens = _tokens();
         for (uint256 i; i < tokens.length; ++i) {
             balances[i] = tokens[i].balanceOf(address(manager))
                 + tokens[i].balanceOf(address(spotAdapter))
                 + tokens[i].balanceOf(address(conditionalAdapter));
+        }
+        if (!manager.inConditionalMode() && settlements != 0) {
+            balances[0] += balances[winnerIsYes ? 2 : 3];
+            balances[1] += balances[winnerIsYes ? 4 : 5];
+            for (uint256 i = 2; i < balances.length; ++i) {
+                balances[i] = 0;
+            }
         }
     }
 
@@ -360,6 +377,12 @@ contract FutarchyLiquidityManagerInvariantTest is StdInvariant, Test {
         handler.settleAndReturnToSpot(true);
         assertEq(handler.settlements(), 1);
         assertFalse(manager.inConditionalMode());
+
+        handler.donate(2, 1 ether);
+        assertEq(yesCompany.balanceOf(address(manager)), 1 ether);
+        handler.redeem(1 ether);
+        assertEq(yesCompany.balanceOf(address(manager)), 0);
+        assertEq(handler.successfulRedemptions(), 2);
     }
 
     function invariant_conditionalAccountingIsConsistent() public view {
