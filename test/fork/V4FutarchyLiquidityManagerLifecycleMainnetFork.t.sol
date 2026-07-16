@@ -9,7 +9,7 @@ import {
     V4ConditionalLiquidityAdapter
 } from "../../src/adapters/V4ConditionalLiquidityAdapter.sol";
 import {UniswapV3LiquidityAdapter} from "../../src/adapters/UniswapV3LiquidityAdapter.sol";
-import {V4InitializationGate} from "../../src/adapters/V4InitializationGate.sol";
+import {V4InitializationGate, V4PoolKey} from "../../src/adapters/V4InitializationGate.sol";
 import {
     FutarchyLiquidityManager,
     IWrappedNative
@@ -31,6 +31,10 @@ import {FutarchyConditionalRouter} from "../../src/routers/FutarchyConditionalRo
 import {FutarchyOfficialProposalSource} from "../../src/sources/FutarchyOfficialProposalSource.sol";
 import {MockFutarchyProposalLike} from "../mocks/MockFutarchyProposalLike.sol";
 import {MockMintableERC20} from "../mocks/MockMintableERC20.sol";
+import {
+    IV4PoolManagerDonate,
+    MainnetV4Donor
+} from "./V4ConditionalLiquidityAdapterMainnetFork.t.sol";
 
 interface IMainnetConditionalTokens is IFutarchyConditionalTokens {
     function prepareCondition(address oracle, bytes32 questionId, uint256 outcomeSlotCount) external;
@@ -52,6 +56,7 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
     uint256 private constant FORK_BLOCK_GAS_LIMIT = 60_000_000;
     uint256 private constant MAX_CONSERVATIVE_TRANSACTION_GAS = FORK_BLOCK_GAS_LIMIT / 2;
     uint256 private constant AMOUNT = 100 ether;
+    uint256 private constant DONATION = 1 ether;
     uint160 private constant ALL_HOOK_MASK = (1 << 14) - 1;
     uint160 private constant BEFORE_INITIALIZE_FLAG = 1 << 13;
     int24 private constant TICK_LOWER = -887_270;
@@ -225,6 +230,30 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         assertEq(source.officialProposalExtended().yesPool, POOL_MANAGER);
         assertEq(source.officialProposalExtended().noPool, POOL_MANAGER);
 
+        MainnetV4Donor donor = new MainnetV4Donor(IV4PoolManagerDonate(POOL_MANAGER));
+        company.mint(address(this), DONATION);
+        collateral.mint(address(this), DONATION);
+        company.approve(address(router), DONATION);
+        collateral.approve(address(router), DONATION);
+        router.splitPositionPairTo(
+            conditionId,
+            address(company),
+            yesCompany,
+            noCompany,
+            DONATION,
+            address(collateral),
+            yesCollateral,
+            noCollateral,
+            DONATION,
+            address(donor)
+        );
+        donor.donate(_v4PoolKey(conditional, yesCompany, yesCollateral), DONATION, DONATION);
+        donor.donate(_v4PoolKey(conditional, noCompany, noCollateral), DONATION, DONATION);
+        assertEq(IERC20(yesCompany).balanceOf(address(donor)), 0);
+        assertEq(IERC20(noCompany).balanceOf(address(donor)), 0);
+        assertEq(IERC20(yesCollateral).balanceOf(address(donor)), 0);
+        assertEq(IERC20(noCollateral).balanceOf(address(donor)), 0);
+
         uint256 supplyBeforePartial = manager.totalSupply();
         uint256 partialShares = supplyBeforePartial / 3;
         address partialHolder = address(0xBEEF);
@@ -253,8 +282,13 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
 
         assertEq(company.balanceOf(partialHolder), partialCompanyOut);
         assertEq(collateral.balanceOf(partialHolder), partialCollateralOut);
-        assertGt(partialCompanyOut, 0);
-        assertGt(partialCollateralOut, 0);
+        uint256 expectedPartialOut = (AMOUNT + DONATION) * partialShares / supplyBeforePartial;
+        assertApproxEqAbs(
+            partialCompanyOut, expectedPartialOut, 4, "company fees were not paid pro rata"
+        );
+        assertApproxEqAbs(
+            partialCollateralOut, expectedPartialOut, 4, "collateral fees were not paid pro rata"
+        );
         assertEq(manager.totalSupply(), supplyBeforePartial - partialShares);
         assertEq(
             manager.spotLiquidity(),
@@ -301,10 +335,14 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         assertEq(manager.spotLiquidity(), 0);
         assertEq(spot.getPositionTokenId(address(company), address(collateral)), 0);
         assertApproxEqAbs(
-            company.balanceOf(address(this)) + company.balanceOf(partialHolder), AMOUNT, 4
+            company.balanceOf(address(this)) + company.balanceOf(partialHolder),
+            AMOUNT + DONATION,
+            4
         );
         assertApproxEqAbs(
-            collateral.balanceOf(address(this)) + collateral.balanceOf(partialHolder), AMOUNT, 4
+            collateral.balanceOf(address(this)) + collateral.balanceOf(partialHolder),
+            AMOUNT + DONATION,
+            4
         );
         assertEq(company.balanceOf(address(manager)), 0);
         assertEq(collateral.balanceOf(address(manager)), 0);
@@ -369,6 +407,21 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         return tokenA < tokenB
             ? keccak256(abi.encode(tokenA, tokenB))
             : keccak256(abi.encode(tokenB, tokenA));
+    }
+
+    function _v4PoolKey(V4ConditionalLiquidityAdapter adapter, address tokenA, address tokenB)
+        private
+        view
+        returns (V4PoolKey memory key)
+    {
+        (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
+        key = V4PoolKey({
+            currency0: token0,
+            currency1: token1,
+            fee: adapter.FEE(),
+            tickSpacing: adapter.TICK_SPACING(),
+            hooks: address(adapter.INITIALIZATION_GATE())
+        });
     }
 
     function _toString31(string memory value) private pure returns (bytes32 encodedString) {

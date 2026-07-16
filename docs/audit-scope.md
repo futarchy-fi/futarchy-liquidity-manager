@@ -32,8 +32,8 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   and adds a fresh full-range position, settles exact PoolManager deltas, separates fee pokes from
   principal removal, and rejects dependency-codehash or fee-report drift. A pinned full-mainnet
   fixture covers the source, canonical CTF, deployed wrapper factory, both v4 positions, settlement,
-  a one-third unresolved redemption, and final-holder conservation together with the real v3 spot
-  position manager and production guard.
+  live v4 donations, a one-third unresolved redemption with pro-rata fee allocation, and
+  final-holder conservation together with the real v3 spot position manager and production guard.
 - `V4FutarchyLiquidityManagerFactory`: permissionless atomic v4 bundle deployer. It hash-pins all
   five child creation codes, deploys the initialization gate at a caller-bound mined CREATE2
   address, deploys the source/adapters/manager, wires the source's pool lookup directly to the v4

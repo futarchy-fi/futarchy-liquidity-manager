@@ -105,15 +105,17 @@ with its own Foundry configuration and Solidity 0.8.26:
   Wrapped1155 factory. Combined v3/v4 rounding leaves at most two wei per base asset; only the spot
   tokens remain deterministic stand-ins. The production v3 guard passes after the fixture raises
   observation cardinality before the first mint and waits its full 30-minute history window.
-- while the CTF condition is unresolved, a one-third holder exits across the real spot, YES, and NO
-  positions. The spot NFT identity survives, exact floor-rounded liquidity remains for survivors,
-  canonical CTF merges the withdrawing complete sets with no outcome residue, and the final holder
-  drains the remaining positions and idle assets. Aggregate recovery stays within four wei per base
-  asset of the original inventory.
+- both live v4 pools receive a one-complete-set donation before a one-third holder exits the
+  unresolved spot, YES, and NO positions. The zero-liquidity fee phase pays that holder its exact
+  pro-rata original inventory plus donated fees within four wei; the spot NFT identity survives and
+  exact floor-rounded liquidity remains for survivors. Canonical CTF merges the withdrawing
+  complete sets with no outcome residue, and the final holder drains the remaining positions and
+  idle assets. Aggregate recovery stays within four wei per base asset of all original plus donated
+  inventory.
 - at pinned block gas limit 60,000,000, conservative transaction accounting charges 21,000 base
   gas and 16 gas for every calldata byte. The atomic five-child bundle costs less than 12,360,000
-  gas, source/CTF/two-pool activation costs 2,343,088 gas, and the real-stack partial redemption
-  costs 1,354,771 gas by that upper bound. Each is asserted below half the actual block limit,
+  gas, source/CTF/two-pool activation costs 2,343,088 gas, and the donated-fee partial redemption
+  costs 1,460,711 gas by that upper bound. Each is asserted below half the actual block limit,
   leaving more than 30,000,000 gas of explicit headroom.
 
 These fixtures validate the singleton and full outer-transaction architecture, but not the final

@@ -379,6 +379,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | The first spot mint overwrites a fresh v3 pool's only oracle observation | Production setup raises observation cardinality before minting and waits the complete 30-minute window. Otherwise the immutable guard fails closed with `OLD`; activation cannot proceed on fabricated history. |
 | One redeemer manipulates or removes TWAP history | Redemption still succeeds; no guard is consulted. |
 | First partial redeemer attempts to take all NFT fees | Pre-collect/decrease/post-collect separation limits payout to its share. |
+| v4 donations accrue before a partial manager redemption | The zero-liquidity phase realizes the live fees, only the redeemer's floor-rounded share is paid, and the remainder stays share-owned for survivors. |
 | Fees or donations arrive after a partial redemption | Only the then-current share supply owns the new value; exited holders gain no retroactive claim. |
 | Resolved wrappers are donated after settlement but before the next activation | The stored winner and durable wrapper snapshot convert them before a later spot sync, deposit, redemption, or activation; pricing and payout include the value, and activation cannot orphan it by replacing pointers. |
 | Fees, donations, deposits, redemptions, and settlement are repeatedly interleaved | Every successful deposit and redemption preserves existing-holder value per share; issued assets stay in known custody and zero supply leaves no managed residue. |

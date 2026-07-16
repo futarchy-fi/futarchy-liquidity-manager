@@ -119,16 +119,18 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   the first mint so the initialization observation survives. Pinned dependency evidence is
   recorded in `production-mainnet-dependency-manifest.md`; final tokens, roles, exact config, salt,
   batch, and independent review remain unresolved.
-- The same real-stack fork gives one holder one third of the shares and redeems them while the CTF
-  condition is unresolved. The spot NFT identity survives; spot, YES, and NO liquidity decrease by
-  their exact floor-rounded shares; canonical CTF merges complete sets; the redeemer receives no
-  outcome residue; and the final holder drains all positions and manager balances. Combined v3/v4
-  recovery remains within four wei per base asset of the original inventory.
+- The same real-stack fork donates one complete set across both live v4 pools, then gives one holder
+  one third of the shares and redeems them while the CTF condition is unresolved. The fee phase pays
+  that holder its exact pro-rata original inventory plus donation within four wei. The spot NFT
+  identity survives; spot, YES, and NO liquidity decrease by their exact floor-rounded shares;
+  canonical CTF merges complete sets; the redeemer receives no outcome residue; and the final holder
+  drains all positions and manager balances. Combined v3/v4 recovery remains within four wei per
+  base asset of all original plus donated inventory.
 - The pinned block's actual gas limit is 60,000,000. Charging 21,000 base gas plus the worst-case
   16 gas for every calldata byte yields less than 12,360,000 gas for the atomic bundle transaction,
-  2,343,088 gas for source/CTF/two-pool activation, and 1,354,771 gas for partial redemption. The
-  fork asserts each remains below half a block, leaving more than 30,000,000 gas of explicit
-  headroom.
+  2,343,088 gas for source/CTF/two-pool activation, and 1,460,711 gas for donated-fee partial
+  redemption. The fork asserts each remains below half a block, leaving more than 30,000,000 gas of
+  explicit headroom.
 
 ## Required before any funded deployment
 
