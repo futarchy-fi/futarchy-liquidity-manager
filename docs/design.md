@@ -50,6 +50,11 @@ fully consolidates the spot position so principal, accrued AMM fees, donations, 
 form one observable two-asset vector. This prevents a new depositor from diluting earlier value
 without a price oracle or per-holder fee index.
 
+Settlement retains the verified winner beside the durable last-proposal wrapper snapshot. Before
+any later spot-mode sync, deposit, redemption, or activation, the manager converts balances newly
+donated in those resolved wrappers into base assets. The value is therefore priced for current
+shareholders, and a later activation cannot overwrite the only pointers that can recover it.
+
 A spot deposit supplies maximum amounts of both base assets. Shares are the smaller of the two
 proportional contributions, rounded down; the accepted asset amounts are rounded up and all excess
 is refunded or left unpulled. A redemption receives the same fraction of each consolidated asset,
@@ -69,7 +74,9 @@ principal. Adapter field-label misclassification therefore cannot change payouts
 overreported output cannot spend survivor-owned idle inventory. In conditional mode it merges only
 the withdrawing slice's matched complete sets and transfers unmatched outcomes in kind. If either
 merge reverts, that underlying's complete sets are transferred in kind too, so router availability
-cannot block withdrawal. The final holder receives all rounding residue.
+cannot block conditional withdrawal. In spot mode, any late donation to the durable last resolved
+wrapper snapshot is converted before the redemption snapshot. The final holder receives all
+rounding residue.
 
 Native collateral enters only through payable deposit functions and is wrapped immediately; the
 manager's receive path accepts native currency only from its immutable wrapper during an unwrap.

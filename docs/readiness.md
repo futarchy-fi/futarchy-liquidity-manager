@@ -49,6 +49,9 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 - Settlement remains permissionless after the final unresolved redemption reduces share supply and
   all liquidity to zero; any subsequently donated losing wrappers are consumed before binding is
   cleared.
+- Settlement stores the verified winner with its durable wrapper snapshot. Tests donate all four
+  resolved wrappers after settlement and prove recovery before spot redemption, deposit pricing,
+  and a later proposal activation replaces the snapshot.
 - Once the owner arms the delayed emergency path, any account can execute its non-custodial unwind;
   active positions move into the manager while every share remains redeemable, and arming or
   execution does not disable settlement of the captured CTF condition.

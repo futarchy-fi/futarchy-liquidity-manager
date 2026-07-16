@@ -52,6 +52,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     bool public emergencyExitExecuted;
     uint96 private _capturedProposalId;
     uint128 public conditionalNoLiquidity;
+    bool private _capturedYesWon;
     uint256 public emergencyExitArmedAt;
     uint128 public spotLiquidity;
     uint128 public conditionalYesLiquidity;
@@ -370,7 +371,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         bool wrapNativeCollateral
     ) internal returns (uint256 sharesMinted) {
         _assertNotEmergencyMode();
-        _assertInitialized();
+        _prepareInitializedOperation();
         if (inConditionalMode) revert DepositsDisabledInConditionalMode();
 
         _consolidateVault();
@@ -436,6 +437,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         nonReentrant
         returns (uint256 companyOut, uint256 collateralOut)
     {
+        _prepareInitializedOperation();
         if (recipient == address(0)) revert ZeroRecipient();
         uint256 supply = totalSupply();
         if (shares == 0 || shares > balanceOf(msg.sender)) revert InvalidShares();
@@ -490,7 +492,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     ) external nonReentrant {
         if (msg.sender != address(PROPOSAL_SOURCE)) revert OnlyProposalSource();
         _assertNotEmergencyMode();
-        _assertInitialized();
+        _prepareInitializedOperation();
         if (inConditionalMode) revert ProposalAlreadyActive();
 
         _validateProposal(proposal);
@@ -556,7 +558,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     /// @dev Spot-to-conditional activation is source-only and cannot be reached through this call.
     /// Settlement remains available while emergency mode is armed or executed.
     function sync() external nonReentrant returns (SyncAction action) {
-        _assertInitialized();
+        _prepareInitializedOperation();
         if (!inConditionalMode) {
             return SyncAction.None;
         }
@@ -701,6 +703,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         ) revert IncompleteOutcomeRecovery();
 
         emit LiquidityMigratedBackToSpot(uint256(_capturedProposalId), condLiq, 0);
+        _capturedYesWon = yesWins;
         _clearConditionalModeState();
         return SyncAction.MigratedBackToSpot;
     }
@@ -730,9 +733,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         (uint256 companyUsed, uint256 collateralUsed) = _fromTokenOrder(amount0Used, amount1Used);
         companyUnused = companyAmount - companyUsed;
         collateralUnused = collateralAmount - collateralUsed;
-        if (liquidityMinted > 0) {
-            spotLiquidity += liquidityMinted;
-        }
+        spotLiquidity += liquidityMinted;
     }
 
     function _addFreshConditionalPair(
@@ -801,7 +802,6 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     function _removeFromConditionalPair(address tokenA, address tokenB, uint128 liquidity)
         internal
     {
-        if (liquidity == 0) return;
         (address token0, address token1) = _sortPair(tokenA, tokenB);
         _removeLiquidityExact(CONDITIONAL_ADAPTER, token0, token1, liquidity);
     }
@@ -1097,21 +1097,21 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
 
     function _sweepActiveOutcomeTokensTo(address recipient) internal {
         if (recipient == address(0)) return;
-        if (_capturedYesCompanyToken != address(0)) {
-            uint256 bal = IERC20(_capturedYesCompanyToken).balanceOf(address(this));
-            if (bal > 0) IERC20(_capturedYesCompanyToken).safeTransfer(recipient, bal);
-        }
-        if (_capturedNoCompanyToken != address(0)) {
-            uint256 bal = IERC20(_capturedNoCompanyToken).balanceOf(address(this));
-            if (bal > 0) IERC20(_capturedNoCompanyToken).safeTransfer(recipient, bal);
-        }
-        if (_capturedYesCurrencyToken != address(0)) {
-            uint256 bal = IERC20(_capturedYesCurrencyToken).balanceOf(address(this));
-            if (bal > 0) IERC20(_capturedYesCurrencyToken).safeTransfer(recipient, bal);
-        }
-        if (_capturedNoCurrencyToken != address(0)) {
-            uint256 bal = IERC20(_capturedNoCurrencyToken).balanceOf(address(this));
-            if (bal > 0) IERC20(_capturedNoCurrencyToken).safeTransfer(recipient, bal);
+        address[4] memory tokens = [
+            _capturedYesCompanyToken,
+            _capturedNoCompanyToken,
+            _capturedYesCurrencyToken,
+            _capturedNoCurrencyToken
+        ];
+        for (uint256 i; i < tokens.length;) {
+            IERC20 token = IERC20(tokens[i]);
+            if (address(token) != address(0)) {
+                uint256 balance = token.balanceOf(address(this));
+                if (balance != 0) token.safeTransfer(recipient, balance);
+            }
+            unchecked {
+                ++i;
+            }
         }
     }
 
@@ -1286,8 +1286,13 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         if (msg.sender != BOOTSTRAP_RECIPIENT) revert OnlyBootstrapRecipient();
     }
 
-    function _assertInitialized() internal view {
+    /// @dev Before any spot-mode operation, converts late donations to the last resolved wrapper
+    /// snapshot so they are priced for current shareholders and cannot be orphaned by reactivation.
+    function _prepareInitializedOperation() internal {
         if (!initializedFromBootstrap) revert NotInitialized();
+        if (!inConditionalMode && _capturedConditionId != bytes32(0)) {
+            _recoverIdleOutcomeBalances(_capturedYesWon);
+        }
     }
 
     function _assertNotEmergencyMode() internal view {

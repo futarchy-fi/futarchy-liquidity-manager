@@ -124,6 +124,13 @@ a reviewed router primitive. The manager must prove their exact consumption befo
 token addresses. Losing wrappers may not be stranded in an address the share-accounting code can no
 longer reach.
 
+The manager retains the verified winner and durable wrapper snapshot after settlement. Before a
+later spot-mode sync, deposit, redemption, or activation, it applies the same exact recovery to
+balances donated in that resolved snapshot. Deposits price the recovered base assets, redemptions
+pay their proportional share, and a later activation drains them before replacing the snapshot.
+Transfers of older wrappers after a later snapshot has replaced them are unsupported
+arbitrary-token transfers rather than vault donations.
+
 The manager first removes and resolves the bound conditional assets without consulting the spot
 pool. A spot manipulation guard may gate only the subsequent spot join; if it fails, recovered base
 assets remain idle, share-owned, and redeemable. A broken or manipulated spot pool must never strand
@@ -365,6 +372,7 @@ realized balance deltas and liquidity minted, not a hard-coded live fee or a pre
 | One redeemer manipulates or removes TWAP history | Redemption still succeeds; no guard is consulted. |
 | First partial redeemer attempts to take all NFT fees | Pre-collect/decrease/post-collect separation limits payout to its share. |
 | Fees or donations arrive after a partial redemption | Only the then-current share supply owns the new value; exited holders gain no retroactive claim. |
+| Resolved wrappers are donated after settlement but before the next activation | The stored winner and durable wrapper snapshot convert them before a later spot sync, deposit, redemption, or activation; pricing and payout include the value, and activation cannot orphan it by replacing pointers. |
 | Fees, donations, deposits, redemptions, and settlement are repeatedly interleaved | Every successful deposit and redemption preserves existing-holder value per share; issued assets stay in known custody and zero supply leaves no managed residue. |
 | Merge router is unavailable or maliciously reverts | Withdrawing outcome slice is paid in kind. |
 | Settlement router reverts, partially consumes, or underpays | The whole settlement reverts; active positions and the captured binding remain intact. |

@@ -29,7 +29,7 @@ contract MockConditionalRouter is IFutarchyConditionalRouter {
         bool exists;
     }
 
-    mapping(address collateralToken => OutcomeConfig) public outcomeConfig;
+    mapping(bytes32 pairKey => OutcomeConfig) public outcomeConfig;
 
     function setConditionalTokens(address conditionalTokens) external {
         CONDITIONAL_TOKENS = conditionalTokens;
@@ -43,7 +43,7 @@ contract MockConditionalRouter is IFutarchyConditionalRouter {
         bool _winnerIsYes
     ) external {
         winnerIsYes = _winnerIsYes;
-        outcomeConfig[collateralToken] = OutcomeConfig({
+        outcomeConfig[keccak256(abi.encode(collateralToken, yesToken, noToken))] = OutcomeConfig({
             yesToken: yesToken, noToken: noToken, winnerIsYes: _winnerIsYes, exists: true
         });
     }
@@ -212,7 +212,7 @@ contract MockConditionalRouter is IFutarchyConditionalRouter {
         view
         returns (OutcomeConfig memory cfg)
     {
-        cfg = outcomeConfig[collateralToken];
+        cfg = outcomeConfig[keccak256(abi.encode(collateralToken, yesToken, noToken))];
         require(
             cfg.exists && cfg.yesToken == yesToken && cfg.noToken == noToken,
             "missing outcome config"

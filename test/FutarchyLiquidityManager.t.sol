@@ -447,6 +447,119 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(noCurrency.balanceOf(address(manager)), 0);
     }
 
+    function test_late_resolved_outcome_donation_is_recovered_before_spot_redemption() public {
+        _bootstrap();
+        _activateProposal(true);
+        router.setPayouts(1, 1, 0);
+        manager.sync();
+
+        yesCompany.mint(address(manager), 7 ether);
+        noCompany.mint(address(manager), 3 ether);
+        yesCurrency.mint(address(manager), 5 ether);
+        noCurrency.mint(address(manager), 2 ether);
+        company.mint(address(router), 7 ether);
+        wrappedNative.mint(address(router), 5 ether);
+        vm.prank(bootstrapRecipient);
+        manager.transfer(depositor, 100 ether);
+
+        vm.prank(depositor);
+        (uint256 companyOut, uint256 collateralOut) = manager.redeem(100 ether, depositor, false);
+
+        assertEq(companyOut, 107 ether);
+        assertEq(collateralOut, 105 ether);
+        assertEq(yesCompany.balanceOf(address(manager)), 0);
+        assertEq(noCompany.balanceOf(address(manager)), 0);
+        assertEq(yesCurrency.balanceOf(address(manager)), 0);
+        assertEq(noCurrency.balanceOf(address(manager)), 0);
+        assertEq(manager.totalSupply(), 0);
+    }
+
+    function test_late_resolved_outcome_donation_is_priced_before_spot_deposit() public {
+        _bootstrap();
+        _activateProposal(true);
+        router.setPayouts(1, 1, 0);
+        manager.sync();
+
+        yesCompany.mint(address(manager), 20 ether);
+        company.mint(address(router), 20 ether);
+
+        vm.prank(depositor);
+        uint256 minted = manager.depositToSpot{value: 100 ether}(120 ether);
+
+        assertEq(minted, 100 ether);
+        assertEq(yesCompany.balanceOf(address(manager)), 0);
+
+        vm.prank(depositor);
+        (uint256 depositorCompany, uint256 depositorCollateral) =
+            manager.redeem(100 ether, depositor, false);
+        assertEq(depositorCompany, 120 ether);
+        assertEq(depositorCollateral, 100 ether);
+
+        vm.prank(bootstrapRecipient);
+        (uint256 incumbentCompany, uint256 incumbentCollateral) =
+            manager.redeem(100 ether, bootstrapRecipient, false);
+        assertEq(incumbentCompany, 120 ether);
+        assertEq(incumbentCollateral, 100 ether);
+    }
+
+    function test_late_resolved_outcome_donation_is_recovered_before_next_activation() public {
+        _bootstrap();
+        _activateProposal(true);
+        router.setPayouts(1, 1, 0);
+        manager.sync();
+
+        yesCompany.mint(address(manager), 7 ether);
+        company.mint(address(router), 7 ether);
+
+        MockMintableERC20 nextYesCompany = new MockMintableERC20("NEXT_YES_COMP", "NYC");
+        MockMintableERC20 nextNoCompany = new MockMintableERC20("NEXT_NO_COMP", "NNC");
+        MockMintableERC20 nextYesCurrency = new MockMintableERC20("NEXT_YES_CURR", "NYU");
+        MockMintableERC20 nextNoCurrency = new MockMintableERC20("NEXT_NO_CURR", "NNU");
+        MockFutarchyProposalLike nextProposal = new MockFutarchyProposalLike(
+            address(company),
+            address(wrappedNative),
+            address(nextYesCompany),
+            address(nextNoCompany),
+            address(nextYesCurrency),
+            address(nextNoCurrency)
+        );
+        nextProposal.setQuestionAndCondition(bytes32(uint256(2)), bytes32(uint256(0xC0DF)));
+        proposalSource.createProposalExtended(
+            address(nextProposal),
+            officialProposer,
+            address(company),
+            address(wrappedNative),
+            address(nextYesCompany),
+            address(nextNoCompany),
+            address(nextYesCurrency),
+            address(nextNoCurrency),
+            address(0),
+            address(0)
+        );
+        router.setOutcomeConfig(
+            address(nextProposal),
+            address(company),
+            address(nextYesCompany),
+            address(nextNoCompany),
+            true
+        );
+        router.setOutcomeConfig(
+            address(nextProposal),
+            address(wrappedNative),
+            address(nextYesCurrency),
+            address(nextNoCurrency),
+            true
+        );
+        router.setPayouts(0, 0, 0);
+
+        proposalSource.activate(address(manager));
+
+        assertTrue(manager.inConditionalMode());
+        assertEq(manager.activeProposal(), address(nextProposal));
+        assertEq(yesCompany.balanceOf(address(manager)), 0);
+        assertEq(company.balanceOf(address(manager)), 87 ether);
+    }
+
     function test_settlement_losing_underconsumption_rolls_back_positions_and_binding() public {
         _bootstrap();
         _activateProposal(true);

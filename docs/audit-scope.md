@@ -55,6 +55,9 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   and redemption must preserve or increase each remaining liquidity and six-token balance claim
   per share. All issued test assets remain in modeled manager, adapter, router, or holder custody,
   and zero share supply leaves no balance under manager or adapter control.
+- The manager persists the verified settlement winner with the last captured wrappers. Any later
+  donation in that resolved snapshot is converted before a spot-mode sync, deposit, redemption, or
+  activation, so it is priced for current shares and cannot be orphaned by pointer replacement.
 - Proposal manager cannot select arbitrary unsafe proposals once validation is enabled.
 - The proposal source completes an official write only if the activation target reports an exact
   capture of every source-validated proposal field; any mismatch rolls back both contracts.
@@ -77,7 +80,8 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   removed from the TWAP-anchored spot position.
 - Redemption performs no re-add and consults no stability guard. Settlement resolves the stored CTF
   assets before any optional spot action and currently leaves recovered base inventory idle and
-  share-owned.
+  share-owned. Later donations to the still-current resolved wrapper snapshot follow the same
+  recovery path before a subsequent spot sync, deposit, redemption, or activation.
 - The factory accepts no caller-supplied constructor suffixes: it verifies bare creation-code
   hashes, appends all wiring itself, enforces the EIP-3860 limit, and rolls back partial bundles,
   including invalid identical-base-token and code-less-company-token manager deployments.
