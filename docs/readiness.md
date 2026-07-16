@@ -141,6 +141,23 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   manager accounting/custody invariants runs 256 times at depth 500 (128,000 calls each), while the
   two UniV3 invariants retain their stricter inline 256-by-512 configuration (131,072 calls each).
   The final candidate must re-run this gate after its exact configuration is fixed.
+- The current 234-test suite also passes Foundry's coverage profile with `--ir-minimum` (required
+  because unoptimized instrumentation exceeds Solidity's stack limit). The manager reports 92.50%
+  line, 90.91% statement, 68.63% branch, and 98.61% function coverage. Production compilation
+  independently confirms a 24,171-byte manager runtime, 405 bytes below EIP-170.
+
+## Atomic rollback evidence map
+
+| Failure boundary | Direct adversarial evidence |
+| --- | --- |
+| Source write or activation target | `test_activation_revert_rolls_back_source_write`; every corrupt captured field is also faulted independently. |
+| Resolved condition or spot guard | `test_activation_rejects_resolved_condition_before_removing_spot`; `test_activation_guard_failure_rolls_back_every_side_effect`. |
+| Either CTF split leg | `test_atomic_activation_uses_captured_source_snapshot` injects a receipt shortfall for company and collateral separately and checks source, spot, CTF, router, allowance, wrapper, and adapter state. |
+| First conditional pool/add | The same full binding test injects first-add and post-add accounting failures and proves the created pool, split wrappers, and spot removal all roll back. |
+| Second conditional pool | `test_activation_rolls_back_first_pool_when_second_pool_is_precreated` proves the newly created first pool disappears while the adversarial second pool remains. |
+| AMM create, initialize, or first mint | `test_freshAddPoolCreateAndInitializeFailuresRollBack`, `test_freshAddFirstMintFailureRollsBackPoolAndCustody`, and `test_firstLiquidityFailureRollsBackInitializationAndCustody`. |
+| Outer lifecycle step after successful activation | `test_atomic_activation_uses_captured_source_snapshot` forces its resolver step to revert and compares the complete source, manager, spot, CTF, router, wrapper, pool, balance, and allowance envelope. |
+| Atomic bundle deployment/wiring | `test_lateManagerFailureRollsBackHookAndEveryCreate`, `test_sameTokenManagerFailureAlsoRollsBackMinedHook`, and the empty-runtime/initcode/hash fault cases. |
 
 ## Required before any funded deployment
 

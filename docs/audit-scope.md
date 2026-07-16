@@ -106,6 +106,9 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
 - The factory accepts no caller-supplied constructor suffixes: it verifies bare creation-code
   hashes, appends all wiring itself, enforces the EIP-3860 limit, and rolls back partial bundles,
   including invalid identical-base-token and code-less-company-token manager deployments.
+- The atomic rollback matrix in `readiness.md` maps every named source, CTF split, pool lifecycle,
+  first-liquidity, outer coordinator, and bundle boundary to direct fault injection and the state
+  envelope checked after the revert.
 
 ## Permissions
 
