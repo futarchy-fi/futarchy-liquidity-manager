@@ -57,8 +57,10 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   resolved wrappers after settlement and prove recovery before spot redemption, deposit pricing,
   and a later proposal activation replaces the snapshot.
 - Once the owner arms the delayed emergency path, any account can execute its non-custodial unwind;
-  active positions move into the manager while every share remains redeemable, and arming or
-  execution does not disable settlement of the captured CTF condition.
+  active positions move into the manager, the redemption entry point remains enabled, and arming
+  or execution does not disable settlement of the captured CTF condition. A nonfinal redemption
+  whose share of every active position floors to zero liquidity reverts without burning shares;
+  the holder must combine or transfer shares until at least one unit is withdrawable.
 - Every spot and conditional adapter removal receipt must equal the manager's exact token balance
   deltas. The manager derives fee/principal classification from separate zero/nonzero removal
   phases rather than trusting returned labels. Misclassification cannot change payouts, and an
@@ -81,7 +83,9 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   position liquidity.
 - Independent executable rounding properties prove that floor-rounded share minting plus
   ceil-rounded accepted deposits cannot dilute either base asset, while floor-rounded liquidity,
-  idle, and fee payouts cannot reduce the corresponding survivor claim per share.
+  idle, and fee payouts cannot reduce the corresponding survivor claim per share. A direct unit
+  test proves an all-zero nonfinal liquidity plan reverts without burning the dust holder's shares,
+  then succeeds after that holder combines enough shares.
 - Unit, fuzz, invariant, API-freeze, scope, configuration, batch-template, and fork fixtures are
   machine checked in CI. The real Algebra fork suite also captures the cooldown liveness failure
   and bounds a live-fee partial removal at 150,000 gas (116,245 measured). Both the public-vault and

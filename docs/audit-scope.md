@@ -3,7 +3,8 @@
 The current Swapr Algebra path is a no-funds prototype. A factory owner may enable mutable
 `liquidityCooldown`, after which repeated third-party dust mints reset the shared position timestamp
 and can indefinitely block spot and conditional burns. This unresolved trust boundary prevents the
-bundle from satisfying always-redeemable custody.
+bundle from satisfying the administrator-independent position-removal liveness required by
+redemption.
 
 ## Objective
 
@@ -109,8 +110,10 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   pools during atomic activation.
 - Deadline proxy gives new FLM-grade proposals a bounded liveness path.
 - Emergency exit only unwinds positions into the manager. It neither burns shares nor transfers
-  shareholder assets, redemption remains available while emergency mode is armed or executed, and
-  anyone may execute the unwind after the owner-authorized delay. Arming or execution never blocks
+  shareholder assets, the redemption entry point remains enabled while emergency mode is armed or
+  executed, and anyone may execute the unwind after the owner-authorized delay. A nonfinal
+  redemption still reverts without burning shares if every active-liquidity slice floors to zero.
+  Arming or execution never blocks
   permissionless settlement of a captured CTF condition. The pinned-mainnet lifecycle proves this
   against donated official-v4 positions and canonical CTF even after the source registry is
   cleared, with zero caller gain and final shareholder conservation. It also faults the second

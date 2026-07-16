@@ -84,6 +84,10 @@ cannot block conditional withdrawal. In spot mode, any late donation to the dura
 wrapper snapshot is converted before the redemption snapshot. The final holder receives all
 rounding residue.
 
+If a nonfinal redemption's share of every active position floors to zero liquidity, it reverts
+without burning shares. The holder must combine or transfer shares until at least one liquidity
+unit is withdrawable; otherwise burning the shares would silently donate their principal claim.
+
 Native collateral enters only through payable deposit functions and is wrapped immediately; the
 manager's receive path accepts native currency only from its immutable wrapper during an unwrap.
 Unavoidable forced native currency is outside the six-token accounting model and cannot be swept

@@ -714,7 +714,7 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(noCurrency.balanceOf(bootstrapRecipient), 5.9608 ether);
     }
 
-    function test_nonfinal_redeem_reverts_when_every_liquidity_slice_rounds_to_zero() public {
+    function test_nonfinal_dust_redeem_preserves_shares_until_holder_combines_enough() public {
         _bootstrap();
         _activateProposal(true);
         vm.prank(bootstrapRecipient);
@@ -728,6 +728,17 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(manager.spotLiquidity(), 20 ether);
         assertEq(manager.conditionalYesLiquidity(), 80 ether);
         assertEq(manager.conditionalNoLiquidity(), 80 ether);
+
+        vm.prank(bootstrapRecipient);
+        manager.transfer(depositor, 1 ether);
+        uint256 combinedShares = manager.balanceOf(depositor);
+        vm.prank(depositor);
+        (uint256 companyOut, uint256 collateralOut) =
+            manager.redeem(combinedShares, depositor, false);
+
+        assertEq(manager.balanceOf(depositor), 0);
+        assertGt(companyOut, 0);
+        assertGt(collateralOut, 0);
     }
 
     function test_conditional_redeem_falls_back_to_in_kind_when_merge_reverts() public {

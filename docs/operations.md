@@ -1,8 +1,8 @@
 # Operation Batches
 
 Do not sign or fund batches for the current Swapr Algebra prototype. Its mutable pool cooldown lets
-third-party position mints block burns, so the AMM cannot yet support the promised unconditional
-redemption path.
+third-party position mints block burns, so the AMM cannot yet support the administrator-independent
+position-removal path required by redemption.
 
 `script/BuildLiquidityOperationBatch.s.sol` generates Safe transaction-builder JSON from
 `config/safe-batch.example.json` style files. The script emits exactly one logical operation per
@@ -92,6 +92,8 @@ slippage parameters therefore cannot be selected by a depositor, redeemer, or em
     proportional principal and fees, and never redeploys survivor assets. In conditional mode it
     merges only the withdrawing slice's matched complete sets; if the router rejects a merge, that
     slice is transferred in kind. Unmatched outcome tokens are always transferred in kind.
+  - A nonfinal call reverts without burning shares if its share of every active position floors to
+    zero liquidity. Combine or transfer shares until at least one liquidity unit is withdrawable.
 - `setOfficialProposal`
   - Transaction: `proposalSource.setOfficialProposal`.
   - Must be submitted by the immutable lifecycle coordinator. The source write, manager

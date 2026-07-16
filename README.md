@@ -7,9 +7,11 @@ manager handles spot liquidity, source-atomic conditional YES/NO activation duri
 proposal, and CTF settlement back to share-owned base inventory.
 
 Public deposits are accepted only in spot mode and in the vault's existing two-asset proportion.
-Redemption is always available, including conditional and emergency modes. A redemption removes
-only its proportional liquidity, principal, fee, and idle slices; it never redeploys survivor
-assets. Callers supply no adapter ticks, slippage, deadlines, or initialization prices.
+The redemption entry point stays enabled in spot, conditional, and emergency modes. A redemption
+removes only its proportional liquidity, principal, fee, and idle slices; it never redeploys
+survivor assets. A nonfinal call reverts without burning shares if every active-position liquidity
+slice floors to zero; the holder must combine or transfer shares until at least one liquidity unit
+is withdrawable. Callers supply no adapter ticks, slippage, deadlines, or initialization prices.
 
 The current Swapr Algebra path is a no-funds prototype because permissionless pool precreation and
 a mutable burn cooldown violate the production threat model. See

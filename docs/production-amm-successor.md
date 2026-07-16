@@ -14,7 +14,9 @@ The current candidate disposition and release blockers are recorded in
 - The hook's CREATE2 address must not introduce a new public-salt precreation veto. Address mining
   and factory deployment must commit the effective salt to the actual creating wallet.
 - No administrator or third-party liquidity action may impose or refresh a lock on FLM removal.
-  Share redemption, settlement, and emergency unwind must remain permissionless.
+  Share redemption, settlement, and emergency unwind must remain permissionless. The only
+  share-size liveness exception is a nonfinal redemption whose every active-liquidity slice floors
+  to zero; it must revert without burning shares rather than donate the holder's principal claim.
 - The manager passes one source-validated proposal snapshot through activation. The AMM integration
   must not reread a mutable proposal or accept caller-selected wrappers, pool keys, prices, ticks,
   deadlines, or slippage policy.
