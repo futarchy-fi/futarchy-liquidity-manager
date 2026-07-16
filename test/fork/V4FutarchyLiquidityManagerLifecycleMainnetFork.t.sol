@@ -334,6 +334,17 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         donor.donate(_v4PoolKey(conditional, yesCompany, yesCollateral), DONATION, DONATION);
         donor.donate(_v4PoolKey(conditional, noCompany, noCollateral), DONATION, DONATION);
 
+        company.mint(address(this), DONATION);
+        company.approve(address(router), DONATION);
+        router.splitPosition(address(company), conditionId, yesCompany, noCompany, DONATION);
+        assertTrue(IERC20(yesCompany).transfer(address(donor), DONATION));
+        V4PoolKey memory yesPoolKey = _v4PoolKey(conditional, yesCompany, yesCollateral);
+        if (yesPoolKey.currency0 == yesCompany) {
+            donor.donate(yesPoolKey, DONATION, 0);
+        } else {
+            donor.donate(yesPoolKey, 0, DONATION);
+        }
+
         uint256[] memory payouts = new uint256[](2);
         payouts[0] = 1;
         ctf.reportPayouts(questionId, payouts);
@@ -357,7 +368,7 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         assertEq(collateral.balanceOf(partialHolder), partialCollateralOut);
         assertApproxEqAbs(
             company.balanceOf(address(this)) + company.balanceOf(partialHolder),
-            AMOUNT + (2 * DONATION),
+            AMOUNT + (3 * DONATION),
             5
         );
         assertApproxEqAbs(

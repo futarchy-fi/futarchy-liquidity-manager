@@ -35,6 +35,11 @@ initial observation, waits the full 30-minute window, and proves both bootstrap 
 checks. Without that second observation slot, the first mint overwrites the only observation and
 the later TWAP correctly reverts `OLD`.
 
+The same fixture donates complete sets across both live v4 pools before a one-third exit, then adds
+another complete set and a YES-company-only donation after it. The exited balances remain fixed;
+final recovery is 103 company versus 102 collateral within five wei, so asymmetric live fees are
+credited only to then-current shares without fabricating the undonated asset.
+
 At this block the actual gas limit is `60,000,000`. Conservative transaction estimates add `21,000`
 base gas and charge all calldata bytes at the nonzero rate of 16 gas: the atomic bundle is below
 `12,360,000` gas, source/CTF/two-pool activation is `2,343,088` gas, and partial real-stack

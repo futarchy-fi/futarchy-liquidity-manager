@@ -109,10 +109,11 @@ with its own Foundry configuration and Solidity 0.8.26:
   unresolved spot, YES, and NO positions. The zero-liquidity fee phase pays that holder its exact
   pro-rata original inventory plus donated fees within four wei; the spot NFT identity survives and
   exact floor-rounded liquidity remains for survivors. Canonical CTF merges the withdrawing
-  complete sets with no outcome residue. A second complete-set donation then accrues to both live
-  pools; the exited holder's balance stays fixed and the final holder drains it with every remaining
-  position and idle asset. Aggregate recovery stays within five wei per base asset of all original
-  plus donated inventory.
+  complete sets with no outcome residue. A second complete-set donation and a YES-company-only
+  donation then accrue after exit; the exited holder's balance stays fixed and the final holder
+  drains the asymmetric value with every remaining position and idle asset. Aggregate recovery is
+  103 company versus 102 collateral within five wei, matching all original plus donated inventory
+  without inventing collateral for the single-leg fee.
 - at pinned block gas limit 60,000,000, conservative transaction accounting charges 21,000 base
   gas and 16 gas for every calldata byte. The atomic five-child bundle costs less than 12,360,000
   gas, source/CTF/two-pool activation costs 2,343,088 gas, and the donated-fee partial redemption
