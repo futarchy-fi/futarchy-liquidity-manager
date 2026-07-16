@@ -5,9 +5,9 @@
 FAO production now targets Ethereum mainnet, not Gnosis Chain. Ethereum has an official Uniswap v4
 deployment, so the prior missing-deployment blocker is superseded. Uniswap v4 with an immutable
 initialization-only hook is selected for implementation. The repository now contains the gate and
-manager-bound direct conditional adapter, but not atomic bundle wiring, a full-lifecycle mainnet
-fork proof, or external review. Do not sign a deployment batch or fund this path until those gates
-pass.
+manager-bound direct conditional adapter plus an atomic caller-bound CREATE2 bundle factory, but
+not a full-lifecycle mainnet fork proof, final deployment manifest, or external review. Do not sign
+a deployment batch or fund this path until those gates pass.
 
 ## Candidate decision
 
@@ -32,7 +32,8 @@ key and the bound adapter can still initialize it afterward.
 - Pin the official Ethereum PoolManager address and reviewed runtime code hash. Deploy the
   non-proxy hook by CREATE2 at an address whose low permission bits contain only
   `BEFORE_INITIALIZE`; atomically deploy the adapter and irreversibly bind it through the bundle
-  factory before returning.
+  factory before returning. Bind the effective salt to the creating wallet so a different caller
+  cannot front-run and consume the mined address.
 - The hook checks both `msg.sender == POOL_MANAGER`, the original initializer equals the bound
   adapter, and the pool key names that hook. The adapter fixes fee, tick spacing, hook, full-range
   ticks, salt, token ordering, and guarded initial price; callers supply none of them.
@@ -63,6 +64,18 @@ and derives a conservative liquidity request from the guarded price. Exact retur
 capped by the prefunded assets and must consume at least 99.5% of both legs. Its removal unlock
 pokes and takes real fee deltas before removing principal, requires the second fee report to be
 zero, and sends both phases directly to the bound manager.
+
+The committed v4 bundle factory validates the five bare creation-code hashes supplied in calldata,
+derives the hook CREATE2 salt from the creating wallet and its mined raw salt, validates the exact
+permission bits before any child deployment, and then deploys the hook, proposal source, v3 spot
+adapter, v4 conditional adapter, and manager. The hook→adapter, both adapter→manager, and
+source→manager bindings all complete in the same reverting transaction. Deterministic tests prove a
+late manager failure removes the already-created hook and every preceding child.
+
+The production batch must call this factory directly from the Safe or creator address used while
+mining the hook salt. It must not use a public relay or intermediary proxy: `msg.sender` is the salt
+domain, so an intermediary would derive a different address and a shared public sender would lose
+the intended caller-separation property.
 
 ## Upstream validation
 
@@ -114,8 +127,8 @@ legal review remains a real-funds gate; this document is an engineering analysis
 
 ## Release blockers
 
-1. Implement atomic factory wiring for mined hook deployment, adapter deployment, both irreversible
-   bindings, and manager/source creation in one transaction.
+1. Produce the final Ethereum dependency manifest, mine and independently reproduce the
+   creator-bound hook salt, and exercise the exact factory bytecode against those addresses.
 2. Pin and independently verify the official Ethereum PoolManager runtime hash and every imported
    upstream file/license; complete legal review before real funds.
 3. Run every adversarial, conservation, rollback, gas, bytecode, configuration, and batch gate in

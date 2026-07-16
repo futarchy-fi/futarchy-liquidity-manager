@@ -49,6 +49,9 @@ check_contract \
   "V4ConditionalLiquidityAdapter" \
   "src/adapters/V4ConditionalLiquidityAdapter.sol:V4ConditionalLiquidityAdapter"
 check_contract \
+  "V4FutarchyLiquidityManagerFactory" \
+  "src/factories/V4FutarchyLiquidityManagerFactory.sol:V4FutarchyLiquidityManagerFactory"
+check_contract \
   "UniV3PoolStabilityGuard" \
   "src/oracles/UniV3PoolStabilityGuard.sol:UniV3PoolStabilityGuard"
 check_contract \

@@ -26,6 +26,10 @@
           "path": "audit/api-freeze/V4ConditionalLiquidityAdapter.method-identifiers.json"
         },
         {
+          "description": "Frozen selector manifest for the atomic v4 bundle factory.",
+          "path": "audit/api-freeze/V4FutarchyLiquidityManagerFactory.method-identifiers.json"
+        },
+        {
           "description": "Audit scope documents core boundaries and out-of-scope FAO/SnapshotX behavior.",
           "path": "docs/audit-scope.md"
         }
@@ -90,6 +94,10 @@
         {
           "description": "Factory tests prove constructor rejection of code-less shared dependencies and that identical or code-less company-token manager wiring rolls back the permissionless bundle.",
           "path": "test/FutarchyLiquidityManagerFactory.t.sol"
+        },
+        {
+          "description": "The v4 factory suite proves caller-bound CREATE2 prediction and hook permissions, exact source/hook/adapter/manager bindings, front-run salt separation, mutation rejection, and complete rollback when the final manager deployment fails.",
+          "path": "test/V4FutarchyLiquidityManagerFactory.t.sol"
         },
         {
           "description": "The production router test proves exact CTF split receipts and exact wrapper mint deltas.",

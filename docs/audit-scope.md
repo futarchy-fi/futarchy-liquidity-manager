@@ -26,11 +26,16 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   creation-code hashes and shared protocol dependencies.
 - `V4InitializationGate`: partial Ethereum-mainnet successor seam. It reserves pool initialization
   for one irreversibly bound adapter and deliberately exposes no liquidity callbacks. The v4
-  factory wiring remains outside the implemented surface.
+  bundle factory deploys it at the mined address and binds it in the same transaction.
 - `V4ConditionalLiquidityAdapter`: manager-bound direct v4 position owner. It atomically initializes
   and adds a fresh full-range position, settles exact PoolManager deltas, separates fee pokes from
-  principal removal, and rejects dependency-codehash or fee-report drift. Atomic bundle deployment
-  and the full manager lifecycle remain outside the implemented v4 surface.
+  principal removal, and rejects dependency-codehash or fee-report drift. The full mainnet
+  source/CTF/two-pool manager lifecycle remains outside the implemented v4 surface.
+- `V4FutarchyLiquidityManagerFactory`: permissionless atomic v4 bundle deployer. It hash-pins all
+  five child creation codes, deploys the initialization gate at a caller-bound mined CREATE2
+  address, deploys the source/adapters/manager, and completes all irreversible bindings before
+  returning. Final-address deployment configuration and the full mainnet lifecycle remain outside
+  the implemented surface.
 
 ## External Dependencies
 

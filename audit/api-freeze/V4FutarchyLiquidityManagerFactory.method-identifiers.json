@@ -1,0 +1,21 @@
+{
+  "CONDITIONAL_ADAPTER_CREATION_CODE_HASH()": "9e92a64e",
+  "CONDITIONAL_ROUTER()": "cd91811e",
+  "INITIALIZATION_GATE_CREATION_CODE_HASH()": "98b8f2b3",
+  "MANAGER_CREATION_CODE_HASH()": "461d4ffe",
+  "MAX_INIT_CODE_SIZE()": "9056eb1c",
+  "POOL_STABILITY_GUARD()": "b7a44a99",
+  "PROPOSAL_AMM_FACTORY()": "f77e3149",
+  "PROPOSAL_SOURCE_CREATION_CODE_HASH()": "296bd630",
+  "SPOT_ADAPTER_CREATION_CODE_HASH()": "65c15946",
+  "SPOT_FEE()": "a9d25ed6",
+  "SPOT_POSITION_MANAGER()": "a8a152f8",
+  "SPOT_TICK_LOWER()": "e83d010a",
+  "SPOT_TICK_UPPER()": "b5a02858",
+  "V4_POOL_MANAGER()": "e34e7283",
+  "V4_POOL_MANAGER_CODEHASH()": "d464b46e",
+  "WRAPPED_NATIVE()": "d999984d",
+  "createLiquidityManager((address,address,address,address,address,address,string,string,bytes,bytes32),(bytes,bytes,bytes,bytes,bytes))": "d652fae8",
+  "effectiveHookSalt(address,bytes32)": "d745533b",
+  "predictHookAddress(address,bytes32,bytes)": "19c9bb3e"
+}

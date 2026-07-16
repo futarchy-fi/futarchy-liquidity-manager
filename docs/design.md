@@ -3,9 +3,10 @@
 The source-atomic activation and proportional-redemption design is specified in
 [`atomic-lifecycle-amendment.md`](atomic-lifecycle-amendment.md) and implemented at repository head.
 The current Swapr Algebra adapter still fails its removal-liveness threat model. The selected v4
-successor now has a mainnet-verified initialization gate and direct conditional adapter, but no
-atomic bundle factory or full source/CTF/manager mainnet proof. This therefore remains a no-funds
-prototype pending the remaining gates in `production-amm-successor.md`.
+successor now has a mainnet-verified initialization gate and direct conditional adapter plus an
+atomic caller-bound bundle factory, but no full source/CTF/two-pool manager mainnet proof or final
+deployment manifest. This therefore remains a no-funds prototype pending the remaining gates in
+`production-amm-successor.md`.
 
 ## Goal
 

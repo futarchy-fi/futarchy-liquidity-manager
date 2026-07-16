@@ -11,6 +11,8 @@ The current candidate disposition and release blockers are recorded in
 
 - Only the authenticated FLM activation may initialize a conditional pool and create its first
   liquidity. Predictable token pairs must not let a third party veto activation beforehand.
+- The hook's CREATE2 address must not introduce a new public-salt precreation veto. Address mining
+  and factory deployment must commit the effective salt to the actual creating wallet.
 - No administrator or third-party liquidity action may impose or refresh a lock on FLM removal.
   Share redemption, settlement, and emergency unwind must remain permissionless.
 - The manager passes one source-validated proposal snapshot through activation. The AMM integration

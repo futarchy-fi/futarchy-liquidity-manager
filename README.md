@@ -17,7 +17,8 @@ a mutable burn cooldown violate the production threat model. See
 
 FAO production targets Ethereum mainnet. The selected successor uses the official Uniswap v4
 PoolManager plus an initialization-only hook and a direct manager-bound conditional adapter. The
-repository remains unfundable until atomic factory wiring, a full-lifecycle mainnet fork, and
+caller-bound CREATE2 factory now deploys and irreversibly binds that bundle atomically. The
+repository remains unfundable until a full-lifecycle mainnet fork, final deployment manifest, and
 external review are complete.
 
 ## Layout

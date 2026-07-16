@@ -100,8 +100,13 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   Unit tests cover atomic first-liquidity rollback, dependency drift, donation fees, dishonest fee
   reports, second-phase fee leakage, and sequential partial/final removal. A pinned mainnet fork
   proves the same direct add, donation-fee collection, and proportional removal against the
-  official PoolManager. Atomic bundle wiring and the full source/CTF/manager mainnet fixture remain
-  unbuilt.
+  official PoolManager. The full source/CTF/manager mainnet fixture remains unbuilt.
+- The selector-frozen v4 bundle factory now hash-pins the source, spot adapter, initialization gate,
+  conditional adapter, and manager. Its effective CREATE2 salt commits to `msg.sender`, preventing
+  a different wallet from consuming the advertised hook address. Tests prove exact address
+  prediction, permission-bit enforcement, all four irreversible bindings, mutated-code rejection,
+  and rollback of the mined hook plus every earlier child when the final manager deployment fails.
+  The full source/CTF/two-pool manager mainnet fixture and final manifest remain unbuilt.
 
 ## Required before any funded deployment
 
