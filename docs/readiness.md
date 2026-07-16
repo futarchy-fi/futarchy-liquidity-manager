@@ -129,12 +129,13 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   the first mint so the initialization observation survives. Pinned dependency evidence is
   recorded in `production-mainnet-dependency-manifest.md`; final tokens, roles, exact config, salt,
   batch, and independent review remain unresolved.
-  Three additional full-stack fault runs inject a revert at the canonical CTF split, the first
-  official-PoolManager initialization, and the exact second official-PoolManager initialization.
-  Each failed outer proposal write restores the empty registry, original spot NFT and liquidity,
-  base balances, wrapper supplies and custody, and both absent conditional positions. Clearing the
-  injected fault then lets the identical proposal activate, proving the failed attempt left no
-  live-pool precreation veto.
+  Nine full-stack fault runs inject a revert at official-v3 spot principal removal, each canonical
+  CTF split, wrapper conversion on each underlying, and each official-PoolManager initialization
+  and first-liquidity call. Each failed outer proposal write restores the empty registry, actual
+  spot NFT and liquidity, base custody and allowances, CTF underlying custody, wrapper supplies
+  and custody, PoolManager balances, and both absent conditional positions. Clearing the injected
+  fault then lets the identical proposal activate, proving the failed attempt left no live-pool
+  precreation veto.
 - The same real-stack fork donates one complete set across both live v4 pools, then gives one holder
   one third of the shares and redeems them while the CTF condition is unresolved. The fee phase pays
   that holder its exact pro-rata original inventory plus donation within four wei. The spot NFT
@@ -158,13 +159,13 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   across nine randomized actions, while the two UniV3 invariants retain their stricter inline
   256-by-512 configuration (131,072 calls each). The final candidate must re-run this gate after
   its exact configuration is fixed.
-- The current 242-test instrumented suite also passes Foundry's coverage profile with `--ir-minimum`
+- The current 248-test instrumented suite also passes Foundry's coverage profile with `--ir-minimum`
   after excluding the production-profile-only artifact-hash assertion (coverage deliberately
   recompiles different bytecode). This flag is required because unoptimized instrumentation
   exceeds Solidity's stack limit. The manager reports 93.06%
   line, 91.20% statement, 67.65% branch, and 98.61% function coverage. Production compilation
   independently confirms a 24,171-byte manager runtime, 405 bytes below EIP-170.
-- The current 243-test normal suite includes direct emergency-handler reachability, three
+- The current 249-test normal suite includes direct emergency-handler reachability, nine
   pinned-mainnet activation rollback cases, and a fifth invariant that requires executed emergency
   mode to leave every manager position at zero liquidity. Artifact drift, permissionless bundle
   interleaving, code-less PoolManager, and immutable spot-tick-policy checks remain green.
@@ -183,10 +184,12 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 | Source write or activation target | `test_activation_revert_rolls_back_source_write`; every corrupt captured field is also faulted independently. |
 | Resolved condition or spot guard | `test_activation_rejects_resolved_condition_before_removing_spot`; `test_activation_guard_failure_rolls_back_every_side_effect`. |
 | Either CTF split leg | `test_atomic_activation_uses_captured_source_snapshot` injects a receipt shortfall for company and collateral separately and checks source, spot, CTF, router, allowance, wrapper, and adapter state. |
-| Canonical mainnet CTF split | `testFork_realCtfSplitFailureRollsBackAndRetrySucceeds` faults the deployed CTF call after real v3 spot removal, checks the outer registry/spot/wrapper/adapter envelope, then retries successfully. |
+| Official mainnet v3 spot removal | `testFork_spotRemovalFailureRollsBackAndRetrySucceeds` faults principal removal after the real fee-collection phase, restores actual NFT liquidity and the outer envelope, then retries successfully. |
+| Both canonical mainnet CTF splits | `testFork_firstRealCtfSplitFailureRollsBackAndRetrySucceeds` and `testFork_secondRealCtfSplitFailureRollsBackAndRetrySucceeds` fault each deployed CTF call, including after the first underlying completed, compare base/CTF custody and allowances, then retry successfully. |
+| Deployed wrapper conversion for either underlying | `testFork_firstRealWrapperMintFailureRollsBackAndRetrySucceeds` and `testFork_secondAssetRealWrapperMintFailureRollsBackAndRetrySucceeds` fault the canonical ERC1155-to-ERC20 conversion before the first and after the complete first underlying, restore CTF/wrapper custody and supply, then retry successfully. |
 | First conditional pool/add | The same full binding test injects first-add and post-add accounting failures and proves the created pool, split wrappers, and spot removal all roll back. |
 | Second conditional pool | `test_activation_rolls_back_first_pool_when_second_pool_is_precreated` proves the newly created first pool disappears while the adversarial second pool remains. |
-| First or second official mainnet v4 initialization | `testFork_firstRealV4InitializeFailureRollsBackAndRetrySucceeds` and `testFork_secondRealV4InitializeFailureRollsBackAndRetrySucceeds` fault each deployed PoolManager boundary, prove prior live-stack effects disappear, and retry the identical activation. |
+| First or second official mainnet v4 initialization/liquidity | `testFork_firstRealV4InitializeFailureRollsBackAndRetrySucceeds`, `testFork_firstRealV4LiquidityFailureRollsBackAndRetrySucceeds`, `testFork_secondRealV4InitializeFailureRollsBackAndRetrySucceeds`, and `testFork_secondRealV4LiquidityFailureRollsBackAndRetrySucceeds` fault each deployed PoolManager boundary, prove prior live-stack effects and any pool initialization disappear, and retry the identical activation. |
 | AMM create, initialize, or first mint | `test_freshAddPoolCreateAndInitializeFailuresRollBack`, `test_freshAddFirstMintFailureRollsBackPoolAndCustody`, and `test_firstLiquidityFailureRollsBackInitializationAndCustody`. |
 | Outer lifecycle step after successful activation | `test_atomic_activation_uses_captured_source_snapshot` forces its resolver step to revert and compares the complete source, manager, spot, CTF, router, wrapper, pool, balance, and allowance envelope. |
 | Atomic bundle deployment/wiring | `test_lateManagerFailureRollsBackHookAndEveryCreate`, `test_sameTokenManagerFailureAlsoRollsBackMinedHook`, and the empty-runtime/initcode/hash fault cases. |

@@ -72,11 +72,13 @@ A separate run moves the YES-company-only donation before the unresolved one-thi
 redeemer receives its floor-rounded fee share as an unmatched wrapper within four wei, keeps the
 same base balance through settlement, and redeems the winning wrapper independently afterward.
 
-Three rollback variants fault the canonical CTF split, first official-PoolManager initialization,
-and exact second official-PoolManager initialization. Each failed outer proposal write restores
-the empty source registry, original spot NFT/liquidity and base balances, wrapper supplies and
-custody, and absent YES/NO adapter positions. Clearing the fault lets the identical proposal
-activate, so neither failed initialization leaves a latent pool-precreation veto.
+Nine rollback variants fault official-v3 spot principal removal, each canonical CTF split, wrapper
+conversion on each underlying, and each official-PoolManager initialization and first-liquidity
+call. Each failed outer proposal write restores the empty source registry, actual spot NFT and
+liquidity, base custody and allowances, CTF underlying custody, wrapper supplies and custody,
+PoolManager balances, and absent YES/NO adapter positions. Clearing the fault lets the identical
+proposal activate, so no failed initialization or later first-liquidity call leaves a latent
+pool-precreation veto.
 
 At this block the actual gas limit is `60,000,000`. Conservative transaction estimates add `21,000`
 base gas and charge all calldata bytes at the nonzero rate of 16 gas: the atomic bundle is

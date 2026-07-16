@@ -27,7 +27,10 @@ import {
     IUniswapV3NonfungiblePositionManager
 } from "../../src/interfaces/IUniswapV3NonfungiblePositionManager.sol";
 import {UniV3PoolStabilityGuard} from "../../src/oracles/UniV3PoolStabilityGuard.sol";
-import {FutarchyConditionalRouter} from "../../src/routers/FutarchyConditionalRouter.sol";
+import {
+    FutarchyConditionalRouter,
+    ICanonicalWrapped1155
+} from "../../src/routers/FutarchyConditionalRouter.sol";
 import {FutarchyOfficialProposalSource} from "../../src/sources/FutarchyOfficialProposalSource.sol";
 import {MockFutarchyProposalLike} from "../mocks/MockFutarchyProposalLike.sol";
 import {MockMintableERC20} from "../mocks/MockMintableERC20.sol";
@@ -54,9 +57,15 @@ interface IMainnetUniV3Pool {
 contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
     enum ActivationFault {
         None,
-        CtfSplit,
+        SpotRemoval,
+        FirstCtfSplit,
+        SecondCtfSplit,
+        FirstWrapperMint,
+        SecondAssetWrapperMint,
         FirstV4Initialize,
-        SecondV4Initialize
+        FirstV4Liquidity,
+        SecondV4Initialize,
+        SecondV4Liquidity
     }
 
     uint256 private constant FORK_BLOCK = 25_542_490;
@@ -97,16 +106,40 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         _runLifecycle(true, true, ActivationFault.None);
     }
 
-    function testFork_realCtfSplitFailureRollsBackAndRetrySucceeds() public {
-        _runLifecycle(true, false, ActivationFault.CtfSplit);
+    function testFork_spotRemovalFailureRollsBackAndRetrySucceeds() public {
+        _runLifecycle(true, false, ActivationFault.SpotRemoval);
+    }
+
+    function testFork_firstRealCtfSplitFailureRollsBackAndRetrySucceeds() public {
+        _runLifecycle(true, false, ActivationFault.FirstCtfSplit);
+    }
+
+    function testFork_secondRealCtfSplitFailureRollsBackAndRetrySucceeds() public {
+        _runLifecycle(true, false, ActivationFault.SecondCtfSplit);
+    }
+
+    function testFork_firstRealWrapperMintFailureRollsBackAndRetrySucceeds() public {
+        _runLifecycle(true, false, ActivationFault.FirstWrapperMint);
+    }
+
+    function testFork_secondAssetRealWrapperMintFailureRollsBackAndRetrySucceeds() public {
+        _runLifecycle(true, false, ActivationFault.SecondAssetWrapperMint);
     }
 
     function testFork_firstRealV4InitializeFailureRollsBackAndRetrySucceeds() public {
         _runLifecycle(true, false, ActivationFault.FirstV4Initialize);
     }
 
+    function testFork_firstRealV4LiquidityFailureRollsBackAndRetrySucceeds() public {
+        _runLifecycle(true, false, ActivationFault.FirstV4Liquidity);
+    }
+
     function testFork_secondRealV4InitializeFailureRollsBackAndRetrySucceeds() public {
         _runLifecycle(true, false, ActivationFault.SecondV4Initialize);
+    }
+
+    function testFork_secondRealV4LiquidityFailureRollsBackAndRetrySucceeds() public {
+        _runLifecycle(true, false, ActivationFault.SecondV4Liquidity);
     }
 
     function _runLifecycle(bool yesWins, bool singleLegBeforeExit, ActivationFault activationFault)
@@ -249,6 +282,7 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
                 activationFault,
                 source,
                 proposal,
+                router,
                 manager,
                 spot,
                 conditional,
@@ -479,6 +513,7 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         ActivationFault fault,
         FutarchyOfficialProposalSource source,
         MockFutarchyProposalLike proposal,
+        FutarchyConditionalRouter router,
         FutarchyLiquidityManager manager,
         UniswapV3LiquidityAdapter spot,
         V4ConditionalLiquidityAdapter conditional,
@@ -488,27 +523,94 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
     ) private {
         uint128 spotLiquidityBefore = manager.spotLiquidity();
         uint256 spotTokenIdBefore = spot.getPositionTokenId(address(company), address(collateral));
+        uint128 spotNftLiquidityBefore = _spotPositionLiquidity(spotTokenIdBefore);
         uint256 companyBalanceBefore = company.balanceOf(address(manager));
         uint256 collateralBalanceBefore = collateral.balanceOf(address(manager));
+        uint256 companyCtfBalanceBefore = company.balanceOf(CONDITIONAL_TOKENS);
+        uint256 collateralCtfBalanceBefore = collateral.balanceOf(CONDITIONAL_TOKENS);
+        uint256 companyRouterBalanceBefore = company.balanceOf(address(router));
+        uint256 collateralRouterBalanceBefore = collateral.balanceOf(address(router));
+        uint256 companyRouterAllowanceBefore = company.allowance(address(manager), address(router));
+        uint256 collateralRouterAllowanceBefore =
+            collateral.allowance(address(manager), address(router));
+        uint256 companyCtfAllowanceBefore = company.allowance(address(router), CONDITIONAL_TOKENS);
+        uint256 collateralCtfAllowanceBefore =
+            collateral.allowance(address(router), CONDITIONAL_TOKENS);
         uint256[4] memory suppliesBefore;
+        uint256[4] memory routerUnderlyingBefore;
+        uint256[4] memory factoryUnderlyingBefore;
+        uint256[4] memory poolManagerBalancesBefore;
         for (uint256 i; i < outcomes.length; ++i) {
             suppliesBefore[i] = IERC20(outcomes[i]).totalSupply();
+            poolManagerBalancesBefore[i] = IERC20(outcomes[i]).balanceOf(POOL_MANAGER);
+            uint256 tokenId = ICanonicalWrapped1155(outcomes[i]).tokenId();
+            routerUnderlyingBefore[i] =
+                IFutarchyConditionalTokens(CONDITIONAL_TOKENS).balanceOf(address(router), tokenId);
+            factoryUnderlyingBefore[i] = IFutarchyConditionalTokens(CONDITIONAL_TOKENS)
+                .balanceOf(WRAPPED_1155_FACTORY, tokenId);
         }
 
         bytes memory faultData = abi.encodeWithSignature("Error(string)", "injected fault");
-        if (fault == ActivationFault.CtfSplit) {
+        if (fault == ActivationFault.SpotRemoval) {
             vm.mockCallRevert(
-                CONDITIONAL_TOKENS, IFutarchyConditionalTokens.splitPosition.selector, faultData
+                SPOT_POSITION_MANAGER,
+                IUniswapV3NonfungiblePositionManager.decreaseLiquidity.selector,
+                faultData
+            );
+        } else if (
+            fault == ActivationFault.FirstCtfSplit || fault == ActivationFault.SecondCtfSplit
+        ) {
+            address
+                faultedCollateral = fault == ActivationFault.FirstCtfSplit
+                    ? address(company)
+                    : address(collateral);
+            vm.mockCallRevert(
+                CONDITIONAL_TOKENS,
+                abi.encodePacked(
+                    IFutarchyConditionalTokens.splitPosition.selector,
+                    bytes32(uint256(uint160(faultedCollateral)))
+                ),
+                faultData
+            );
+        } else if (
+            fault == ActivationFault.FirstWrapperMint
+                || fault == ActivationFault.SecondAssetWrapperMint
+        ) {
+            uint256 tokenId = ICanonicalWrapped1155(
+                    fault == ActivationFault.FirstWrapperMint ? outcomes[0] : outcomes[2]
+                ).tokenId();
+            vm.mockCallRevert(
+                CONDITIONAL_TOKENS,
+                abi.encodePacked(
+                    bytes4(keccak256("safeTransferFrom(address,address,uint256,uint256,bytes)")),
+                    bytes32(uint256(uint160(address(router)))),
+                    bytes32(uint256(uint160(WRAPPED_1155_FACTORY))),
+                    bytes32(tokenId)
+                ),
+                faultData
             );
         } else if (fault == ActivationFault.FirstV4Initialize) {
             vm.mockCallRevert(POOL_MANAGER, IV4PoolManagerMinimal.initialize.selector, faultData);
-        } else {
+        } else if (fault == ActivationFault.SecondV4Initialize) {
             vm.mockCallRevert(
                 POOL_MANAGER,
                 abi.encodeWithSelector(
                     IV4PoolManagerMinimal.initialize.selector,
                     _v4PoolKey(conditional, outcomes[1], outcomes[3]),
                     uint160(1 << 96)
+                ),
+                faultData
+            );
+        } else {
+            V4PoolKey memory key = fault == ActivationFault.FirstV4Liquidity
+                ? _v4PoolKey(conditional, outcomes[0], outcomes[2])
+                : _v4PoolKey(conditional, outcomes[1], outcomes[3]);
+            vm.mockCallRevert(
+                POOL_MANAGER,
+                abi.encodePacked(
+                    IV4PoolManagerMinimal.modifyLiquidity.selector,
+                    bytes32(uint256(uint160(key.currency0))),
+                    bytes32(uint256(uint160(key.currency1)))
                 ),
                 faultData
             );
@@ -523,8 +625,21 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         assertFalse(manager.inConditionalMode());
         assertEq(manager.spotLiquidity(), spotLiquidityBefore);
         assertEq(spot.getPositionTokenId(address(company), address(collateral)), spotTokenIdBefore);
+        assertEq(_spotPositionLiquidity(spotTokenIdBefore), spotNftLiquidityBefore);
         assertEq(company.balanceOf(address(manager)), companyBalanceBefore);
         assertEq(collateral.balanceOf(address(manager)), collateralBalanceBefore);
+        assertEq(company.balanceOf(CONDITIONAL_TOKENS), companyCtfBalanceBefore);
+        assertEq(collateral.balanceOf(CONDITIONAL_TOKENS), collateralCtfBalanceBefore);
+        assertEq(company.balanceOf(address(router)), companyRouterBalanceBefore);
+        assertEq(collateral.balanceOf(address(router)), collateralRouterBalanceBefore);
+        assertEq(company.allowance(address(manager), address(router)), companyRouterAllowanceBefore);
+        assertEq(
+            collateral.allowance(address(manager), address(router)), collateralRouterAllowanceBefore
+        );
+        assertEq(company.allowance(address(router), CONDITIONAL_TOKENS), companyCtfAllowanceBefore);
+        assertEq(
+            collateral.allowance(address(router), CONDITIONAL_TOKENS), collateralCtfAllowanceBefore
+        );
         assertEq(conditional.positionLiquidity(_pairKey(outcomes[0], outcomes[2])), 0);
         assertEq(conditional.positionLiquidity(_pairKey(outcomes[1], outcomes[3])), 0);
         assertEq(conditional.poolByPair(outcomes[0], outcomes[2]), address(0));
@@ -532,7 +647,19 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         for (uint256 i; i < outcomes.length; ++i) {
             assertEq(IERC20(outcomes[i]).totalSupply(), suppliesBefore[i]);
             assertEq(IERC20(outcomes[i]).balanceOf(address(manager)), 0);
+            assertEq(IERC20(outcomes[i]).balanceOf(address(router)), 0);
             assertEq(IERC20(outcomes[i]).balanceOf(address(conditional)), 0);
+            assertEq(IERC20(outcomes[i]).balanceOf(POOL_MANAGER), poolManagerBalancesBefore[i]);
+            uint256 tokenId = ICanonicalWrapped1155(outcomes[i]).tokenId();
+            assertEq(
+                IFutarchyConditionalTokens(CONDITIONAL_TOKENS).balanceOf(address(router), tokenId),
+                routerUnderlyingBefore[i]
+            );
+            assertEq(
+                IFutarchyConditionalTokens(CONDITIONAL_TOKENS)
+                    .balanceOf(WRAPPED_1155_FACTORY, tokenId),
+                factoryUnderlyingBefore[i]
+            );
         }
 
         vm.clearMockedCalls();
@@ -625,6 +752,11 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         return tokenA < tokenB
             ? keccak256(abi.encode(tokenA, tokenB))
             : keccak256(abi.encode(tokenB, tokenA));
+    }
+
+    function _spotPositionLiquidity(uint256 tokenId) private view returns (uint128 liquidity) {
+        (,,,,,,, liquidity,,,,) =
+            IUniswapV3NonfungiblePositionManager(SPOT_POSITION_MANAGER).positions(tokenId);
     }
 
     function _v4PoolKey(V4ConditionalLiquidityAdapter adapter, address tokenA, address tokenB)

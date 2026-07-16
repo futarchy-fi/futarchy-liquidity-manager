@@ -100,7 +100,7 @@
           "path": "test/V4FutarchyLiquidityManagerFactory.t.sol"
         },
         {
-          "description": "A pinned Ethereum-mainnet fork drives the factory-deployed source, canonical Conditional Tokens, router, manager, and two conditional positions through atomic activation and settlement against the official v4 PoolManager; fault variants independently revert the canonical CTF split and first and second PoolManager initializations, compare the complete outer rollback envelope, and prove the identical proposal activates after each fault is cleared.",
+          "description": "A pinned Ethereum-mainnet fork drives the factory-deployed source, official v3 position manager, canonical Conditional Tokens, deployed Wrapped1155 factory, router, manager, and two conditional positions through atomic activation and settlement against the official v4 PoolManager. Nine fault variants independently revert spot principal removal, each CTF split, wrapper conversion on each underlying, and each v4 initialization and first-liquidity call; they compare actual protocol custody and position state as well as manager accounting, then prove the identical proposal activates after every fault is cleared.",
           "path": "test/fork/V4FutarchyLiquidityManagerLifecycleMainnetFork.t.sol"
         },
         {
