@@ -171,6 +171,33 @@ contract V4FutarchyLiquidityManagerFactoryTest is Test {
         assertLt(address(factory).code.length, 24_576);
     }
 
+    function test_candidateCreationCodeHashesMatchMainnetManifest() public pure {
+        assertEq(
+            keccak256(type(FutarchyOfficialProposalSource).creationCode),
+            0xeec528405c315ae9de9317487b7ddaf26bf3748af830bb4dd95538ca09c2afbf
+        );
+        assertEq(
+            keccak256(type(UniswapV3LiquidityAdapter).creationCode),
+            0xc2f01cca15a3dc38280b20c05dcce401b71abd0f017fa04abe32550dc18e9a2b
+        );
+        assertEq(
+            keccak256(type(V4InitializationGate).creationCode),
+            0x56052e89d8d3305ab4d3c35922882faee512c39fe45102cc0dec86bf7e57f75f
+        );
+        assertEq(
+            keccak256(type(V4ConditionalLiquidityAdapter).creationCode),
+            0xba940a9f090ff9120797bb258c48717d0c508bbbc23d9379eb8c10bebcc4fc53
+        );
+        assertEq(
+            keccak256(type(FutarchyLiquidityManager).creationCode),
+            0x7accf3e36923467479f9a697e2ae81b5e2da0a8ab31031d61901f04cc253550c
+        );
+        assertEq(
+            keccak256(type(V4FutarchyLiquidityManagerFactory).creationCode),
+            0x017e329a21ebd0758eb2993c3f330f22f235dc0bb2edb7e01f0e6db46f2f1989
+        );
+    }
+
     function test_constructorRejectsPoolManagerCodehashMismatch() public {
         vm.expectRevert(V4FutarchyLiquidityManagerFactory.InvalidDependency.selector);
         _newFactoryWith(

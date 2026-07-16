@@ -145,6 +145,9 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   because unoptimized instrumentation exceeds Solidity's stack limit). The manager reports 92.50%
   line, 90.91% statement, 68.63% branch, and 98.61% function coverage. Production compilation
   independently confirms a 24,171-byte manager runtime, 405 bytes below EIP-170.
+- The current compiler profile and bare creation-code hashes for the v4 factory and all five
+  children are pinned in `production-mainnet-dependency-manifest.md`; an executable drift test
+  requires an explicit manifest update whenever any artifact changes.
 
 ## Atomic rollback evidence map
 

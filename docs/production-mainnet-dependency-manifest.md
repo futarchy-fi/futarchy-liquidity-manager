@@ -29,6 +29,23 @@ Uniswap v3 spot adapter, v4 conditional adapter, and manager. The factory must p
 creation-code hashes and the PoolManager runtime hash above. Its creator-bound CREATE2 salt must be
 mined and reproduced for the final Safe sender; no relay may substitute for that sender.
 
+The current candidate is compiled with Solidity `0.8.36`, optimizer enabled at one run, and
+`via_ir = true`. It targets Shanghai EVM with stripped revert strings and no CBOR/bytecode metadata
+hash. Under that exact profile, the bare creation-code hashes are:
+
+| Candidate artifact | Bare creation-code hash |
+| --- | --- |
+| `FutarchyOfficialProposalSource` | `0xeec528405c315ae9de9317487b7ddaf26bf3748af830bb4dd95538ca09c2afbf` |
+| `UniswapV3LiquidityAdapter` | `0xc2f01cca15a3dc38280b20c05dcce401b71abd0f017fa04abe32550dc18e9a2b` |
+| `V4InitializationGate` | `0x56052e89d8d3305ab4d3c35922882faee512c39fe45102cc0dec86bf7e57f75f` |
+| `V4ConditionalLiquidityAdapter` | `0xba940a9f090ff9120797bb258c48717d0c508bbbc23d9379eb8c10bebcc4fc53` |
+| `FutarchyLiquidityManager` | `0x7accf3e36923467479f9a697e2ae81b5e2da0a8ab31031d61901f04cc253550c` |
+| `V4FutarchyLiquidityManagerFactory` | `0x017e329a21ebd0758eb2993c3f330f22f235dc0bb2edb7e01f0e6db46f2f1989` |
+
+`test_candidateCreationCodeHashesMatchMainnetManifest` fails on any artifact drift. These are
+candidate build identities, not deployed-address or audit approval claims; any reviewed source or
+compiler change must deliberately update both the test and this table.
+
 The full fork also deploys the production `UniV3PoolStabilityGuard` against the official v3 factory.
 It raises the fresh spot pool's observation cardinality to two before the first mint, preserves the
 initial observation, waits the full 30-minute window, and proves both bootstrap and activation
@@ -67,8 +84,8 @@ Do not render or sign a production batch until one reviewed manifest revision fi
 - owner Safe, lifecycle coordinator, bootstrap recipient, official proposer, and emergency process;
 - proposal validation stack, Reality/CTF identifiers and bounds, and final router configuration;
 - raw hook salt, effective creator-bound salt, predicted hook and all five child addresses;
-- factory address and runtime hash, child creation/runtime hashes, constructor arguments, and
-  verified-source/license records;
+- factory address and runtime hash, final confirmation of the candidate creation hashes above,
+  deployed child runtime hashes, constructor arguments, and verified-source/license records;
 - exact deployment calldata, Safe batch hash, simulation block, gas bounds, and independent
   reproduction sign-off.
 
