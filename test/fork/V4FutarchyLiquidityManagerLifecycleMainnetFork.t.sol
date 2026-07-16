@@ -119,7 +119,7 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         _runLifecycle(true, false, ActivationFault.None, false, false, true);
     }
 
-    function testFork_outsiderSpotEmergencyExitPreservesSharesAndAssets() public {
+    function testFork_outsiderSpotEmergencyRollbackPreservesSharesAndAssets() public {
         _runLifecycle(true, false, ActivationFault.None, false, false, false, true);
     }
 
@@ -766,6 +766,13 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         uint256 supplyBefore = manager.totalSupply();
         uint128 spotLiquidityBefore = manager.spotLiquidity();
         uint256 spotTokenIdBefore = spot.getPositionTokenId(address(company), address(collateral));
+        uint128 spotNftLiquidityBefore = _spotPositionLiquidity(spotTokenIdBefore);
+        uint256 managerCompanyBefore = company.balanceOf(address(manager));
+        uint256 managerCollateralBefore = collateral.balanceOf(address(manager));
+        uint256 adapterCompanyBefore = company.balanceOf(address(spot));
+        uint256 adapterCollateralBefore = collateral.balanceOf(address(spot));
+        uint256 npmCompanyBefore = company.balanceOf(SPOT_POSITION_MANAGER);
+        uint256 npmCollateralBefore = collateral.balanceOf(SPOT_POSITION_MANAGER);
         uint256 outsiderCompanyBefore = company.balanceOf(outsider);
         uint256 outsiderCollateralBefore = collateral.balanceOf(outsider);
         assertGt(spotLiquidityBefore, 0);
@@ -773,6 +780,37 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
 
         manager.armEmergencyExit();
         vm.warp(block.timestamp + manager.EMERGENCY_EXIT_DELAY());
+
+        bytes memory faultData = abi.encodeWithSignature("Error(string)", "spot removal fault");
+        vm.mockCallRevert(
+            SPOT_POSITION_MANAGER,
+            IUniswapV3NonfungiblePositionManager.decreaseLiquidity.selector,
+            faultData
+        );
+        vm.expectCall(
+            SPOT_POSITION_MANAGER,
+            abi.encodeWithSelector(IUniswapV3NonfungiblePositionManager.collect.selector)
+        );
+        vm.expectRevert(faultData);
+        vm.prank(outsider);
+        manager.executeEmergencyExit();
+
+        assertFalse(manager.emergencyExitExecuted());
+        assertTrue(manager.emergencyExitReady());
+        assertEq(manager.totalSupply(), supplyBefore);
+        assertEq(manager.spotLiquidity(), spotLiquidityBefore);
+        assertEq(spot.getPositionTokenId(address(company), address(collateral)), spotTokenIdBefore);
+        assertEq(_spotPositionLiquidity(spotTokenIdBefore), spotNftLiquidityBefore);
+        assertEq(company.balanceOf(address(manager)), managerCompanyBefore);
+        assertEq(collateral.balanceOf(address(manager)), managerCollateralBefore);
+        assertEq(company.balanceOf(address(spot)), adapterCompanyBefore);
+        assertEq(collateral.balanceOf(address(spot)), adapterCollateralBefore);
+        assertEq(company.balanceOf(SPOT_POSITION_MANAGER), npmCompanyBefore);
+        assertEq(collateral.balanceOf(SPOT_POSITION_MANAGER), npmCollateralBefore);
+        assertEq(company.balanceOf(outsider), outsiderCompanyBefore);
+        assertEq(collateral.balanceOf(outsider), outsiderCollateralBefore);
+
+        vm.clearMockedCalls();
         vm.prank(outsider);
         manager.executeEmergencyExit();
 
