@@ -102,12 +102,13 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   proves the same direct add, donation-fee collection, and proportional removal against the
   official PoolManager.
 - The selector-frozen v4 bundle factory now hash-pins the source, spot adapter, initialization gate,
-  conditional adapter, and manager. Its effective CREATE2 salt commits to `msg.sender`, preventing
-  a different wallet from consuming the advertised hook address. The proposal source uses the
+  conditional adapter, and manager. Its effective CREATE2 salt commits to `msg.sender`; every child
+  uses a domain-separated derivative, preventing another wallet from consuming or a permissionless
+  intervening deployment from shifting any advertised address. The proposal source uses the
   deployed v4 adapter as its immutable singleton-pool lookup rather than retaining an unrelated
-  Algebra dependency. Tests prove exact address prediction, permission-bit enforcement, all four
-  irreversible bindings, mutated-code rejection, and rollback of the mined hook plus every earlier
-  child when the final manager deployment fails. A pinned fork then drives the factory-deployed
+  Algebra dependency. Tests prove exact five-child prediction across interleaving, permission-bit
+  enforcement, all four irreversible bindings, mutated-code rejection, and rollback of every child
+  when the final manager deployment fails. A pinned fork then drives the factory-deployed
   source, canonical Ethereum CTF, router, manager, and both conditional positions through atomic
   activation and settlement against the official PoolManager and deployed Ethereum Wrapped1155
   factory. That live factory exposed a semantic-order lookup failure when deterministic wrapper
@@ -133,7 +134,7 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   within four wei, retains the same base balance through settlement, and can redeem the winning
   wrapper independently afterward.
 - The pinned block's actual gas limit is 60,000,000. Charging 21,000 base gas plus the worst-case
-  16 gas for every calldata byte yields less than 12,360,000 gas for the atomic bundle transaction,
+  16 gas for every calldata byte yields 12,125,922 gas for the atomic bundle transaction,
   2,343,088 gas for source/CTF/two-pool activation, 1,460,745 gas for symmetric donated-fee partial
   redemption, and 1,487,553 gas for asymmetric in-kind redemption. The fork asserts each remains
   below half a block, leaving more than 30,000,000 gas of explicit headroom.
@@ -145,6 +146,8 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   because unoptimized instrumentation exceeds Solidity's stack limit). The manager reports 92.50%
   line, 90.91% statement, 68.63% branch, and 98.61% function coverage. Production compilation
   independently confirms a 24,171-byte manager runtime, 405 bytes below EIP-170.
+- The current 236-test normal suite adds artifact-drift and permissionless interleaving checks; the
+  latter proves all five precomputed CREATE2 addresses survive an unrelated bundle deployment.
 - The current compiler profile and bare creation-code hashes for the v4 factory and all five
   children are pinned in `production-mainnet-dependency-manifest.md`; an executable drift test
   requires an explicit manifest update whenever any artifact changes.

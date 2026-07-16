@@ -177,6 +177,8 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
             createParams,
             creationCodes
         );
+        V4FutarchyLiquidityManagerFactory.DeployedContracts memory predicted =
+            factory.predictBundleAddresses(address(this), createParams, creationCodes);
         uint256 gasBefore = gasleft();
         V4FutarchyLiquidityManagerFactory.DeployedContracts memory deployed =
             factory.createLiquidityManager(createParams, creationCodes);
@@ -188,6 +190,11 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
             MAX_CONSERVATIVE_TRANSACTION_GAS,
             "factory transaction has less than half-block headroom"
         );
+        assertEq(deployed.proposalSource, predicted.proposalSource);
+        assertEq(deployed.spotAdapter, predicted.spotAdapter);
+        assertEq(deployed.initializationGate, predicted.initializationGate);
+        assertEq(deployed.conditionalAdapter, predicted.conditionalAdapter);
+        assertEq(deployed.manager, predicted.manager);
 
         V4ConditionalLiquidityAdapter conditional =
             V4ConditionalLiquidityAdapter(deployed.conditionalAdapter);

@@ -24,8 +24,8 @@ interface IUniV3FactoryBoundGuard {
 
 /// @notice Permissionless atomic deployment factory for the Ethereum-mainnet v4 FLM successor.
 /// @dev The caller mines a raw salt whose caller-bound CREATE2 address enables exactly the
-/// before-initialize hook bit. Binding the effective salt to msg.sender prevents another wallet
-/// from consuming the advertised hook address first.
+/// before-initialize hook bit. Every child uses a domain-separated derivative of that effective
+/// salt, so unrelated permissionless deployments cannot change or consume the predicted bundle.
 contract V4FutarchyLiquidityManagerFactory {
     uint256 public constant MAX_INIT_CODE_SIZE = 49_152;
     uint24 public constant SPOT_FEE = 500;
@@ -181,18 +181,21 @@ contract V4FutarchyLiquidityManagerFactory {
             _deployCreate2(codes.initializationGate, gateArgs, effectiveSalt);
         if (deployed.initializationGate != predictedGate) revert DeploymentFailed();
 
-        deployed.spotAdapter = _deploy(
-            codes.spotAdapter, abi.encode(SPOT_POSITION_MANAGER, SPOT_TICK_LOWER, SPOT_TICK_UPPER)
+        deployed.spotAdapter = _deployCreate2(
+            codes.spotAdapter,
+            abi.encode(SPOT_POSITION_MANAGER, SPOT_TICK_LOWER, SPOT_TICK_UPPER),
+            _childSalt(effectiveSalt, 1)
         );
-        deployed.conditionalAdapter = _deploy(
+        deployed.conditionalAdapter = _deployCreate2(
             codes.conditionalAdapter,
             abi.encode(
                 V4_POOL_MANAGER,
                 V4_POOL_MANAGER_CODEHASH,
                 V4InitializationGate(deployed.initializationGate)
-            )
+            ),
+            _childSalt(effectiveSalt, 2)
         );
-        deployed.proposalSource = _deploy(
+        deployed.proposalSource = _deployCreate2(
             codes.proposalSource,
             abi.encode(
                 params.owner,
@@ -200,9 +203,12 @@ contract V4FutarchyLiquidityManagerFactory {
                 params.officialProposer,
                 deployed.conditionalAdapter,
                 params.proposalValidationConfigData
-            )
+            ),
+            _childSalt(effectiveSalt, 3)
         );
-        deployed.manager = _deploy(codes.manager, _managerConstructorArgs(params, deployed));
+        deployed.manager = _deployCreate2(
+            codes.manager, _managerConstructorArgs(params, deployed), _childSalt(effectiveSalt, 4)
+        );
 
         V4InitializationGate(deployed.initializationGate).bindAdapter(deployed.conditionalAdapter);
         UniswapV3LiquidityAdapter(deployed.spotAdapter).bindManager(deployed.manager);
@@ -220,6 +226,20 @@ contract V4FutarchyLiquidityManagerFactory {
             deployed.conditionalAdapter,
             deployed.manager
         );
+    }
+
+    function predictBundleAddresses(
+        address creator,
+        CreateParams calldata params,
+        CreationCodes calldata codes
+    ) external view returns (DeployedContracts memory predicted) {
+        _validateCreateParams(params);
+        _validateCreationCode(codes.proposalSource, PROPOSAL_SOURCE_CREATION_CODE_HASH);
+        _validateCreationCode(codes.spotAdapter, SPOT_ADAPTER_CREATION_CODE_HASH);
+        _validateCreationCode(codes.initializationGate, INITIALIZATION_GATE_CREATION_CODE_HASH);
+        _validateCreationCode(codes.conditionalAdapter, CONDITIONAL_ADAPTER_CREATION_CODE_HASH);
+        _validateCreationCode(codes.manager, MANAGER_CREATION_CODE_HASH);
+        predicted = _predictBundle(creator, params, codes);
     }
 
     function predictHookAddress(
@@ -240,6 +260,67 @@ contract V4FutarchyLiquidityManagerFactory {
 
     function effectiveHookSalt(address creator, bytes32 rawSalt) public pure returns (bytes32) {
         return keccak256(abi.encode(creator, rawSalt));
+    }
+
+    function _predictBundle(
+        address creator,
+        CreateParams calldata params,
+        CreationCodes calldata codes
+    ) private view returns (DeployedContracts memory predicted) {
+        bytes32 effectiveSalt = effectiveHookSalt(creator, params.hookSalt);
+        predicted.initializationGate = _predictCreate2(
+            effectiveSalt,
+            keccak256(
+                abi.encodePacked(
+                    codes.initializationGate, abi.encode(V4_POOL_MANAGER, address(this))
+                )
+            )
+        );
+        predicted.spotAdapter = _predictCreate2(
+            _childSalt(effectiveSalt, 1),
+            keccak256(
+                abi.encodePacked(
+                    codes.spotAdapter,
+                    abi.encode(SPOT_POSITION_MANAGER, SPOT_TICK_LOWER, SPOT_TICK_UPPER)
+                )
+            )
+        );
+        predicted.conditionalAdapter = _predictCreate2(
+            _childSalt(effectiveSalt, 2),
+            keccak256(
+                abi.encodePacked(
+                    codes.conditionalAdapter,
+                    abi.encode(
+                        V4_POOL_MANAGER,
+                        V4_POOL_MANAGER_CODEHASH,
+                        V4InitializationGate(predicted.initializationGate)
+                    )
+                )
+            )
+        );
+        predicted.proposalSource = _predictCreate2(
+            _childSalt(effectiveSalt, 3),
+            keccak256(
+                abi.encodePacked(
+                    codes.proposalSource,
+                    abi.encode(
+                        params.owner,
+                        params.proposalManager,
+                        params.officialProposer,
+                        predicted.conditionalAdapter,
+                        params.proposalValidationConfigData
+                    )
+                )
+            )
+        );
+        predicted.manager = _predictCreate2(
+            _childSalt(effectiveSalt, 4),
+            keccak256(abi.encodePacked(codes.manager, _managerConstructorArgs(params, predicted)))
+        );
+    }
+
+    function _childSalt(bytes32 effectiveSalt, uint256 child) private pure returns (bytes32) {
+        return keccak256(abi.encode(effectiveSalt, child));
     }
 
     function _validateCreateParams(CreateParams calldata params) private view {
@@ -277,17 +358,6 @@ contract V4FutarchyLiquidityManagerFactory {
         if (actualHash != expectedHash) {
             revert CreationCodeHashMismatch(expectedHash, actualHash);
         }
-    }
-
-    function _deploy(bytes calldata creationCode, bytes memory constructorArgs)
-        private
-        returns (address deployed)
-    {
-        bytes memory initCode = _initCode(creationCode, constructorArgs);
-        assembly ("memory-safe") {
-            deployed := create(0, add(initCode, 0x20), mload(initCode))
-        }
-        if (deployed == address(0) || deployed.code.length == 0) revert DeploymentFailed();
     }
 
     function _deployCreate2(bytes calldata creationCode, bytes memory constructorArgs, bytes32 salt)

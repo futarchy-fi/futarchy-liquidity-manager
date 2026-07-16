@@ -66,11 +66,12 @@ pokes and takes real fee deltas before removing principal, requires the second f
 zero, and sends both phases directly to the bound manager.
 
 The committed v4 bundle factory validates the five bare creation-code hashes supplied in calldata,
-derives the hook CREATE2 salt from the creating wallet and its mined raw salt, validates the exact
-permission bits before any child deployment, and then deploys the hook, proposal source, v3 spot
-adapter, v4 conditional adapter, and manager. The hook→adapter, both adapter→manager, and
-source→manager bindings all complete in the same reverting transaction. Deterministic tests prove a
-late manager failure removes the already-created hook and every preceding child.
+derives a creator-bound bundle salt from the creating wallet and its mined raw salt, validates the
+exact hook permission bits before any deployment, and deploys every child with CREATE2 using
+domain-separated salts. The hook→adapter, both adapter→manager, and source→manager bindings all
+complete in the same reverting transaction. Deterministic tests prove a late manager failure
+removes every child and that an unrelated permissionless deployment cannot shift any precomputed
+address.
 The source's immutable pool lookup is the deployed v4 conditional adapter itself, so registry views
 resolve both singleton pool keys without retaining a legacy Algebra-factory dependency.
 
@@ -118,8 +119,8 @@ with its own Foundry configuration and Solidity 0.8.26:
   exit: the redeemer receives its floor-rounded fee share in kind within four wei, its base balance
   stays fixed through settlement, and it can redeem the winning wrapper independently afterward.
 - at pinned block gas limit 60,000,000, conservative transaction accounting charges 21,000 base
-  gas and 16 gas for every calldata byte. The atomic five-child bundle costs less than 12,360,000
-  gas, source/CTF/two-pool activation costs 2,343,088 gas, the symmetric donated-fee partial
+  gas and 16 gas for every calldata byte. The atomic five-child bundle costs 12,125,922 gas,
+  source/CTF/two-pool activation costs 2,343,088 gas, the symmetric donated-fee partial
   redemption costs 1,460,745 gas, and the asymmetric in-kind case costs 1,487,553 gas by that upper
   bound. Each is asserted below half the actual block limit, leaving more than 30,000,000 gas of
   explicit headroom.
@@ -161,7 +162,8 @@ legal review remains a real-funds gate; this document is an engineering analysis
 ## Release blockers
 
 1. Produce the final Ethereum dependency manifest, mine and independently reproduce the
-   creator-bound hook salt, and exercise the exact factory bytecode against those addresses.
+   creator-bound bundle salt and all five predicted child addresses, then exercise the exact
+   factory bytecode against them.
 2. Pin and independently verify the official Ethereum PoolManager runtime hash and every imported
    upstream file/license; complete legal review before real funds.
 3. Run every adversarial, conservation, rollback, gas, bytecode, configuration, and batch gate in

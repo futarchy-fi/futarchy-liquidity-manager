@@ -37,11 +37,11 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   allocation, and final-holder conservation together with the real v3 spot position manager and
   production guard.
 - `V4FutarchyLiquidityManagerFactory`: permissionless atomic v4 bundle deployer. It hash-pins all
-  five child creation codes, deploys the initialization gate at a caller-bound mined CREATE2
-  address, deploys the source/adapters/manager, wires the source's pool lookup directly to the v4
-  conditional adapter, and completes all irreversible bindings before returning. Final-address
-  deployment configuration and production dependency selection remain outside the implemented
-  surface.
+  five child creation codes and deploys the entire bundle at creator-bound CREATE2 addresses. Its
+  exact prediction view remains stable across unrelated permissionless deployments. It wires the
+  source's pool lookup directly to the v4 conditional adapter and completes all irreversible
+  bindings before returning. Final-address deployment configuration and production dependency
+  selection remain outside the implemented surface.
 
 ## External Dependencies
 

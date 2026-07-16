@@ -26,8 +26,10 @@ pinned lifecycle fixture.
 The production bundle is intended to deploy the selector-frozen
 `V4FutarchyLiquidityManagerFactory` children atomically: initialization gate, proposal source,
 Uniswap v3 spot adapter, v4 conditional adapter, and manager. The factory must pin the reviewed
-creation-code hashes and the PoolManager runtime hash above. Its creator-bound CREATE2 salt must be
-mined and reproduced for the final Safe sender; no relay may substitute for that sender.
+creation-code hashes and the PoolManager runtime hash above. Its creator-bound CREATE2 bundle salt
+must be mined and reproduced for the final Safe sender; no relay may substitute for that sender.
+All five addresses are available from `predictBundleAddresses` and remain unchanged if unrelated
+callers deploy intervening bundles.
 
 The current candidate is compiled with Solidity `0.8.36`, optimizer enabled at one run, and
 `via_ir = true`. It targets Shanghai EVM with stripped revert strings and no CBOR/bytecode metadata
@@ -40,7 +42,7 @@ hash. Under that exact profile, the bare creation-code hashes are:
 | `V4InitializationGate` | `0x56052e89d8d3305ab4d3c35922882faee512c39fe45102cc0dec86bf7e57f75f` |
 | `V4ConditionalLiquidityAdapter` | `0xba940a9f090ff9120797bb258c48717d0c508bbbc23d9379eb8c10bebcc4fc53` |
 | `FutarchyLiquidityManager` | `0x7accf3e36923467479f9a697e2ae81b5e2da0a8ab31031d61901f04cc253550c` |
-| `V4FutarchyLiquidityManagerFactory` | `0x017e329a21ebd0758eb2993c3f330f22f235dc0bb2edb7e01f0e6db46f2f1989` |
+| `V4FutarchyLiquidityManagerFactory` | `0x05f8e6f496c81090d5d14773d99ccc5710fef674eaf0f6e5519c632a3eef27c6` |
 
 `test_candidateCreationCodeHashesMatchMainnetManifest` fails on any artifact drift. These are
 candidate build identities, not deployed-address or audit approval claims; any reviewed source or
@@ -64,8 +66,8 @@ redeemer receives its floor-rounded fee share as an unmatched wrapper within fou
 same base balance through settlement, and redeems the winning wrapper independently afterward.
 
 At this block the actual gas limit is `60,000,000`. Conservative transaction estimates add `21,000`
-base gas and charge all calldata bytes at the nonzero rate of 16 gas: the atomic bundle is below
-`12,360,000` gas, source/CTF/two-pool activation is `2,343,088` gas, and partial real-stack
+base gas and charge all calldata bytes at the nonzero rate of 16 gas: the atomic bundle is
+`12,125,922` gas, source/CTF/two-pool activation is `2,343,088` gas, and partial real-stack
 redemption after symmetric live v4 donations is `1,460,745` gas; the asymmetric in-kind case is
 `1,487,553` gas. The fork asserts each stays below half the block limit. These are fixture bounds,
 not estimates for still-unknown final token or coordinator calldata.
@@ -83,7 +85,7 @@ Do not render or sign a production batch until one reviewed manifest revision fi
 - the exact v3 spot tick range, initial price, existing-pool rejection behavior, and token ordering;
 - owner Safe, lifecycle coordinator, bootstrap recipient, official proposer, and emergency process;
 - proposal validation stack, Reality/CTF identifiers and bounds, and final router configuration;
-- raw hook salt, effective creator-bound salt, predicted hook and all five child addresses;
+- raw bundle salt, effective creator-bound salt, and predicted addresses for all five children;
 - factory address and runtime hash, final confirmation of the candidate creation hashes above,
   deployed child runtime hashes, constructor arguments, and verified-source/license records;
 - exact deployment calldata, Safe batch hash, simulation block, gas bounds, and independent

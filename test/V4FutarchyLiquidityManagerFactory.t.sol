@@ -71,17 +71,41 @@ contract V4FutarchyLiquidityManagerFactoryTest is Test {
 
     function test_anyWalletAtomicallyDeploysAndBindsV4Bundle() public {
         bytes32 salt = _findHookSalt(factory, CREATOR);
-        address predicted =
-            factory.predictHookAddress(CREATOR, salt, type(V4InitializationGate).creationCode);
         V4FutarchyLiquidityManagerFactory.CreateParams memory params = _params(salt);
+        V4FutarchyLiquidityManagerFactory.CreationCodes memory codes = _codes();
+        V4FutarchyLiquidityManagerFactory.DeployedContracts memory predicted =
+            factory.predictBundleAddresses(CREATOR, params, codes);
+        assertEq(
+            predicted.initializationGate,
+            factory.predictHookAddress(CREATOR, salt, type(V4InitializationGate).creationCode)
+        );
 
         vm.prank(CREATOR);
         V4FutarchyLiquidityManagerFactory.DeployedContracts memory deployed =
-            factory.createLiquidityManager(params, _codes());
+            factory.createLiquidityManager(params, codes);
 
-        assertEq(deployed.initializationGate, predicted);
-        assertEq(uint160(predicted) & ALL_HOOK_MASK, BEFORE_INITIALIZE_FLAG);
+        _assertBundleAddresses(deployed, predicted);
+        assertEq(uint160(predicted.initializationGate) & ALL_HOOK_MASK, BEFORE_INITIALIZE_FLAG);
         _assertBundle(deployed);
+    }
+
+    function test_bundlePredictionsSurviveUnrelatedPermissionlessDeployment() public {
+        V4FutarchyLiquidityManagerFactory.CreationCodes memory codes = _codes();
+        V4FutarchyLiquidityManagerFactory.CreateParams memory intendedParams =
+            _params(_findHookSalt(factory, CREATOR));
+        V4FutarchyLiquidityManagerFactory.DeployedContracts memory predicted =
+            factory.predictBundleAddresses(CREATOR, intendedParams, codes);
+
+        address otherCreator = address(0xB0B);
+        V4FutarchyLiquidityManagerFactory.CreateParams memory otherParams =
+            _params(_findHookSalt(factory, otherCreator));
+        vm.prank(otherCreator);
+        factory.createLiquidityManager(otherParams, codes);
+
+        vm.prank(CREATOR);
+        V4FutarchyLiquidityManagerFactory.DeployedContracts memory deployed =
+            factory.createLiquidityManager(intendedParams, codes);
+        _assertBundleAddresses(deployed, predicted);
     }
 
     function test_creatorBoundSaltCannotBeConsumedByAnotherWallet() public view {
@@ -194,7 +218,7 @@ contract V4FutarchyLiquidityManagerFactoryTest is Test {
         );
         assertEq(
             keccak256(type(V4FutarchyLiquidityManagerFactory).creationCode),
-            0x017e329a21ebd0758eb2993c3f330f22f235dc0bb2edb7e01f0e6db46f2f1989
+            0x05f8e6f496c81090d5d14773d99ccc5710fef674eaf0f6e5519c632a3eef27c6
         );
     }
 
@@ -258,6 +282,17 @@ contract V4FutarchyLiquidityManagerFactoryTest is Test {
         assertEq(address(manager.CONDITIONAL_ADAPTER()), deployed.conditionalAdapter);
         assertEq(address(manager.CONDITIONAL_ROUTER()), address(conditionalRouter));
         assertEq(address(manager.POOL_STABILITY_GUARD()), address(stabilityGuard));
+    }
+
+    function _assertBundleAddresses(
+        V4FutarchyLiquidityManagerFactory.DeployedContracts memory actual,
+        V4FutarchyLiquidityManagerFactory.DeployedContracts memory expected
+    ) private pure {
+        assertEq(actual.proposalSource, expected.proposalSource);
+        assertEq(actual.spotAdapter, expected.spotAdapter);
+        assertEq(actual.initializationGate, expected.initializationGate);
+        assertEq(actual.conditionalAdapter, expected.conditionalAdapter);
+        assertEq(actual.manager, expected.manager);
     }
 
     function _params(bytes32 hookSalt)
