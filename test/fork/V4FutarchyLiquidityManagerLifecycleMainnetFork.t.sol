@@ -119,6 +119,10 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         _runLifecycle(true, false, ActivationFault.None, false, false, true);
     }
 
+    function testFork_outsiderSpotEmergencyExitPreservesSharesAndAssets() public {
+        _runLifecycle(true, false, ActivationFault.None, false, false, false, true);
+    }
+
     function testFork_spotRemovalFailureRollsBackAndRetrySucceeds() public {
         _runLifecycle(true, false, ActivationFault.SpotRemoval);
     }
@@ -185,6 +189,26 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         bool companyMergeFault,
         bool settlementMergeFault,
         bool emergencyLifecycle
+    ) private {
+        _runLifecycle(
+            yesWins,
+            singleLegBeforeExit,
+            activationFault,
+            companyMergeFault,
+            settlementMergeFault,
+            emergencyLifecycle,
+            false
+        );
+    }
+
+    function _runLifecycle(
+        bool yesWins,
+        bool singleLegBeforeExit,
+        ActivationFault activationFault,
+        bool companyMergeFault,
+        bool settlementMergeFault,
+        bool emergencyLifecycle,
+        bool spotEmergencyLifecycle
     ) private {
         if (!vm.envOr("RUN_MAINNET_FORK_TESTS", false)) return;
         vm.createSelectFork(
@@ -318,6 +342,10 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         company.approve(address(manager), AMOUNT);
         collateral.approve(address(manager), AMOUNT);
         manager.initializeFromBootstrap(AMOUNT, AMOUNT);
+        if (spotEmergencyLifecycle) {
+            _exerciseSpotEmergencyLifecycle(manager, spot, company, collateral);
+            return;
+        }
         if (activationFault != ActivationFault.None) {
             _exerciseActivationRollback(
                 activationFault,
@@ -726,6 +754,47 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
                 5
             );
         }
+    }
+
+    function _exerciseSpotEmergencyLifecycle(
+        FutarchyLiquidityManager manager,
+        UniswapV3LiquidityAdapter spot,
+        MockMintableERC20 company,
+        MockMintableERC20 collateral
+    ) private {
+        address outsider = address(0xC0FFEE);
+        uint256 supplyBefore = manager.totalSupply();
+        uint128 spotLiquidityBefore = manager.spotLiquidity();
+        uint256 spotTokenIdBefore = spot.getPositionTokenId(address(company), address(collateral));
+        uint256 outsiderCompanyBefore = company.balanceOf(outsider);
+        uint256 outsiderCollateralBefore = collateral.balanceOf(outsider);
+        assertGt(spotLiquidityBefore, 0);
+        assertGt(spotTokenIdBefore, 0);
+
+        manager.armEmergencyExit();
+        vm.warp(block.timestamp + manager.EMERGENCY_EXIT_DELAY());
+        vm.prank(outsider);
+        manager.executeEmergencyExit();
+
+        assertTrue(manager.emergencyExitExecuted());
+        assertFalse(manager.inConditionalMode());
+        assertEq(manager.totalSupply(), supplyBefore);
+        assertEq(manager.balanceOf(outsider), 0);
+        assertEq(manager.spotLiquidity(), 0);
+        assertEq(spot.getPositionTokenId(address(company), address(collateral)), 0);
+        assertEq(company.balanceOf(outsider), outsiderCompanyBefore);
+        assertEq(collateral.balanceOf(outsider), outsiderCollateralBefore);
+        assertGt(company.balanceOf(address(manager)), 0);
+        assertGt(collateral.balanceOf(address(manager)), 0);
+
+        manager.redeem(supplyBefore, address(this), false);
+        assertEq(manager.totalSupply(), 0);
+        assertApproxEqAbs(company.balanceOf(address(this)), AMOUNT, 2);
+        assertApproxEqAbs(collateral.balanceOf(address(this)), AMOUNT, 2);
+        assertEq(company.balanceOf(address(manager)), 0);
+        assertEq(collateral.balanceOf(address(manager)), 0);
+        assertEq(company.balanceOf(outsider), outsiderCompanyBefore);
+        assertEq(collateral.balanceOf(outsider), outsiderCollateralBefore);
     }
 
     function _exerciseRedemptionRemovalRollback(

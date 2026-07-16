@@ -93,6 +93,11 @@ liquidity, and lets a one-third holder redeem against unresolved canonical CTF f
 base value within five wei and no outcome residue. The survivor settles after source-registry
 clearing, and aggregate final recovery remains within five wei per base asset.
 
+A separate spot-mode emergency run stops before proposal activation with the official-v3 NFT live.
+After the owner delay an unrelated caller removes it without receiving shares or tokens, share
+supply remains unchanged, and final shareholder redemption recovers both bootstrap assets within
+two wei.
+
 Nine rollback variants fault official-v3 spot principal removal, each canonical CTF split, wrapper
 conversion on each underlying, and each official-PoolManager initialization and first-liquidity
 call. Each failed outer proposal write restores the empty source registry, actual spot NFT and
