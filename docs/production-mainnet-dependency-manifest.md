@@ -12,7 +12,7 @@ bundle fields remain intentionally unresolved.
 | Uniswap v4 PoolManager | `0x000000000004444c5dc75cB358380D2e3dE08A90` | `0x785f1014552b7ce7d5fb7d0c970ca60edee94fd00425d7ca21609acac7ce1293` | Official Ethereum deployment; exercised by all three mainnet fork suites. |
 | Conditional Tokens Framework | `0xC59b0e4De5F1248C1140964E0fF287B192407E0C` | `0x710326c6e1e66bc95ad81734a3c08448d7aa9fd0636c4477003fdababc3d1c1c` | Canonical Ethereum deployment; exercised by the full activation and settlement fork. |
 | Wrapped1155Factory | `0xD194319D1804C1051DD21Ba1Dc931cA72410B79f` | `0x792e0ae192d66bc58541831991b449cd2ba502fe0053507d6c4493d8865371b6` | Ethereum artifact in `seer-pm/demo` commit `cb0eff50b301ff715a7e41b7e164f2478670e0bc`; exercised by the full fork. External review still required. |
-| Uniswap v3 NonfungiblePositionManager | `0xC36442b4a4522E871399CD717aBDD847Ab11FE88` | `0x692e658b31cbe3407682854806658d315d61a58c7e4933a2f91d383dc00736c6` | Candidate final spot manager. At the pinned block `factory()` and `WETH9()` return the entries below. Exact-token spot lifecycle is not yet exercised. |
+| Uniswap v3 NonfungiblePositionManager | `0xC36442b4a4522E871399CD717aBDD847Ab11FE88` | `0x692e658b31cbe3407682854806658d315d61a58c7e4933a2f91d383dc00736c6` | Candidate final spot manager. At the pinned block `factory()` and `WETH9()` return the entries below. The full fork creates a test-token pool, mints its spot NFT, and removes the migration slice through this deployment; final-token behavior is not yet exercised. |
 | Uniswap v3 factory | `0x1F98431c8aD98523631AE4a59f267346ea31F984` | `0x4d7b8525cd5d14343fa67a732fba5b24cddba11620ca88392f4ec6c52f91fd69` | Returned by the candidate spot position manager. |
 | WETH9 | `0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2` | `0xd0a06b12ac47863b5c7be4185c2deaad1c61557033f56c7d4ea74429cbb25e23` | Returned by the candidate spot position manager; this does not select WETH as FAO collateral. |
 
@@ -44,5 +44,5 @@ Do not render or sign a production batch until one reviewed manifest revision fi
   reproduction sign-off.
 
 Until those fields are fixed, the v3 spot position manager remains a pinned candidate rather than
-a production selection, and the full fixture correctly uses deterministic spot tokens, guard, and
-position manager while using the real PoolManager, CTF, and Wrapped1155Factory.
+a production selection. The full fixture correctly uses deterministic spot tokens and guard while
+using the real v3 position manager, v4 PoolManager, CTF, and Wrapped1155Factory.

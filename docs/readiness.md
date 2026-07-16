@@ -113,7 +113,8 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   factory. That live factory exposed a semantic-order lookup failure when deterministic wrapper
   addresses sort opposite the proposal pair; the adapter's read-only lookup now canonicalizes
   either order while mutation entry points remain strictly ordered. The candidate spot position
-  manager and pinned dependency evidence are recorded in
+  manager is now codehash-pinned and exercised through spot pool creation, bootstrap mint, and
+  activation removal in that same fork. Its pinned dependency evidence is recorded in
   `production-mainnet-dependency-manifest.md`; final tokens, roles, exact config, salt, batch, and
   independent review remain unresolved.
 

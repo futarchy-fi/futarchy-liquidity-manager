@@ -6,9 +6,10 @@ The current Swapr Algebra adapter still fails its removal-liveness threat model.
 successor now has a mainnet-verified initialization gate and direct conditional adapter plus an
 atomic caller-bound bundle factory. A pinned fork now exercises that factory through the real
 source, canonical Ethereum CTF, deployed Wrapped1155 factory, router, manager, and two
-official-PoolManager positions. The candidate spot manager and remaining configuration are recorded
-in `production-mainnet-dependency-manifest.md`, but are not yet a final selection. This therefore
-remains a no-funds prototype pending the remaining gates in `production-amm-successor.md`.
+official-PoolManager positions, including a real mainnet-v3 spot NFT. The pinned spot manager and
+remaining configuration are recorded in `production-mainnet-dependency-manifest.md`, but are not
+yet a final selection. This therefore remains a no-funds prototype pending the remaining gates in
+`production-amm-successor.md`.
 
 ## Goal
 

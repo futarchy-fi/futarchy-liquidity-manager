@@ -29,9 +29,6 @@ import {FutarchyConditionalRouter} from "../../src/routers/FutarchyConditionalRo
 import {FutarchyOfficialProposalSource} from "../../src/sources/FutarchyOfficialProposalSource.sol";
 import {MockFutarchyProposalLike} from "../mocks/MockFutarchyProposalLike.sol";
 import {MockMintableERC20} from "../mocks/MockMintableERC20.sol";
-import {
-    MockUniswapV3NonfungiblePositionManager
-} from "../mocks/MockUniswapV3NonfungiblePositionManager.sol";
 
 interface IMainnetConditionalTokens is IFutarchyConditionalTokens {
     function prepareCondition(address oracle, bytes32 questionId, uint256 outcomeSlotCount) external;
@@ -79,6 +76,12 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
     address private constant WRAPPED_1155_FACTORY = 0xD194319D1804C1051DD21Ba1Dc931cA72410B79f;
     bytes32 private constant WRAPPED_1155_FACTORY_CODEHASH =
         0x792e0ae192d66bc58541831991b449cd2ba502fe0053507d6c4493d8865371b6;
+    address private constant SPOT_POSITION_MANAGER = 0xC36442b4a4522E871399CD717aBDD847Ab11FE88;
+    bytes32 private constant SPOT_POSITION_MANAGER_CODEHASH =
+        0x692e658b31cbe3407682854806658d315d61a58c7e4933a2f91d383dc00736c6;
+    address private constant SPOT_FACTORY = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
+    bytes32 private constant SPOT_FACTORY_CODEHASH =
+        0x4d7b8525cd5d14343fa67a732fba5b24cddba11620ca88392f4ec6c52f91fd69;
 
     function testFork_factoryBundleCompletesRealCtfTwoPoolLifecycle() public {
         if (!vm.envOr("RUN_MAINNET_FORK_TESTS", false)) return;
@@ -88,6 +91,8 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         assertEq(POOL_MANAGER.codehash, POOL_MANAGER_CODEHASH);
         assertEq(CONDITIONAL_TOKENS.codehash, CONDITIONAL_TOKENS_CODEHASH);
         assertEq(WRAPPED_1155_FACTORY.codehash, WRAPPED_1155_FACTORY_CODEHASH);
+        assertEq(SPOT_POSITION_MANAGER.codehash, SPOT_POSITION_MANAGER_CODEHASH);
+        assertEq(SPOT_FACTORY.codehash, SPOT_FACTORY_CODEHASH);
 
         IMainnetConditionalTokens ctf = IMainnetConditionalTokens(CONDITIONAL_TOKENS);
         IFutarchyWrapped1155Factory wrapperFactory =
@@ -95,13 +100,20 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         FutarchyConditionalRouter router = new FutarchyConditionalRouter(ctf, wrapperFactory);
         MockMintableERC20 company = new MockMintableERC20("Company", "COMP");
         MockMintableERC20 collateral = new MockMintableERC20("Collateral", "COLL");
-        MockUniswapV3NonfungiblePositionManager spotPositionManager =
-            new MockUniswapV3NonfungiblePositionManager();
-        MainnetLifecycleSpotGuard guard =
-            new MainnetLifecycleSpotGuard(spotPositionManager.factory());
+        IUniswapV3NonfungiblePositionManager spotPositionManager =
+            IUniswapV3NonfungiblePositionManager(SPOT_POSITION_MANAGER);
+        assertEq(spotPositionManager.factory(), SPOT_FACTORY);
+        (address spotToken0, address spotToken1) = address(company) < address(collateral)
+            ? (address(company), address(collateral))
+            : (address(collateral), address(company));
+        address spotPool = spotPositionManager.createAndInitializePoolIfNecessary(
+            spotToken0, spotToken1, 500, uint160(1 << 96)
+        );
+        assertGt(spotPool.code.length, 0);
+        MainnetLifecycleSpotGuard guard = new MainnetLifecycleSpotGuard(SPOT_FACTORY);
 
         V4FutarchyLiquidityManagerFactory factory = new V4FutarchyLiquidityManagerFactory(
-            IUniswapV3NonfungiblePositionManager(address(spotPositionManager)),
+            spotPositionManager,
             IV4PoolManagerMinimal(POOL_MANAGER),
             POOL_MANAGER_CODEHASH,
             IFutarchyConditionalRouter(address(router)),
@@ -202,8 +214,8 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         assertEq(manager.conditionalNoLiquidity(), 0);
         assertEq(conditional.positionLiquidity(_pairKey(yesCompany, yesCollateral)), 0);
         assertEq(conditional.positionLiquidity(_pairKey(noCompany, noCollateral)), 0);
-        assertApproxEqAbs(company.balanceOf(address(manager)), AMOUNT * 80 / 100, 1);
-        assertApproxEqAbs(collateral.balanceOf(address(manager)), AMOUNT * 80 / 100, 1);
+        assertApproxEqAbs(company.balanceOf(address(manager)), AMOUNT * 80 / 100, 2);
+        assertApproxEqAbs(collateral.balanceOf(address(manager)), AMOUNT * 80 / 100, 2);
     }
 
     function _creationCodes()

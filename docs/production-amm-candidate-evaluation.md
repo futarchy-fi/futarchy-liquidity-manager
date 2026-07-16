@@ -100,9 +100,10 @@ with its own Foundry configuration and Solidity 0.8.26:
 - a full pinned-mainnet fixture deploys the caller-bound factory bundle, uses canonical Ethereum
   Conditional Tokens to split both base assets through the real router, atomically activates the
   real source and manager into two official-PoolManager positions, resolves through CTF, and removes
-  and redeems both positions with at most one wei of v4 rounding. It uses the deployed Ethereum
-  Wrapped1155 factory; only the spot tokens, guard, and position manager remain deterministic
-  stand-ins pending final production selection.
+  and redeems both positions. It also creates a spot pool, mints its NFT, and removes the migration
+  slice through the deployed mainnet Uniswap v3 position manager, while using the deployed Ethereum
+  Wrapped1155 factory. Combined v3/v4 rounding leaves at most two wei per base asset; only the spot
+  tokens and guard remain deterministic stand-ins pending final production selection.
 
 These fixtures validate the singleton and full outer-transaction architecture, but not the final
 spot manager, deployment addresses, calldata, or Safe batch. The pinned dependency evidence and
