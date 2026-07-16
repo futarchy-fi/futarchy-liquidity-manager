@@ -830,6 +830,71 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(noCurrency.balanceOf(bootstrapRecipient), 8 ether);
     }
 
+    function test_each_in_kind_outcome_transfer_failure_rolls_back_complete_redemption() public {
+        _bootstrap();
+        _activateProposal(true);
+        router.setMergeReverts(true);
+        address recipient = address(0xCAFE2);
+        address[6] memory tokens = [
+            address(company),
+            address(wrappedNative),
+            address(yesCompany),
+            address(noCompany),
+            address(yesCurrency),
+            address(noCurrency)
+        ];
+        uint256[6] memory managedBefore = _managedBalances(tokens);
+        uint256[6] memory routerBefore;
+        for (uint256 i; i < tokens.length; i++) {
+            routerBefore[i] = IERC20(tokens[i]).balanceOf(address(router));
+        }
+        uint256 spotRemoveCallsBefore = spotAdapter.removeDetailedCalls();
+        uint256 conditionalRemoveCallsBefore = conditionalAdapter.removeDetailedCalls();
+        IERC20[4] memory outcomeTokens = [
+            IERC20(address(yesCompany)),
+            IERC20(address(noCompany)),
+            IERC20(address(yesCurrency)),
+            IERC20(address(noCurrency))
+        ];
+        bytes memory payoutFault = abi.encodeWithSignature("Error(string)", "outcome payout fault");
+
+        for (uint256 faultIndex; faultIndex < outcomeTokens.length; faultIndex++) {
+            vm.mockCallRevert(
+                address(outcomeTokens[faultIndex]),
+                abi.encodeCall(IERC20.transfer, (recipient, 8 ether)),
+                payoutFault
+            );
+            vm.prank(bootstrapRecipient);
+            vm.expectRevert(payoutFault);
+            manager.redeem(10 ether, recipient, false);
+            _assertConditionalRedeemRollback(
+                recipient,
+                tokens,
+                managedBefore,
+                routerBefore,
+                spotRemoveCallsBefore,
+                conditionalRemoveCallsBefore
+            );
+            vm.clearMockedCalls();
+        }
+
+        vm.prank(bootstrapRecipient);
+        (uint256 companyOut, uint256 collateralOut) = manager.redeem(10 ether, recipient, false);
+
+        assertEq(companyOut, 2 ether);
+        assertEq(collateralOut, 2 ether);
+        assertEq(manager.totalSupply(), 90 ether);
+        assertEq(manager.balanceOf(bootstrapRecipient), 90 ether);
+        assertEq(manager.spotLiquidity(), 18 ether);
+        assertEq(manager.conditionalYesLiquidity(), 72 ether);
+        assertEq(manager.conditionalNoLiquidity(), 72 ether);
+        for (uint256 i = 2; i < tokens.length; i++) {
+            assertEq(IERC20(tokens[i]).balanceOf(recipient), 8 ether);
+        }
+        assertEq(company.balanceOf(recipient), 2 ether);
+        assertEq(wrappedNative.balanceOf(recipient), 2 ether);
+    }
+
     function test_conditional_redeem_falls_back_to_in_kind_when_merge_underpays() public {
         _bootstrap();
         _activateProposal(true);

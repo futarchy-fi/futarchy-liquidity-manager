@@ -87,6 +87,9 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   later faults also roll back the recipient's preceding company-token transfer, while rejected
   native delivery restores the burned WETH and native balances. Clearing the faults lets the
   identical native redemption succeed.
+- When both complete-set merges fall back to in-kind outcomes, independent faults on each of the
+  four wrapper transfers restore every earlier wrapper payment plus the complete redemption state.
+  Clearing the fault lets the identical exit pay the exact base and four-wrapper slice.
 - Independent executable rounding properties prove that floor-rounded share minting plus
   ceil-rounded accepted deposits cannot dilute either base asset, while floor-rounded liquidity,
   idle, and fee payouts cannot reduce the corresponding survivor claim per share. A direct unit
@@ -194,13 +197,13 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
   across nine randomized actions, while the two UniV3 invariants retain their stricter inline
   256-by-512 configuration (131,072 calls each). The final candidate must re-run this gate after
   its exact configuration is fixed.
-- The current 255-test instrumented suite also passes Foundry's coverage profile with `--ir-minimum`
+- The current 256-test instrumented suite also passes Foundry's coverage profile with `--ir-minimum`
   after excluding the production-profile-only artifact-hash assertion (coverage deliberately
   recompiles different bytecode). This flag is required because unoptimized instrumentation
   exceeds Solidity's stack limit. The manager reports 93.06%
   line, 91.20% statement, 67.65% branch, and 98.61% function coverage. Production compilation
   independently confirms a 24,171-byte manager runtime, 405 bytes below EIP-170.
-- The current 256-test normal suite includes direct emergency-handler reachability, ten
+- The current 257-test normal suite includes direct emergency-handler reachability, ten
   pinned-mainnet activation rollback cases, and a fifth invariant that requires executed emergency
   mode to leave every manager position at zero liquidity. Artifact drift, permissionless bundle
   interleaving, code-less PoolManager, and immutable spot-tick-policy checks remain green.
@@ -227,6 +230,7 @@ See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 | First or second official mainnet v4 initialization/liquidity | `testFork_firstRealV4InitializeFailureRollsBackAndRetrySucceeds`, `testFork_firstRealV4LiquidityFailureRollsBackAndRetrySucceeds`, `testFork_secondRealV4InitializeFailureRollsBackAndRetrySucceeds`, and `testFork_secondRealV4LiquidityFailureRollsBackAndRetrySucceeds` fault each deployed PoolManager boundary, prove prior live-stack effects and any pool initialization disappear, and retry the identical activation. |
 | Second conditional removal during proportional redemption | `testFork_lateRemovalRollbackThenCompanyMergeFailureRemainsRedeemable` completes the proportional YES removal before faulting the NO adapter boundary, then proves LP shares, both positions, spot identity, and all six holder/manager/PoolManager balances roll back. |
 | Canonical mainnet CTF merge during redemption | The identical retry in `testFork_lateRemovalRollbackThenCompanyMergeFailureRemainsRedeemable` faults the company merge, proves collateral still merges and exact YES/NO company wrappers are paid in kind, then redeems/consumes those wrappers after resolution and conserves both assets through survivor settlement and final exit. |
+| Any in-kind outcome transfer during proportional redemption | `test_each_in_kind_outcome_transfer_failure_rolls_back_complete_redemption` forces both merges into fallback, then independently faults each of the four exact wrapper transfers. Every case restores shares, spot/YES/NO liquidity, removal counters, managed/router custody, and any preceding wrapper payments before the identical retry pays the exact base and four-wrapper slice. |
 | Each final recipient payout path during proportional redemption | `test_each_final_payout_failure_rolls_back_complete_conditional_redemption` independently faults the exact company-token transfer, wrapped-collateral transfer, and native delivery after unwrap. Each occurs after spot/YES/NO removal, share burn, and both complete-set merges; the later faults occur after company payment, and native delivery also occurs after WETH withdrawal. Every case restores shares, liquidity, removal counters, and token/native custody before the identical native retry succeeds. |
 | Late canonical mainnet CTF merge during settlement | `testFork_lateRealSettlementMergeFailureRollsBackAndRetrySucceeds` proves both v4 removals and company merge/winner redemption execute before the collateral fault, compares captured binding/accounting plus actual protocol custody and positions, then completes the identical settlement after clearing the fault. |
 | Second conditional removal during emergency unwind | `testFork_outsiderEmergencyRollbackKeepsUnresolvedRedemptionLive` executes the first official-v4 removal before faulting the second adapter boundary, proves both positions, PoolManager/manager custody, accounting, shares, and the emergency flag roll back, then completes the identical outsider retry, unresolved shareholder redemption, and source-independent survivor settlement. |
