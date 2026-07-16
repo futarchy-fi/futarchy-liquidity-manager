@@ -145,8 +145,9 @@ with its own Foundry configuration and Solidity 0.8.26:
   unrelated account begins the delayed unwind. A fault at the second adapter removal restores the
   already removed first official-v4 position, both custody envelopes, manager accounting, shares,
   and the unexecuted emergency flag. The identical outsider retry receives no assets, reaches zero
-  position liquidity, settles canonical CTF after source-registry clearing, and leaves final
-  shareholder recovery within five wei per base asset.
+  position liquidity, and lets a one-third holder redeem against unresolved canonical CTF for
+  proportional base value within five wei and no outcome residue. The survivor settles after
+  source-registry clearing, and aggregate final recovery remains within five wei per base asset.
 - at pinned block gas limit 60,000,000, conservative transaction accounting charges 21,000 base
   gas and 16 gas for every calldata byte. The atomic five-child bundle costs 12,125,922 gas,
   source/CTF/two-pool activation costs 2,343,088 gas, the symmetric donated-fee partial

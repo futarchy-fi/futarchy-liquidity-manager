@@ -115,7 +115,7 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         _runLifecycle(true, false, ActivationFault.None, false, true);
     }
 
-    function testFork_outsiderEmergencyExitRollsBackSettlesAndPreservesAllShares() public {
+    function testFork_outsiderEmergencyRollbackKeepsUnresolvedRedemptionLive() public {
         _runLifecycle(true, false, ActivationFault.None, false, false, true);
     }
 
@@ -824,7 +824,10 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         address[4] memory outcomes
     ) private {
         address outsider = address(0xCAFE);
+        address emergencyHolder = address(0xD00D);
         uint256 supplyBefore = manager.totalSupply();
+        uint256 partialShares = supplyBefore / 3;
+        assertTrue(manager.transfer(emergencyHolder, partialShares));
         uint128 yesLiquidityBefore = manager.conditionalYesLiquidity();
         uint128 noLiquidityBefore = manager.conditionalNoLiquidity();
         uint256[6] memory outsiderBalancesBefore = [
@@ -878,6 +881,7 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         assertFalse(manager.emergencyExitExecuted());
         assertTrue(manager.emergencyExitReady());
         assertEq(manager.totalSupply(), supplyBefore);
+        assertEq(manager.balanceOf(emergencyHolder), partialShares);
         assertEq(manager.conditionalYesLiquidity(), yesLiquidityBefore);
         assertEq(manager.conditionalNoLiquidity(), noLiquidityBefore);
         assertEq(
@@ -914,6 +918,20 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         assertEq(company.balanceOf(outsider), outsiderBalancesBefore[0]);
         assertEq(collateral.balanceOf(outsider), outsiderBalancesBefore[1]);
 
+        vm.prank(emergencyHolder);
+        (uint256 partialCompanyOut, uint256 partialCollateralOut) =
+            manager.redeem(partialShares, emergencyHolder, false);
+        uint256 expectedPartialOut = (AMOUNT + DONATION) * partialShares / supplyBefore;
+        assertEq(manager.totalSupply(), supplyBefore - partialShares);
+        assertEq(manager.balanceOf(emergencyHolder), 0);
+        assertEq(company.balanceOf(emergencyHolder), partialCompanyOut);
+        assertEq(collateral.balanceOf(emergencyHolder), partialCollateralOut);
+        assertApproxEqAbs(partialCompanyOut, expectedPartialOut, 5);
+        assertApproxEqAbs(partialCollateralOut, expectedPartialOut, 5);
+        for (uint256 i; i < outcomes.length; ++i) {
+            assertEq(IERC20(outcomes[i]).balanceOf(emergencyHolder), 0);
+        }
+
         uint256[] memory payouts = new uint256[](2);
         payouts[0] = 1;
         ctf.reportPayouts(questionId, payouts);
@@ -926,17 +944,25 @@ contract V4FutarchyLiquidityManagerLifecycleMainnetForkTest is Test {
         assertFalse(manager.inConditionalMode());
         assertEq(manager.activeProposal(), address(0));
         assertEq(manager.activeConditionId(), bytes32(0));
-        assertEq(manager.totalSupply(), supplyBefore);
+        assertEq(manager.totalSupply(), supplyBefore - partialShares);
         assertEq(manager.spotLiquidity(), 0);
         for (uint256 i; i < outcomes.length; ++i) {
             assertEq(IERC20(outcomes[i]).balanceOf(address(manager)), 0);
             assertEq(IERC20(outcomes[i]).balanceOf(outsider), outsiderBalancesBefore[i + 2]);
         }
 
-        manager.redeem(supplyBefore, address(this), false);
+        manager.redeem(manager.balanceOf(address(this)), address(this), false);
         assertEq(manager.totalSupply(), 0);
-        assertApproxEqAbs(company.balanceOf(address(this)), AMOUNT + DONATION, 5);
-        assertApproxEqAbs(collateral.balanceOf(address(this)), AMOUNT + DONATION, 5);
+        assertApproxEqAbs(
+            company.balanceOf(address(this)) + company.balanceOf(emergencyHolder),
+            AMOUNT + DONATION,
+            5
+        );
+        assertApproxEqAbs(
+            collateral.balanceOf(address(this)) + collateral.balanceOf(emergencyHolder),
+            AMOUNT + DONATION,
+            5
+        );
         assertEq(company.balanceOf(address(manager)), 0);
         assertEq(collateral.balanceOf(address(manager)), 0);
         assertEq(company.balanceOf(outsider), outsiderBalancesBefore[0]);

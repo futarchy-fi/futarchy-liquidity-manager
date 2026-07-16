@@ -89,8 +89,9 @@ An emergency run accrues donations in both official-v4 positions, arms the delay
 an unrelated account begin the unwind. A fault at the second adapter removal restores the already
 removed first official-v4 position, PoolManager/manager custody, accounting, shares, and the
 unexecuted emergency flag. The identical outsider retry receives no assets, reaches zero position
-liquidity, settles canonical CTF after source-registry clearing, and leaves final shareholder
-recovery within five wei per base asset.
+liquidity, and lets a one-third holder redeem against unresolved canonical CTF for proportional
+base value within five wei and no outcome residue. The survivor settles after source-registry
+clearing, and aggregate final recovery remains within five wei per base asset.
 
 Nine rollback variants fault official-v3 spot principal removal, each canonical CTF split, wrapper
 conversion on each underlying, and each official-PoolManager initialization and first-liquidity
