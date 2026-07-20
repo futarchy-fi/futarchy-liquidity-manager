@@ -94,7 +94,7 @@ contract FutarchyLiquidityManagerFactoryTest is Test {
             factory.createLiquidityManager(
                 _createParams(_defaultValidationConfigData()), _creationCodes()
             );
-        assertLe(deployed.manager.code.length, 24_448);
+        assertLe(deployed.manager.code.length, 23_552);
     }
 
     function test_adapterBindingIsIrreversibleAndRestrictsLiquidityOperations() public {
