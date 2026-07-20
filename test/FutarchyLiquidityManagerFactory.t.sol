@@ -94,7 +94,7 @@ contract FutarchyLiquidityManagerFactoryTest is Test {
             factory.createLiquidityManager(
                 _createParams(_defaultValidationConfigData()), _creationCodes()
             );
-        assertLe(deployed.manager.code.length, 24_448);
+        assertLe(deployed.manager.code.length, 23_552);
     }
 
     function test_adapterBindingIsIrreversibleAndRestrictsLiquidityOperations() public {
@@ -251,8 +251,29 @@ contract FutarchyLiquidityManagerFactoryTest is Test {
     }
 
     function test_revertsWhenManagerInitCodeExceedsEip3860AndRollsBack() public {
-        FutarchyLiquidityManagerFactory.CreateParams memory params = _createParams("");
-        params.lpTokenName = new string(24_000);
+        FutarchyLiquidityManagerFactory.CreateParams memory params =
+            _createParams(_defaultValidationConfigData());
+        bytes memory constructorArgsWithoutName = abi.encode(
+            params.bootstrapRecipient,
+            params.companyToken,
+            wrappedNative,
+            address(0),
+            address(0),
+            address(0),
+            conditionalRouter,
+            stabilityGuard,
+            params.owner,
+            FutarchyLiquidityManager.LpTokenMetadata({name: "", symbol: params.lpTokenSymbol})
+        );
+        uint256 fixedConstructorArgsLength = constructorArgsWithoutName.length;
+        uint256 baseInitCodeSize =
+            type(FutarchyLiquidityManager).creationCode.length + fixedConstructorArgsLength;
+        uint256 minimumInitCodeSize = factory.MAX_INIT_CODE_SIZE() + 1024;
+        uint256 nameLength =
+            minimumInitCodeSize > baseInitCodeSize ? minimumInitCodeSize - baseInitCodeSize : 0;
+        params.lpTokenName = new string(nameLength);
+        uint256 paddedNameLength = (nameLength + 31) / 32 * 32;
+        assertGe(baseInitCodeSize + paddedNameLength, minimumInitCodeSize);
         uint64 nonceBefore = vm.getNonce(address(factory));
         address wouldBeProposalSource = vm.computeCreateAddress(address(factory), nonceBefore);
 

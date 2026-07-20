@@ -303,6 +303,17 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         token.safeApprove(spender, value);
     }
 
+    function _balanceOf(IERC20 token, address account) internal view returns (uint256 amount) {
+        assembly ("memory-safe") {
+            let ptr := mload(0x40)
+            mstore(ptr, shl(224, 0x70a08231))
+            mstore(add(ptr, 4), account)
+            if iszero(staticcall(gas(), token, ptr, 36, ptr, 32)) { revert(0, 0) }
+            if lt(returndatasize(), 32) { revert(0, 0) }
+            amount := mload(ptr)
+        }
+    }
+
     /// @notice Initializes first spot liquidity and mints all initial shares to the bootstrap
     /// recipient. The adapter's immutable execution policy is used.
     function initializeFromBootstrap(uint256 companyAmount)
@@ -376,8 +387,8 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
 
         _consolidateVault();
         uint256 supply = totalSupply();
-        uint256 companyBefore = COMPANY_TOKEN.balanceOf(address(this));
-        uint256 collateralBefore = WRAPPED_NATIVE.balanceOf(address(this));
+        uint256 companyBefore = _balanceOf(COMPANY_TOKEN, address(this));
+        uint256 collateralBefore = _balanceOf(WRAPPED_NATIVE, address(this));
         if (companyBefore == 0 || collateralBefore == 0) revert InvalidDepositRatio();
 
         sharesMinted = _min(
@@ -403,23 +414,23 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         bool wrapNativeCollateral
     ) internal {
         if (companyAmount > 0) {
-            uint256 companyBefore = COMPANY_TOKEN.balanceOf(address(this));
+            uint256 companyBefore = _balanceOf(COMPANY_TOKEN, address(this));
             COMPANY_TOKEN.safeTransferFrom(msg.sender, address(this), companyAmount);
-            if (COMPANY_TOKEN.balanceOf(address(this)) - companyBefore != companyAmount) {
+            if (_balanceOf(COMPANY_TOKEN, address(this)) - companyBefore != companyAmount) {
                 revert InvalidAssetTransfer();
             }
         }
 
         if (collateralAmount == 0) return;
 
-        uint256 collateralBefore = WRAPPED_NATIVE.balanceOf(address(this));
+        uint256 collateralBefore = _balanceOf(WRAPPED_NATIVE, address(this));
         if (wrapNativeCollateral) {
             WRAPPED_NATIVE.deposit{value: collateralAmount}();
         } else {
             IERC20(address(WRAPPED_NATIVE))
                 .safeTransferFrom(msg.sender, address(this), collateralAmount);
         }
-        if (WRAPPED_NATIVE.balanceOf(address(this)) - collateralBefore != collateralAmount) {
+        if (_balanceOf(WRAPPED_NATIVE, address(this)) - collateralBefore != collateralAmount) {
             revert InvalidAssetTransfer();
         }
     }
@@ -696,10 +707,10 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         // assets remain idle and share-owned until a separately safe spot join is available.
         _recoverIdleOutcomeBalances(yesWins);
         if (
-            IERC20(_capturedYesCompanyToken).balanceOf(address(this)) != 0
-                || IERC20(_capturedNoCompanyToken).balanceOf(address(this)) != 0
-                || IERC20(_capturedYesCurrencyToken).balanceOf(address(this)) != 0
-                || IERC20(_capturedNoCurrencyToken).balanceOf(address(this)) != 0
+            _balanceOf(IERC20(_capturedYesCompanyToken), address(this)) != 0
+                || _balanceOf(IERC20(_capturedNoCompanyToken), address(this)) != 0
+                || _balanceOf(IERC20(_capturedYesCurrencyToken), address(this)) != 0
+                || _balanceOf(IERC20(_capturedNoCurrencyToken), address(this)) != 0
         ) revert IncompleteOutcomeRecovery();
 
         emit LiquidityMigratedBackToSpot(uint256(_capturedProposalId), condLiq, 0);
@@ -825,14 +836,14 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         address token1,
         uint128 liquidity
     ) internal returns (uint256 amount0, uint256 amount1) {
-        uint256 balance0Before = IERC20(token0).balanceOf(address(this));
-        uint256 balance1Before = IERC20(token1).balanceOf(address(this));
+        uint256 balance0Before = _balanceOf(IERC20(token0), address(this));
+        uint256 balance1Before = _balanceOf(IERC20(token1), address(this));
         IFutarchyLiquidityAdapter.Removal memory removed =
             adapter.removeLiquidityDetailed(token0, token1, liquidity);
         amount0 = removed.principal0 + removed.fees0;
         amount1 = removed.principal1 + removed.fees1;
-        uint256 balance0After = IERC20(token0).balanceOf(address(this));
-        uint256 balance1After = IERC20(token1).balanceOf(address(this));
+        uint256 balance0After = _balanceOf(IERC20(token0), address(this));
+        uint256 balance1After = _balanceOf(IERC20(token1), address(this));
         if (
             balance0After < balance0Before || balance1After < balance1Before
                 || balance0After - balance0Before != amount0
@@ -859,8 +870,8 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     }
 
     function _restoreSpotLiquidity() internal {
-        uint256 companyAmount = COMPANY_TOKEN.balanceOf(address(this));
-        uint256 collateralAmount = WRAPPED_NATIVE.balanceOf(address(this));
+        uint256 companyAmount = _balanceOf(COMPANY_TOKEN, address(this));
+        uint256 collateralAmount = _balanceOf(WRAPPED_NATIVE, address(this));
         if (companyAmount > 0 && collateralAmount > 0) {
             _assertSpotPoolStable();
             _addToSpot(companyAmount, collateralAmount, "");
@@ -946,17 +957,17 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         view
         returns (VaultAmounts memory amounts)
     {
-        amounts.company = _shareOf(COMPANY_TOKEN.balanceOf(address(this)), shares, supply);
-        amounts.collateral = _shareOf(WRAPPED_NATIVE.balanceOf(address(this)), shares, supply);
+        amounts.company = _shareOf(_balanceOf(COMPANY_TOKEN, address(this)), shares, supply);
+        amounts.collateral = _shareOf(_balanceOf(WRAPPED_NATIVE, address(this)), shares, supply);
         if (!inConditionalMode) return amounts;
         amounts.outcomes.yesCompany =
-            _shareOf(IERC20(_capturedYesCompanyToken).balanceOf(address(this)), shares, supply);
+            _shareOf(_balanceOf(IERC20(_capturedYesCompanyToken), address(this)), shares, supply);
         amounts.outcomes.noCompany =
-            _shareOf(IERC20(_capturedNoCompanyToken).balanceOf(address(this)), shares, supply);
+            _shareOf(_balanceOf(IERC20(_capturedNoCompanyToken), address(this)), shares, supply);
         amounts.outcomes.yesCurrency =
-            _shareOf(IERC20(_capturedYesCurrencyToken).balanceOf(address(this)), shares, supply);
+            _shareOf(_balanceOf(IERC20(_capturedYesCurrencyToken), address(this)), shares, supply);
         amounts.outcomes.noCurrency =
-            _shareOf(IERC20(_capturedNoCurrencyToken).balanceOf(address(this)), shares, supply);
+            _shareOf(_balanceOf(IERC20(_capturedNoCurrencyToken), address(this)), shares, supply);
     }
 
     function _mergeRedeemSlice(OutcomeAmounts memory amounts)
@@ -998,16 +1009,16 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
             address(COMPANY_TOKEN),
             _capturedYesCompanyToken,
             _capturedNoCompanyToken,
-            IERC20(_capturedYesCompanyToken).balanceOf(address(this)),
-            IERC20(_capturedNoCompanyToken).balanceOf(address(this)),
+            _balanceOf(IERC20(_capturedYesCompanyToken), address(this)),
+            _balanceOf(IERC20(_capturedNoCompanyToken), address(this)),
             yesWins
         );
         _recoverOutcomeAmounts(
             address(WRAPPED_NATIVE),
             _capturedYesCurrencyToken,
             _capturedNoCurrencyToken,
-            IERC20(_capturedYesCurrencyToken).balanceOf(address(this)),
-            IERC20(_capturedNoCurrencyToken).balanceOf(address(this)),
+            _balanceOf(IERC20(_capturedYesCurrencyToken), address(this)),
+            _balanceOf(IERC20(_capturedNoCurrencyToken), address(this)),
             yesWins
         );
     }
@@ -1032,16 +1043,16 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         if (redeemAmount > 0) {
             IERC20 collateral = IERC20(collateralToken);
             IERC20 winner = IERC20(winningToken);
-            uint256 collateralBefore = collateral.balanceOf(address(this));
-            uint256 winnerBefore = winner.balanceOf(address(this));
+            uint256 collateralBefore = _balanceOf(collateral, address(this));
+            uint256 winnerBefore = _balanceOf(winner, address(this));
             _forceApprove(winner, address(CONDITIONAL_ROUTER), redeemAmount);
             CONDITIONAL_ROUTER.redeemPositions(
                 collateralToken, _capturedConditionId, yesToken, noToken, redeemAmount
             );
             _forceApprove(winner, address(CONDITIONAL_ROUTER), 0);
             if (
-                collateral.balanceOf(address(this)) - collateralBefore != redeemAmount
-                    || winnerBefore - winner.balanceOf(address(this)) != redeemAmount
+                _balanceOf(collateral, address(this)) - collateralBefore != redeemAmount
+                    || winnerBefore - _balanceOf(winner, address(this)) != redeemAmount
             ) revert IncompleteOutcomeRecovery();
         }
 
@@ -1049,13 +1060,13 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         address losingToken = yesWins ? noToken : yesToken;
         if (losingAmount > 0) {
             IERC20 loser = IERC20(losingToken);
-            uint256 losingBefore = loser.balanceOf(address(this));
+            uint256 losingBefore = _balanceOf(loser, address(this));
             _forceApprove(loser, address(CONDITIONAL_ROUTER), losingAmount);
             CONDITIONAL_ROUTER.consumeLosingPositions(
                 collateralToken, _capturedConditionId, yesToken, noToken, losingAmount
             );
             _forceApprove(loser, address(CONDITIONAL_ROUTER), 0);
-            if (losingBefore - loser.balanceOf(address(this)) != losingAmount) {
+            if (losingBefore - _balanceOf(loser, address(this)) != losingAmount) {
                 revert IncompleteOutcomeRecovery();
             }
         }
@@ -1070,9 +1081,9 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         IERC20 collateral = IERC20(collateralToken);
         IERC20 yes = IERC20(yesToken);
         IERC20 no = IERC20(noToken);
-        uint256 collateralBefore = collateral.balanceOf(address(this));
-        uint256 yesBefore = yes.balanceOf(address(this));
-        uint256 noBefore = no.balanceOf(address(this));
+        uint256 collateralBefore = _balanceOf(collateral, address(this));
+        uint256 yesBefore = _balanceOf(yes, address(this));
+        uint256 noBefore = _balanceOf(no, address(this));
         _forceApprove(yes, address(CONDITIONAL_ROUTER), amount);
         _forceApprove(no, address(CONDITIONAL_ROUTER), amount);
         CONDITIONAL_ROUTER.mergePositions(
@@ -1081,9 +1092,9 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         _forceApprove(yes, address(CONDITIONAL_ROUTER), 0);
         _forceApprove(no, address(CONDITIONAL_ROUTER), 0);
         if (
-            collateral.balanceOf(address(this)) - collateralBefore != amount
-                || yesBefore - yes.balanceOf(address(this)) != amount
-                || noBefore - no.balanceOf(address(this)) != amount
+            _balanceOf(collateral, address(this)) - collateralBefore != amount
+                || yesBefore - _balanceOf(yes, address(this)) != amount
+                || noBefore - _balanceOf(no, address(this)) != amount
         ) revert IncompleteOutcomeRecovery();
     }
 
@@ -1106,7 +1117,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         for (uint256 i; i < tokens.length;) {
             IERC20 token = IERC20(tokens[i]);
             if (address(token) != address(0)) {
-                uint256 balance = token.balanceOf(address(this));
+                uint256 balance = _balanceOf(token, address(this));
                 if (balance != 0) _transferExact(token, recipient, balance);
             }
             unchecked {
@@ -1224,11 +1235,11 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     }
 
     function _transferExact(IERC20 token, address recipient, uint256 amount) internal {
-        uint256 balanceBefore = token.balanceOf(recipient);
+        uint256 balanceBefore = _balanceOf(token, recipient);
         token.safeTransfer(recipient, amount);
         unchecked {
             // A valid ERC20 balance plus a transfer cannot exceed its total supply.
-            if (token.balanceOf(recipient) != balanceBefore + amount) {
+            if (_balanceOf(token, recipient) != balanceBefore + amount) {
                 revert InvalidAssetTransfer();
             }
         }
@@ -1244,12 +1255,12 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     {
         _sweepActiveOutcomeTokensTo(BOOTSTRAP_RECIPIENT);
 
-        companySentToBootstrap = COMPANY_TOKEN.balanceOf(address(this));
+        companySentToBootstrap = _balanceOf(COMPANY_TOKEN, address(this));
         if (companySentToBootstrap > 0) {
             _transferExact(COMPANY_TOKEN, BOOTSTRAP_RECIPIENT, companySentToBootstrap);
         }
 
-        uint256 collateralBalance = WRAPPED_NATIVE.balanceOf(address(this));
+        uint256 collateralBalance = _balanceOf(WRAPPED_NATIVE, address(this));
         if (collateralBalance > 0) {
             if (unwrapNative) {
                 WRAPPED_NATIVE.withdraw(collateralBalance);

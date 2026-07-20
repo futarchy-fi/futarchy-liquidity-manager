@@ -26,9 +26,10 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   against the official v3 factory. `AlgebraPoolStabilityGuard` remains legacy prototype scope.
 - `FutarchyLiquidityManagerFactory`: permissionless atomic bundle deployer pinned to immutable bare
   creation-code hashes and shared protocol dependencies.
-- `V4InitializationGate`: partial Ethereum-mainnet successor seam. It reserves pool initialization
-  for one irreversibly bound adapter and deliberately exposes no liquidity callbacks. The v4
-  bundle factory deploys it at the mined address and binds it in the same transaction.
+- `V4InitializationGate`: initialization seam for the implemented Ethereum-mainnet candidate. It
+  reserves pool initialization for one irreversibly bound adapter and deliberately exposes no
+  liquidity callbacks. The v4 bundle factory deploys it at the mined address and binds it in the
+  same transaction.
 - `V4ConditionalLiquidityAdapter`: manager-bound direct v4 position owner. It atomically initializes
   and adds a fresh full-range position, settles exact PoolManager deltas, separates fee pokes from
   principal removal, and rejects dependency-codehash or fee-report drift. A pinned full-mainnet

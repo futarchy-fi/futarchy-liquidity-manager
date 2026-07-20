@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {FutarchyLiquidityManager, IWrappedNative} from "../src/core/FutarchyLiquidityManager.sol";
 import {MockConditionalRouter} from "./mocks/MockConditionalRouter.sol";
@@ -79,6 +80,23 @@ contract FutarchyLiquidityManagerAdapterSafetyTest is Test {
         vm.expectRevert(FutarchyLiquidityManager.AdapterOverusedInput.selector);
         manager.initializeFromBootstrap{value: 1 ether}(1 ether);
         vm.stopPrank();
+    }
+
+    function test_balance_read_rejects_short_return_data_atomically() public {
+        vm.mockCall(
+            address(company),
+            abi.encodeWithSelector(IERC20.balanceOf.selector, address(manager)),
+            hex"01"
+        );
+
+        vm.startPrank(bootstrapRecipient);
+        company.approve(address(manager), type(uint256).max);
+        vm.expectRevert();
+        manager.initializeFromBootstrap{value: 1 ether}(1 ether);
+        vm.stopPrank();
+
+        assertFalse(manager.initializedFromBootstrap());
+        assertEq(company.balanceOf(bootstrapRecipient), 10 ether);
     }
 
     function test_bootstrap_rejects_fee_on_transfer_assets() public {

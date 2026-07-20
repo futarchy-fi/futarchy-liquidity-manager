@@ -4,10 +4,10 @@
 
 FAO production now targets Ethereum mainnet, not Gnosis Chain. Ethereum has an official Uniswap v4
 deployment, so the prior missing-deployment blocker is superseded. Uniswap v4 with an immutable
-initialization-only hook is selected for implementation. The repository now contains the gate and
-manager-bound direct conditional adapter plus an atomic caller-bound CREATE2 bundle factory, but
-not the final production dependency manifest, exact-config rehearsal, or external review. Do not
-sign a deployment batch or fund this path until those gates pass.
+initialization-only hook is the implemented candidate. The repository contains the gate,
+manager-bound direct conditional adapter, atomic caller-bound CREATE2 bundle factory, and draft
+dependency manifest, but not the final exact-config rehearsal or external review. Do not sign a
+deployment batch or fund this path until those gates pass.
 
 ## Candidate decision
 
@@ -17,7 +17,7 @@ sign a deployment batch or fund this path until those gates pass.
 | Canonical Uniswap v3 | No; its permissionless factory has the same precreation veto | Yes | No | Rejected |
 | Private v3/Algebra factory | Possible | Depends on the fork | Yes | Rejected as the larger custom-core path |
 | New constant-product AMM | Possible | Possible | Yes | Rejected; it invents different inventory/price and fee semantics |
-| Official Ethereum Uniswap v4 plus initialization-only hook | Yes | Yes | No | Selected, implementation incomplete |
+| Official Ethereum Uniswap v4 plus initialization-only hook | Yes | Yes | No | Implemented candidate; final config and review pending |
 
 The v4 design is the smallest candidate that does not require inventing or forking an AMM. A pool
 key includes its hook, and `beforeInitialize` receives the original caller. The committed
@@ -160,6 +160,8 @@ with its own Foundry configuration and Solidity 0.8.26:
   redemption costs 1,460,745 gas, the asymmetric in-kind case costs 1,487,553 gas, and the
   canonical-merge-failure fallback costs 1,417,015 gas by that upper bound. Each is asserted below
   half the actual block limit, leaving more than 30,000,000 gas of explicit headroom.
+- the manager creation/runtime sizes are 22,091/19,821 bytes. Runtime remains 4,755 bytes below
+  EIP-170 and 3,731 bytes below the enforced one-kibibyte-reserve target of 23,552 bytes.
 - the expanded deep invariant command passes with five manager invariants executing 128,000 calls
   each across deposit, activation, fee, donation, redemption, settlement, and emergency actions;
   two UniV3 invariants execute 131,072 calls each. All complete with zero reverts. This is current
@@ -215,4 +217,5 @@ legal review remains a real-funds gate; this document is an engineering analysis
    repeat the now-passing source/CTF/two-pool manager lifecycle with those exact addresses.
 4. Complete independent contract and role review before funding.
 
-Until then, both the committed Algebra path and the partial v4 path remain no-funds prototypes.
+Until then, both the committed Algebra path and the implemented v4 candidate remain no-funds
+prototypes.

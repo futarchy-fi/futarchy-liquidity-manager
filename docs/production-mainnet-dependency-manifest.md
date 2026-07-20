@@ -41,7 +41,7 @@ hash. Under that exact profile, the bare creation-code hashes are:
 | `UniswapV3LiquidityAdapter` | `0xe4ede15bf37a793e628f367d45282a9df1241b3cc401e0d8ee896a055ac40843` |
 | `V4InitializationGate` | `0x56052e89d8d3305ab4d3c35922882faee512c39fe45102cc0dec86bf7e57f75f` |
 | `V4ConditionalLiquidityAdapter` | `0x1333c00b08fb2d31f53d11465292f8b869455d8020bd0489059e3e7a3a7af2e3` |
-| `FutarchyLiquidityManager` | `0x530508cbc317688dadfc8711e4bfff2fb23a0b9b5f378eb613c0ca570157e846` |
+| `FutarchyLiquidityManager` | `0x1848c1aa5bad1910ab52912e4b50a216a165812e6c16b0f449723dcc8a62aa16` |
 | `V4FutarchyLiquidityManagerFactory` | `0xe6df50aabe5258cd3d084046eb8b3573cad874c50e7aa721257e033374497440` |
 
 `test_candidateCreationCodeHashesMatchMainnetManifest` fails on any artifact drift. These are

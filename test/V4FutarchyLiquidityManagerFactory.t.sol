@@ -214,7 +214,7 @@ contract V4FutarchyLiquidityManagerFactoryTest is Test {
         );
         assertEq(
             keccak256(type(FutarchyLiquidityManager).creationCode),
-            0x530508cbc317688dadfc8711e4bfff2fb23a0b9b5f378eb613c0ca570157e846
+            0x1848c1aa5bad1910ab52912e4b50a216a165812e6c16b0f449723dcc8a62aa16
         );
         assertEq(
             keccak256(type(V4FutarchyLiquidityManagerFactory).creationCode),
