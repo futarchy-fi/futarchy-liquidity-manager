@@ -4,6 +4,13 @@ The Swapr Algebra implementation is a no-funds prototype. A production successor
 atomic proposal and proportional-redemption model without inheriting its pool-precreation veto,
 mutable burn cooldown, or narrow gas margin.
 
+## Operator-custody Gnosis configs
+
+The no-funds rule remains for public-LP configs. It is lifted only for Gnosis configs whose
+depositor gate has been verified on-chain as operator-only, with the operator Safe as sole
+depositor. That limited operator-custody exception leaves the public-LP production-successor and
+Ethereum v4 conclusions unchanged.
+
 The current candidate disposition and release blockers are recorded in
 `production-amm-candidate-evaluation.md`.
 

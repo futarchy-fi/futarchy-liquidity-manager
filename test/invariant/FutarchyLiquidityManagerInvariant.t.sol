@@ -391,7 +391,7 @@ contract FutarchyLiquidityManagerInvariantTest is StdInvariant, Test {
 
     function test_handlerReachesAtomicActivationAndSettlement() public {
         handler.depositToSpot(1 ether, 1 ether);
-        assertEq(handler.successfulDeposits(), 1);
+        assertEq(handler.successfulDeposits(), 0);
 
         handler.migrateToConditional();
         assertEq(handler.migrations(), 1);

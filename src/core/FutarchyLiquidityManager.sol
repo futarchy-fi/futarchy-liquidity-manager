@@ -370,6 +370,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         uint256 collateralAmount,
         bool wrapNativeCollateral
     ) internal returns (uint256 sharesMinted) {
+        _assertOnlyBootstrap();
         _assertNotEmergencyMode();
         _prepareInitializedOperation();
         if (inConditionalMode) revert DepositsDisabledInConditionalMode();

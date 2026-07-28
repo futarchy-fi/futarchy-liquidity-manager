@@ -6,6 +6,15 @@ a mutable liquidity cooldown and third-party dust mints can then block position 
 See `atomic-lifecycle-amendment.md`, `production-amm-successor.md`,
 `production-amm-candidate-evaluation.md`, and `operations.md`.
 
+## Operator-custody Gnosis configs
+
+The no-funds prohibition remains in force for public-LP configurations: public shareholders still
+require administrator-independent removal and redemption. It is lifted only for a Gnosis config
+whose depositor gate has been verified on-chain to admit the operator Safe as the sole depositor.
+That operator-custody exception exposes only funds controlled by the same Safe that owns the
+emergency powers; it does not make the Swapr Algebra path suitable for public LPs. This scoped
+amendment does not change the Ethereum v4 conclusions below.
+
 ## Evidence available now
 
 - The proposal source validates one proposal snapshot and atomically activates the manager. A

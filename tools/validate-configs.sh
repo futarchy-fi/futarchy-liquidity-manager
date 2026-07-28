@@ -72,6 +72,25 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 1
 fi
 
+COMPROMISED_KEY='0x693e3fb46bb36ee43c702fe94f9463df0691b43d'
+QUARANTINE_DIR='config/quarantine'
+
+require_no_compromised_key() {
+  local file="$1"
+  if grep -qi "$COMPROMISED_KEY" "$file"; then
+    echo "config validation failed (${file}): contains compromised key ${COMPROMISED_KEY}" >&2
+    exit 1
+  fi
+}
+
+if [[ -d "$QUARANTINE_DIR" ]]; then
+  echo "config validation skipped quarantined configs: $QUARANTINE_DIR"
+fi
+
+while IFS= read -r -d '' file; do
+  require_no_compromised_key "$file"
+done < <(find config -type f -name '*.json' ! -path "$QUARANTINE_DIR/*" -print0)
+
 require_jq() {
   local file="$1"
   local filter="$2"
@@ -377,6 +396,7 @@ batch_strict_filter='
 
 if [[ ${#DEPLOY_FILES[@]} -gt 0 ]]; then
   for file in "${DEPLOY_FILES[@]}"; do
+    require_no_compromised_key "$file"
     require_jq "$file" "$deploy_schema_filter" "deployment config schema is invalid"
     if [[ "$ALLOW_PLACEHOLDERS" == false ]]; then
       require_jq "$file" "$deploy_strict_filter" \
@@ -388,6 +408,7 @@ fi
 
 if [[ ${#V4_FACTORY_FILES[@]} -gt 0 ]]; then
   for file in "${V4_FACTORY_FILES[@]}"; do
+    require_no_compromised_key "$file"
     require_jq "$file" "$v4_factory_schema_filter" "v4 mainnet factory config schema is invalid"
     if [[ "$ALLOW_PLACEHOLDERS" == false ]]; then
       require_jq "$file" "$v4_factory_strict_filter" \
@@ -399,6 +420,7 @@ fi
 
 if [[ ${#BATCH_FILES[@]} -gt 0 ]]; then
   for file in "${BATCH_FILES[@]}"; do
+    require_no_compromised_key "$file"
     require_jq "$file" "$batch_schema_filter" "batch config schema is invalid"
     if [[ "$ALLOW_PLACEHOLDERS" == false ]]; then
       require_jq "$file" "$batch_strict_filter" \

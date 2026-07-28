@@ -34,6 +34,17 @@ contract AlgebraPoolStabilityGuardTest is Test {
         guard.assertStable(address(pool));
     }
 
+    function test_assertStable_reverts_when_liquidity_cooldown_is_armed() public {
+        pool.setLiquidityCooldown(1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                AlgebraPoolStabilityGuard.LiquidityCooldownActive.selector, address(pool), uint32(1)
+            )
+        );
+        guard.assertStable(address(pool));
+    }
+
     function test_assertStablePair_resolves_unordered_pair() public view {
         guard.assertStablePair(TOKEN_B, TOKEN_A);
     }

@@ -1,4 +1,6 @@
 {
+  "quarantined": true,
+  "quarantineReason": "Contains compromised key 0x693E3FB46Bb36eE43C702FE94f9463df0691b43d.",
   "chainId": 100,
   "organization": "0xEB2AEC308e7B3340Dea2E89d40187D2637C6c649",
   "factory": "0x0000000000000000000000000000000000000000",

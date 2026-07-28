@@ -508,8 +508,10 @@ contract FutarchyLiquidityManagerTest is Test {
         yesCompany.mint(address(manager), 20 ether);
         company.mint(address(router), 20 ether);
 
-        vm.prank(depositor);
+        vm.startPrank(bootstrapRecipient);
         uint256 minted = manager.depositToSpot{value: 100 ether}(120 ether);
+        manager.transfer(depositor, minted);
+        vm.stopPrank();
 
         assertEq(minted, 100 ether);
         assertEq(yesCompany.balanceOf(address(manager)), 0);
@@ -628,8 +630,10 @@ contract FutarchyLiquidityManagerTest is Test {
 
     function test_spot_redeem_is_proportional_across_principal_fees_and_idle() public {
         _bootstrap();
-        vm.prank(depositor);
+        vm.startPrank(bootstrapRecipient);
         manager.depositToSpot{value: 100 ether}(100 ether);
+        manager.transfer(depositor, 100 ether);
+        vm.stopPrank();
         _accruePairFees(spotAdapter, company, wrappedNative, 20 ether, 40 ether);
         spotAdapter.setMisclassifyRemoveOutput(true);
         company.mint(address(manager), 10 ether);
@@ -786,8 +790,10 @@ contract FutarchyLiquidityManagerTest is Test {
 
     function test_conditional_redeem_is_proportional_without_add_or_guard() public {
         _bootstrap();
-        vm.prank(depositor);
+        vm.startPrank(bootstrapRecipient);
         manager.depositToSpot{value: 100 ether}(100 ether);
+        manager.transfer(depositor, 100 ether);
+        vm.stopPrank();
         _activateProposal(true);
 
         _accruePairFees(conditionalAdapter, yesCompany, yesCurrency, 4 ether, 8 ether);
@@ -1098,24 +1104,54 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(manager.totalSupply(), 0);
     }
 
-    function test_deposit_mints_proportional_shares() public {
+    function test_only_bootstrap_can_use_both_deposit_variants() public {
         _bootstrap();
 
         vm.prank(depositor);
+        vm.expectRevert(FutarchyLiquidityManager.OnlyBootstrapRecipient.selector);
+        manager.depositToSpot{value: 50 ether}(50 ether);
+
+        vm.prank(depositor);
+        vm.expectRevert(FutarchyLiquidityManager.OnlyBootstrapRecipient.selector);
+        manager.depositToSpot(50 ether, 50 ether);
+
+        vm.prank(bootstrapRecipient);
         uint256 sharesMinted = manager.depositToSpot{value: 50 ether}(50 ether);
 
         assertEq(sharesMinted, 50 ether);
-        assertEq(manager.balanceOf(depositor), 50 ether);
+        assertEq(manager.balanceOf(bootstrapRecipient), 150 ether);
         assertEq(manager.totalSupply(), 150 ether);
         assertEq(manager.spotLiquidity(), 150 ether);
+
+        wrappedNative.mint(bootstrapRecipient, 50 ether);
+        vm.startPrank(bootstrapRecipient);
+        wrappedNative.approve(address(manager), 50 ether);
+        sharesMinted = manager.depositToSpot(50 ether, 50 ether);
+        vm.stopPrank();
+        assertEq(sharesMinted, 50 ether);
+        assertEq(manager.balanceOf(bootstrapRecipient), 200 ether);
     }
 
-    function test_single_leg_donation_before_first_public_deposit_cannot_inflate_shares() public {
+    function test_existing_shareholder_can_redeem_after_deposit_gate() public {
+        _bootstrap();
+        vm.prank(bootstrapRecipient);
+        manager.transfer(depositor, 50 ether);
+
+        vm.prank(depositor);
+        (uint256 companyOut, uint256 collateralOut) = manager.redeem(50 ether, depositor, false);
+
+        assertEq(companyOut, 50 ether);
+        assertEq(collateralOut, 50 ether);
+    }
+
+    function test_single_leg_donation_before_first_operator_deposit_cannot_inflate_shares() public {
         _bootstrap();
         company.mint(address(manager), 100 ether);
 
-        vm.prank(depositor);
+        vm.startPrank(bootstrapRecipient);
         uint256 sharesMinted = manager.depositToSpot{value: 100 ether}(100 ether);
+        manager.transfer(depositor, sharesMinted);
+        vm.stopPrank();
 
         assertEq(sharesMinted, 50 ether);
         assertEq(manager.balanceOf(depositor), 50 ether);
@@ -1136,8 +1172,10 @@ contract FutarchyLiquidityManagerTest is Test {
 
     function test_fees_and_donations_after_partial_redemption_belong_to_survivors() public {
         _bootstrap();
-        vm.prank(depositor);
+        vm.startPrank(bootstrapRecipient);
         manager.depositToSpot{value: 100 ether}(100 ether);
+        manager.transfer(depositor, 100 ether);
+        vm.stopPrank();
 
         vm.prank(bootstrapRecipient);
         (uint256 firstCompany, uint256 firstCollateral) =
@@ -1217,14 +1255,15 @@ contract FutarchyLiquidityManagerTest is Test {
         erc20Manager.initializeFromBootstrap(SEED_COMPANY, SEED_NATIVE);
         vm.stopPrank();
 
-        collateral.mint(depositor, 1000 ether);
-        vm.startPrank(depositor);
-        company.approve(address(erc20Manager), type(uint256).max);
-        collateral.approve(address(erc20Manager), type(uint256).max);
+        collateral.mint(bootstrapRecipient, 50 ether);
+        vm.startPrank(bootstrapRecipient);
         uint256 sharesMinted = erc20Manager.depositToSpot(50 ether, 50 ether);
+        erc20Manager.transfer(depositor, sharesMinted);
+        vm.stopPrank();
+
+        vm.prank(depositor);
         (uint256 companyOut, uint256 collateralOut) =
             erc20Manager.redeem(25 ether, depositor, false);
-        vm.stopPrank();
 
         assertEq(sharesMinted, 50 ether);
         assertEq(companyOut, 25 ether);
@@ -1236,7 +1275,7 @@ contract FutarchyLiquidityManagerTest is Test {
         _registerProposal(true);
         manager.armEmergencyExit();
 
-        vm.prank(depositor);
+        vm.prank(bootstrapRecipient);
         vm.expectRevert(FutarchyLiquidityManager.EmergencyModeActive.selector);
         manager.depositToSpot{value: 1 ether}(1 ether);
 
@@ -1387,7 +1426,7 @@ contract FutarchyLiquidityManagerTest is Test {
     function test_lifecycle_requires_bootstrap() public {
         _registerProposal(true);
 
-        vm.prank(depositor);
+        vm.prank(bootstrapRecipient);
         vm.expectRevert(FutarchyLiquidityManager.NotInitialized.selector);
         manager.depositToSpot{value: 1 ether}(1 ether);
 
@@ -1451,8 +1490,10 @@ contract FutarchyLiquidityManagerTest is Test {
     ) public {
         _bootstrap();
         uint256 depositAmount = bound(uint256(depositSeed), 1e9, 250 ether);
-        vm.prank(depositor);
+        vm.startPrank(bootstrapRecipient);
         manager.depositToSpot{value: depositAmount}(depositAmount);
+        manager.transfer(depositor, depositAmount);
+        vm.stopPrank();
         uint256 shares = bound(uint256(redeemSeed), 1, depositAmount);
         uint256 supplyBefore = manager.totalSupply();
         uint128 liquidityBefore = manager.spotLiquidity();

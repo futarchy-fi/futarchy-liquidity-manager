@@ -41,6 +41,7 @@ contract SwaprAlgebraDirectConditionalAdapter is IFutarchyLiquidityAdapter {
     error InvalidTokenOrder();
     error InsufficientPositionLiquidity();
     error InsufficientTokenUsage();
+    error LiquidityCooldownActive(address pool, uint32 liquidityCooldown);
     error ManagerAlreadyBound();
     error PoolAlreadyExists(address pool);
     error PositionAlreadyExists();
@@ -138,6 +139,8 @@ contract SwaprAlgebraDirectConditionalAdapter is IFutarchyLiquidityAdapter {
 
         pool = IAlgebraPoolFactory(address(FACTORY)).createPool(token0, token1);
         if (pool == address(0) || FACTORY.poolByPair(token0, token1) != pool) revert InvalidPool();
+        uint32 liquidityCooldown = ISwaprAlgebraPool(pool).liquidityCooldown();
+        if (liquidityCooldown != 0) revert LiquidityCooldownActive(pool, liquidityCooldown);
         ISwaprAlgebraPool(pool).initialize(sqrtPriceX96);
 
         (uint160 currentSqrtPriceX96,,,,,,) = ISwaprAlgebraPool(pool).globalState();
