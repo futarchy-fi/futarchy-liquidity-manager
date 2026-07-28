@@ -14,12 +14,34 @@ in `tools/validate-configs.sh`.
 
 ## 1. Deploy (one-shot)
 
-1. Fill the private manifest: deployed factory + poolStabilityGuard addresses,
-   salt, predicted manager address (reproduce on a second machine).
-2. `tools/validate-configs.sh --deploy <operator config>` must pass — it refuses
-   zero/placeholder factory/guard and any compromised key.
-3. Sign the deploy batch from the Safe. Nothing here broadcasts automatically.
-4. Deploy the cooldown watcher (below) before funding.
+Deploy is broadcast by the throwaway deployer EOA (not the Safe); the Gnosis
+factory uses nonce-based CREATE, so the manager address is only known after the
+factory + bundle land. Order:
+
+1. **Guard first** (its address feeds the config):
+   ```
+   PRIVATE_KEY=<deployer> FLM_ALGEBRA_FACTORY=<algebra factory> \
+     forge script script/DeployAlgebraPoolStabilityGuard.s.sol \
+     --fork-url <gnosis rpc> --broadcast
+   ```
+2. Write the deployed guard address into the operator config's
+   `poolStabilityGuard`. Then `tools/validate-configs.sh --deploy <config>` must
+   pass — it refuses zero/placeholder guard and any compromised key.
+3. **Stack**:
+   ```
+   PRIVATE_KEY=<deployer> FLM_DEPLOY_CONFIG=<config> \
+     FLM_DEPLOY_OUTPUT=<private path> \
+     forge script script/DeployFutarchyLiquidityManager.s.sol \
+     --fork-url <gnosis rpc> --broadcast
+   ```
+   The output JSON has the deployed `manager` + `proposalSource`.
+4. Copy `manager` into the private bootstrap batch (replace the placeholder in
+   every tx target + approve spender) before signing §2.
+5. Deploy the cooldown watcher (§5) before funding.
+
+The full deploy wiring is rehearsed against real Gnosis dependencies by
+`test/fork/FlmOperatorLifecycleFork.t.sol` (deploys guard + factory + bundle with
+the Safe as coordinator, runs bootstrap→activation→settlement→redeem).
 
 ## 2. Bootstrap (once, per manager)
 
