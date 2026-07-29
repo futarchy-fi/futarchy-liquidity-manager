@@ -81,3 +81,7 @@ jobs:
       - name: Gnosis operator-mode lifecycle fork
         run: >-
           forge test --match-path "test/fork/FlmOperatorLifecycleFork.t.sol" -vv
+
+      - name: Gnosis one-signature launcher fork
+        run: >-
+          forge test --match-path "test/fork/FlmLauncherOneSigFork.t.sol" -vv
