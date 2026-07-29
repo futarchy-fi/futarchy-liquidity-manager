@@ -39,6 +39,10 @@ interface ILauncherAlgebraPoolTokens {
     function token1() external view returns (address);
 }
 
+interface ILauncherGnosisConditionalTokens is IFutarchyConditionalTokens {
+    function reportPayouts(bytes32 questionId, uint256[] calldata payouts) external;
+}
+
 contract LauncherForkOrganization {
     address internal immutable OWNER = msg.sender;
     mapping(address => bool) public editor;
@@ -83,6 +87,7 @@ contract FlmLauncherOneSigForkTest is Test {
     address internal constant ARBITRATOR = 0x68154EA682f95BF582b80Dd6453FA401737491Dc;
 
     struct Fixture {
+        ILauncherGnosisConditionalTokens ctf;
         FLMMarketLauncher launcher;
         LauncherForkOrganization organization;
         FutarchyOfficialProposalSource source;
@@ -138,6 +143,30 @@ contract FlmLauncherOneSigForkTest is Test {
         assertFalse(fixture.source.officialProposalExtended().exists);
     }
 
+    function testFork_launchedMarketSettlesBackToSpot() public {
+        if (!vm.envOr("RUN_GNOSIS_FORK_TESTS", false)) return;
+        Fixture memory fixture = _newFixture();
+        _bootstrap(fixture.manager);
+
+        (address proposal,,) = fixture.launcher.launchMarket(_params(uint32(block.timestamp + 1 days)));
+        assertTrue(fixture.manager.inConditionalMode());
+        uint128 spotLiquidityBeforeSettlement = fixture.manager.spotLiquidity();
+
+        uint256[] memory payouts = new uint256[](2);
+        payouts[0] = 1;
+        bytes32 questionId = IFutarchyProposalCore(proposal).questionId();
+        vm.prank(REALITY_PROXY);
+        fixture.ctf.reportPayouts(questionId, payouts);
+
+        assertEq(
+            uint256(fixture.manager.sync()),
+            uint256(FutarchyLiquidityManager.SyncAction.MigratedBackToSpot)
+        );
+        assertFalse(fixture.manager.inConditionalMode());
+        assertGt(fixture.manager.spotLiquidity(), 0);
+        assertEq(fixture.manager.spotLiquidity(), spotLiquidityBeforeSettlement);
+    }
+
     function _newFixture() private returns (Fixture memory fixture) {
         vm.createSelectFork(
             vm.envOr("GNOSIS_RPC_URL", string("https://rpc.gnosischain.com")), GNOSIS_FORK_BLOCK
@@ -146,6 +175,7 @@ contract FlmLauncherOneSigForkTest is Test {
         assertGt(FUTARCHY_ROUTER.code.length, 0);
         assertGt(ALGEBRA_FACTORY.code.length, 0);
 
+        fixture.ctf = ILauncherGnosisConditionalTokens(CTF);
         fixture.launcher = new FLMMarketLauncher(address(this));
         fixture.organization = new LauncherForkOrganization();
         FactoryCompatibleAlgebraPoolStabilityGuard guard =
@@ -156,7 +186,7 @@ contract FlmLauncherOneSigForkTest is Test {
             ILauncherCanonicalWrapped1155FactoryView(liveWrapper).factory()
         );
         FutarchyConditionalRouter router =
-            new FutarchyConditionalRouter(IFutarchyConditionalTokens(CTF), wrappedFactory);
+            new FutarchyConditionalRouter(fixture.ctf, wrappedFactory);
         FutarchyLiquidityManagerFactory factory = new FutarchyLiquidityManagerFactory(
             ISwaprAlgebraPositionManager(ALGEBRA_NFPM),
             IAlgebraFactoryLike(ALGEBRA_FACTORY),
