@@ -133,3 +133,15 @@ contract AlgebraPoolStabilityGuardTest is Test {
         guard.assertStable(address(0));
     }
 }
+
+// Regression: the bundle factory's IAlgebraFactoryBoundGuard.FACTORY() wiring check must accept
+// the real guard directly (previously only a test wrapper exposed FACTORY(), so a mainnet deploy
+// with the real guard reverted). See src/oracles/AlgebraPoolStabilityGuard.sol FACTORY().
+contract AlgebraPoolStabilityGuardFactoryAliasTest is Test {
+    function test_FACTORY_returnsBoundAlgebraFactory() public {
+        address factory = address(0x1234);
+        AlgebraPoolStabilityGuard guard = new AlgebraPoolStabilityGuard(IAlgebraFactoryLike(factory));
+        assertEq(address(guard.FACTORY()), factory);
+        assertEq(address(guard.FACTORY()), address(guard.ALGEBRA_FACTORY()));
+    }
+}

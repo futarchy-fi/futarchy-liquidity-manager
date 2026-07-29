@@ -25,6 +25,13 @@ contract AlgebraPoolStabilityGuard is IPoolStabilityGuard {
         ALGEBRA_FACTORY = algebraFactory;
     }
 
+    /// @notice Alias exposing the bound Algebra factory under the name the bundle factory's
+    /// wiring check (`IAlgebraFactoryBoundGuard.FACTORY()`) expects, so the real guard is
+    /// accepted directly without a compatibility wrapper.
+    function FACTORY() external view returns (IAlgebraFactoryLike) {
+        return ALGEBRA_FACTORY;
+    }
+
     function assertStable(address pool) external view {
         _assertStable(pool);
     }
