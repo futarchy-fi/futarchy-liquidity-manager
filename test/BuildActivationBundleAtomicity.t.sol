@@ -106,7 +106,7 @@ contract BuildActivationBundleAtomicityTest is Test {
         _bootstrap();
     }
 
-    function test_emittedBundleAtomicallyCreatesAndSeedsMarket() public {
+    function test_emittedBundleCreatesAndSplitsBeforePerSideMigration() public {
         (address[] memory targets, uint256[] memory values, bytes[] memory data) =
             _emittedTransactions();
         assertEq(targets.length, 2);
@@ -118,30 +118,40 @@ contract BuildActivationBundleAtomicityTest is Test {
 
         assertTrue(setup.created());
         assertTrue(source.officialProposalExtended().exists);
+        assertTrue(manager.migrationActive());
+        assertFalse(manager.inConditionalMode());
+        manager.migrateSide(true);
+        manager.migrateSide(false);
         assertTrue(manager.inConditionalMode());
         assertGt(manager.conditionalYesLiquidity(), 0);
         assertGt(manager.conditionalNoLiquidity(), 0);
         assertGt(conditional.addFreshCalls(), 1);
     }
 
-    function test_emittedBundlePrecreatedPoolFailsAtomicallyWithoutMovingFunds() public {
+    function test_emittedBundlePrecreatedPoolCanBeAbortedAfterMigrationFails() public {
         conditional.setFreshPool(address(yesCompany), address(yesCurrency), address(0xBEEF));
         (address[] memory targets, uint256[] memory values, bytes[] memory data) =
             _emittedTransactions();
 
-        vm.expectRevert();
         safe.execute(targets, values, data);
+        vm.expectRevert();
+        manager.migrateSide(true);
 
-        assertFalse(setup.created());
-        assertFalse(source.officialProposalExtended().exists);
+        assertTrue(setup.created());
+        assertTrue(source.officialProposalExtended().exists);
         assertFalse(manager.inConditionalMode());
-        assertEq(manager.spotLiquidity(), SEED);
+        assertTrue(manager.migrationActive());
+        assertEq(manager.spotLiquidity(), 20 ether);
         assertEq(manager.conditionalYesLiquidity(), 0);
         assertEq(manager.conditionalNoLiquidity(), 0);
-        assertEq(spot.totalLiquidity(), SEED);
+        assertEq(spot.totalLiquidity(), 20 ether);
         assertEq(conditional.addFreshCalls(), 0);
         assertEq(company.balanceOf(address(conditional)), 0);
         assertEq(collateral.balanceOf(address(conditional)), 0);
+
+        manager.abortMigration();
+        assertFalse(manager.migrationActive());
+        assertEq(manager.spotLiquidity(), SEED);
     }
 
     function _bootstrap() private {

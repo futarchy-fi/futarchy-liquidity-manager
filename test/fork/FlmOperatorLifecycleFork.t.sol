@@ -56,8 +56,8 @@ interface IAlgebraFactoryCreator is IAlgebraFactoryLike {
 contract FlmOperatorLifecycleForkTest is Test {
     uint256 internal constant GNOSIS_FORK_BLOCK = 47_439_000;
     uint256 internal constant GNOSIS_BLOCK_GAS_LIMIT = 17_000_000;
+    uint256 internal constant LAUNCH_TX_GAS_BUDGET = 10_200_000;
     uint256 internal constant MIN_DEPLOYMENT_GAS_HEADROOM = 3_000_000;
-    uint256 internal constant MIN_ACTIVATION_GAS_HEADROOM = 1_000_000;
     uint256 internal constant BOOTSTRAP_GNO = 10 ether;
     uint256 internal constant BOOTSTRAP_SDAI = 859 ether;
     int24 internal constant FULL_RANGE_LOWER = -887_220;
@@ -101,11 +101,19 @@ contract FlmOperatorLifecycleForkTest is Test {
         fixture.source.setOfficialProposal(1, address(fixture.proposal), OPERATOR_SAFE);
         uint256 activationGas = gasBefore - gasleft() + 21_000 + (activationCall.length * 16);
         emit log_named_uint("operator activation conservative transaction gas", activationGas);
-        assertLt(
-            activationGas + MIN_ACTIVATION_GAS_HEADROOM,
-            GNOSIS_BLOCK_GAS_LIMIT,
-            "activation lacks 1M Gnosis gas headroom"
-        );
+        assertLe(activationGas, LAUNCH_TX_GAS_BUDGET, "activation exceeds gas budget");
+
+        gasBefore = gasleft();
+        fixture.manager.migrateSide(true);
+        uint256 yesGas = gasBefore - gasleft() + 21_000 + 36 * 16;
+        emit log_named_uint("operator YES migration conservative transaction gas", yesGas);
+        assertLe(yesGas, LAUNCH_TX_GAS_BUDGET, "YES migration exceeds gas budget");
+
+        gasBefore = gasleft();
+        fixture.manager.migrateSide(false);
+        uint256 noGas = gasBefore - gasleft() + 21_000 + 36 * 16;
+        emit log_named_uint("operator NO migration conservative transaction gas", noGas);
+        assertLe(noGas, LAUNCH_TX_GAS_BUDGET, "NO migration exceeds gas budget");
 
         assertTrue(fixture.manager.inConditionalMode());
         assertEq(fixture.manager.activeConditionId(), fixture.conditionId);
@@ -151,23 +159,31 @@ contract FlmOperatorLifecycleForkTest is Test {
         vm.clearMockedCalls();
     }
 
-    function testFork_poolCreateRevertRestoresOperatorState() public {
+    function testFork_poolCreateRevertLeavesMigrationAbortable() public {
         if (!vm.envOr("RUN_GNOSIS_FORK_TESTS", false)) return;
         Fixture memory fixture = _newFixture();
         _bootstrap(fixture);
 
+        vm.prank(OPERATOR_SAFE);
+        fixture.source.setOfficialProposal(1, address(fixture.proposal), OPERATOR_SAFE);
         bytes memory fault =
             abi.encodeWithSignature("Error(string)", "first Algebra pool create fault");
         vm.mockCallRevert(ALGEBRA_FACTORY, IAlgebraFactoryCreator.createPool.selector, fault);
-        _assertActivationRollback(fixture, fault);
+        vm.expectRevert(fault);
+        fixture.manager.migrateSide(true);
         vm.clearMockedCalls();
+        vm.prank(OPERATOR_SAFE);
+        fixture.manager.abortMigration();
+        assertFalse(fixture.manager.migrationActive());
     }
 
-    function testFork_firstMintRevertRestoresOperatorState() public {
+    function testFork_firstMintRevertLeavesMigrationAbortable() public {
         if (!vm.envOr("RUN_GNOSIS_FORK_TESTS", false)) return;
         Fixture memory fixture = _newFixture();
         _bootstrap(fixture);
 
+        vm.prank(OPERATOR_SAFE);
+        fixture.source.setOfficialProposal(1, address(fixture.proposal), OPERATOR_SAFE);
         // This callback is reached only by the first newly-created Algebra pool's mint.
         bytes memory fault = abi.encodeWithSignature("Error(string)", "first Algebra mint fault");
         vm.mockCallRevert(
@@ -175,8 +191,37 @@ contract FlmOperatorLifecycleForkTest is Test {
             SwaprAlgebraDirectConditionalAdapter.algebraMintCallback.selector,
             fault
         );
-        _assertActivationRollback(fixture, fault);
+        vm.expectRevert(fault);
+        fixture.manager.migrateSide(true);
         vm.clearMockedCalls();
+        vm.prank(OPERATOR_SAFE);
+        fixture.manager.abortMigration();
+        assertFalse(fixture.manager.migrationActive());
+    }
+
+    /// @dev Real Algebra pool math rounds the removed principal below the stored split amount,
+    /// so abort after a completed side must merge available balances rather than exact amounts.
+    function testFork_abortAfterOneMigratedSideRestoresSpot() public {
+        if (!vm.envOr("RUN_GNOSIS_FORK_TESTS", false)) return;
+        Fixture memory fixture = _newFixture();
+        _bootstrap(fixture);
+
+        vm.prank(OPERATOR_SAFE);
+        fixture.source.setOfficialProposal(1, address(fixture.proposal), OPERATOR_SAFE);
+        fixture.manager.migrateSide(true);
+        assertGt(fixture.manager.conditionalYesLiquidity(), 0);
+
+        vm.prank(OPERATOR_SAFE);
+        fixture.manager.abortMigration();
+
+        assertFalse(fixture.manager.migrationActive());
+        assertFalse(fixture.manager.inConditionalMode());
+        assertEq(fixture.manager.conditionalYesLiquidity(), 0);
+        assertEq(fixture.manager.conditionalNoLiquidity(), 0);
+        assertGt(fixture.manager.spotLiquidity(), 0);
+        for (uint256 i = 0; i < 4; i++) {
+            assertEq(IERC20(fixture.outcomes[i]).balanceOf(address(fixture.manager)), 0);
+        }
     }
 
     function _newFixture() private returns (Fixture memory fixture) {

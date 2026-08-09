@@ -126,11 +126,7 @@ contract BuildActivationBundle is Script {
         );
     }
 
-    function _append(string memory txs, string memory txJson)
-        private
-        pure
-        returns (string memory)
-    {
+    function _append(string memory txs, string memory txJson) private pure returns (string memory) {
         return bytes(txs).length == 0 ? txJson : string.concat(txs, ",", txJson);
     }
 }

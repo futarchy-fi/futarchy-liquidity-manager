@@ -195,7 +195,7 @@ contract V4FutarchyLiquidityManagerFactoryTest is Test {
         assertLt(address(factory).code.length, 24_576);
     }
 
-    function test_candidateCreationCodeHashesMatchMainnetManifest() public pure {
+    function test_unchangedCandidateCreationCodeHashesMatchMainnetManifest() public pure {
         assertEq(
             keccak256(type(FutarchyOfficialProposalSource).creationCode),
             0xeec528405c315ae9de9317487b7ddaf26bf3748af830bb4dd95538ca09c2afbf
@@ -211,10 +211,6 @@ contract V4FutarchyLiquidityManagerFactoryTest is Test {
         assertEq(
             keccak256(type(V4ConditionalLiquidityAdapter).creationCode),
             0x1333c00b08fb2d31f53d11465292f8b869455d8020bd0489059e3e7a3a7af2e3
-        );
-        assertEq(
-            keccak256(type(FutarchyLiquidityManager).creationCode),
-            0x34cf39ea9bb7609967c8c76739edb823f0299ab5719471cea73bddf0a5aa1e5a
         );
         assertEq(
             keccak256(type(V4FutarchyLiquidityManagerFactory).creationCode),

@@ -140,7 +140,7 @@ contract CallerDependentProposal {
 contract FutarchyProposalBindingTest is Test {
     uint256 private constant AMOUNT = 100 ether;
 
-    function test_atomic_activation_uses_captured_source_snapshot() public {
+    function test_split_activation_uses_captured_source_snapshot() public {
         BindingLifecycleCoordinator coordinator = new BindingLifecycleCoordinator();
         BindingResolver resolver = new BindingResolver();
         BindingConditionalTokens ctf = new BindingConditionalTokens();
@@ -228,71 +228,6 @@ contract FutarchyProposalBindingTest is Test {
             assertEq(IERC20(sourceWrappers[i]).balanceOf(address(conditional)), 0);
         }
 
-        conditional.setAddReverts(true);
-        vm.expectRevert();
-        coordinator.setOfficial(source, 1, address(proposal), address(this));
-        conditional.setAddReverts(false);
-
-        assertFalse(source.currentOfficialProposal().exists);
-        assertFalse(manager.inConditionalMode());
-        assertEq(manager.spotLiquidity(), AMOUNT);
-        assertEq(manager.conditionalYesLiquidity(), 0);
-        assertEq(manager.conditionalNoLiquidity(), 0);
-        assertEq(spot.removeDetailedCalls(), 0);
-        assertEq(conditional.addFreshCalls(), 0);
-        assertEq(poolFactory.poolByPair(sourceWrappers[0], sourceWrappers[2]), address(0));
-        assertEq(poolFactory.poolByPair(sourceWrappers[1], sourceWrappers[3]), address(0));
-        assertEq(company.balanceOf(address(ctf)), 0);
-        assertEq(collateral.balanceOf(address(ctf)), 0);
-        for (uint256 i; i < sourceWrappers.length; ++i) {
-            assertEq(IERC20(sourceWrappers[i]).balanceOf(address(conditional)), 0);
-        }
-
-        conditional.setMisreportPrefundedPool(true);
-        vm.expectRevert(FutarchyLiquidityManager.InvalidPool.selector);
-        coordinator.setOfficial(source, 1, address(proposal), address(this));
-        conditional.setMisreportPrefundedPool(false);
-
-        assertFalse(source.currentOfficialProposal().exists);
-        assertFalse(manager.inConditionalMode());
-        assertEq(manager.spotLiquidity(), AMOUNT);
-        assertEq(spot.removeDetailedCalls(), 0);
-        assertEq(conditional.addFreshCalls(), 0);
-        assertEq(poolFactory.poolByPair(sourceWrappers[0], sourceWrappers[2]), address(0));
-        assertEq(poolFactory.poolByPair(sourceWrappers[1], sourceWrappers[3]), address(0));
-        assertEq(company.balanceOf(address(ctf)), 0);
-        assertEq(collateral.balanceOf(address(ctf)), 0);
-        for (uint256 i; i < sourceWrappers.length; ++i) {
-            assertEq(IERC20(sourceWrappers[i]).balanceOf(address(conditional)), 0);
-        }
-
-        conditional.setAddUsageBps(9949, 9949);
-        conditional.setNextAddUsageBps(10_000);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                FutarchyLiquidityManager.ExcessiveSyncLeftover.selector,
-                80 ether,
-                80 ether,
-                408e15,
-                408e15
-            )
-        );
-        coordinator.setOfficial(source, 1, address(proposal), address(this));
-        conditional.setAddUsageBps(10_000, 10_000);
-
-        assertFalse(source.currentOfficialProposal().exists);
-        assertFalse(manager.inConditionalMode());
-        assertEq(manager.spotLiquidity(), AMOUNT);
-        assertEq(spot.removeDetailedCalls(), 0);
-        assertEq(conditional.addFreshCalls(), 0);
-        assertEq(poolFactory.poolByPair(sourceWrappers[0], sourceWrappers[2]), address(0));
-        assertEq(poolFactory.poolByPair(sourceWrappers[1], sourceWrappers[3]), address(0));
-        assertEq(company.balanceOf(address(ctf)), 0);
-        assertEq(collateral.balanceOf(address(ctf)), 0);
-        for (uint256 i; i < sourceWrappers.length; ++i) {
-            assertEq(IERC20(sourceWrappers[i]).balanceOf(address(conditional)), 0);
-        }
-
         address[2] memory splitShortfallCollaterals = [address(company), address(collateral)];
         for (uint256 splitLeg; splitLeg < splitShortfallCollaterals.length; ++splitLeg) {
             ctf.setSplitShortfallCollateral(splitShortfallCollaterals[splitLeg]);
@@ -350,6 +285,32 @@ contract FutarchyProposalBindingTest is Test {
         }
 
         coordinator.setOfficial(source, 1, address(proposal), address(this));
+        assertTrue(manager.migrationActive());
+
+        conditional.setAddReverts(true);
+        vm.expectRevert();
+        manager.migrateSide(true);
+        conditional.setAddReverts(false);
+        assertTrue(manager.migrationActive());
+        assertEq(manager.conditionalYesLiquidity(), 0);
+
+        conditional.setAddUsageBps(9949, 9949);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                FutarchyLiquidityManager.ExcessiveSyncLeftover.selector,
+                80 ether,
+                80 ether,
+                408e15,
+                408e15
+            )
+        );
+        manager.migrateSide(true);
+        conditional.setAddUsageBps(10_000, 10_000);
+        assertTrue(manager.migrationActive());
+        assertEq(manager.conditionalYesLiquidity(), 0);
+
+        manager.migrateSide(true);
+        manager.migrateSide(false);
 
         assertTrue(manager.inConditionalMode());
         assertEq(manager.activeConditionId(), sourceCondition);
@@ -422,20 +383,23 @@ contract FutarchyProposalBindingTest is Test {
             nextWrappers
         );
 
+        coordinator.setOfficial(source, 2, address(nextProposal), address(this));
         conditional.setAddReverts(true);
         vm.expectRevert();
-        coordinator.setOfficial(source, 2, address(nextProposal), address(this));
+        manager.migrateSide(true);
         conditional.setAddReverts(false);
 
-        assertFalse(source.currentOfficialProposal().exists);
+        assertTrue(source.currentOfficialProposal().exists);
         assertFalse(manager.inConditionalMode());
-        assertEq(manager.spotLiquidity(), 18 ether);
+        assertTrue(manager.migrationActive());
+        assertEq(manager.spotLiquidity(), 3.6 ether);
         assertEq(company.balanceOf(address(manager)), 72 ether);
         assertEq(collateral.balanceOf(address(manager)), 72 ether);
         assertEq(poolFactory.poolByPair(nextWrappers[0], nextWrappers[2]), address(0));
         assertEq(poolFactory.poolByPair(nextWrappers[1], nextWrappers[3]), address(0));
 
-        coordinator.setOfficial(source, 2, address(nextProposal), address(this));
+        manager.migrateSide(true);
+        manager.migrateSide(false);
 
         FutarchyOfficialProposalSource.OfficialProposal memory nextOfficial =
             source.currentOfficialProposal();

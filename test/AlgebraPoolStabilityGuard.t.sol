@@ -140,7 +140,8 @@ contract AlgebraPoolStabilityGuardTest is Test {
 contract AlgebraPoolStabilityGuardFactoryAliasTest is Test {
     function test_FACTORY_returnsBoundAlgebraFactory() public {
         address factory = address(0x1234);
-        AlgebraPoolStabilityGuard guard = new AlgebraPoolStabilityGuard(IAlgebraFactoryLike(factory));
+        AlgebraPoolStabilityGuard guard =
+            new AlgebraPoolStabilityGuard(IAlgebraFactoryLike(factory));
         assertEq(address(guard.FACTORY()), factory);
         assertEq(address(guard.FACTORY()), address(guard.ALGEBRA_FACTORY()));
     }

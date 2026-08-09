@@ -149,10 +149,10 @@ contract FLMMarketLauncherTest is Test {
         );
     }
 
-    function test_launchMarket_callsCreateMetadataAndActivationInOrder() public {
+    function test_prepareAndActivateMarket_callDependenciesInOrder() public {
         FLMMarketLauncher.MarketParams memory p = _params();
         vm.prank(OWNER);
-        (address proposal, address metadataContract, uint256 proposalId) = launcher.launchMarket(p);
+        (address proposal, address metadataContract, uint256 proposalId) = launcher.prepareMarket(p);
 
         IFutarchyFactory.CreateParams memory created = factory.last();
         assertEq(proposal, address(0x1001));
@@ -160,7 +160,7 @@ contract FLMMarketLauncherTest is Test {
         assertEq(proposalId, 0);
         assertEq(callLog.factoryCall(), 1);
         assertEq(callLog.organizationCall(), 2);
-        assertEq(callLog.sourceCall(), 3);
+        assertEq(callLog.sourceCall(), 0);
         assertEq(created.marketName, p.marketName);
         assertEq(created.companyToken, COMPANY);
         assertEq(created.currencyToken, CURRENCY);
@@ -174,29 +174,58 @@ contract FLMMarketLauncherTest is Test {
         assertEq(organization.description(), p.description);
         assertEq(organization.metadata(), p.metadataJson);
         assertEq(organization.metadataURI(), "");
+        assertEq(launcher.pendingProposalId(), proposalId);
+        assertEq(launcher.pendingProposal(), proposal);
+        assertEq(launcher.nextProposalId(), 1);
+
+        vm.prank(OWNER);
+        launcher.activateMarket();
+        assertEq(callLog.sourceCall(), 3);
         assertEq(source.proposalId(), proposalId);
         assertEq(source.proposal(), proposal);
         assertEq(source.creator(), address(launcher));
-        assertEq(launcher.nextProposalId(), 1);
+        assertEq(launcher.pendingProposal(), address(0));
     }
 
-    function test_launchMarket_revertsForNonOwner() public {
+    function test_prepareAndActivateMarket_revertForNonOwner() public {
         vm.expectRevert();
         vm.prank(OTHER);
-        launcher.launchMarket(_params());
+        launcher.prepareMarket(_params());
+
+        vm.prank(OWNER);
+        launcher.prepareMarket(_params());
+        vm.expectRevert();
+        vm.prank(OTHER);
+        launcher.activateMarket();
     }
 
-    function test_launchMarket_sourceFailureRollsBackProposalAndMetadata() public {
+    function test_activateMarket_sourceFailurePreservesPendingMarket() public {
+        vm.prank(OWNER);
+        (address proposal,,) = launcher.prepareMarket(_params());
         source.setShouldRevert(true);
         vm.expectRevert();
         vm.prank(OWNER);
-        launcher.launchMarket(_params());
+        launcher.activateMarket();
 
-        assertEq(factory.proposalCount(), 0);
-        assertEq(organization.metadataCount(), 0);
+        assertEq(factory.proposalCount(), 1);
+        assertEq(organization.metadataCount(), 1);
         assertEq(source.proposalId(), 0);
-        assertEq(launcher.nextProposalId(), 0);
-        assertEq(callLog.next(), 0);
+        assertEq(launcher.pendingProposal(), proposal);
+        assertEq(launcher.nextProposalId(), 1);
+    }
+
+    function test_prepareMarket_revertsWhileAnotherMarketIsPending() public {
+        vm.startPrank(OWNER);
+        launcher.prepareMarket(_params());
+        vm.expectRevert(FLMMarketLauncher.MarketAlreadyPending.selector);
+        launcher.prepareMarket(_params());
+        vm.stopPrank();
+    }
+
+    function test_activateMarket_revertsWithoutPendingMarket() public {
+        vm.expectRevert(FLMMarketLauncher.NoPendingMarket.selector);
+        vm.prank(OWNER);
+        launcher.activateMarket();
     }
 
     function test_launcherAbiHasNoRedeemOrErc20TransferPath() public {

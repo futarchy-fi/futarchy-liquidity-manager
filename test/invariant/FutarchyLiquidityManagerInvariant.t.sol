@@ -193,7 +193,11 @@ contract FutarchyLiquidityManagerHandler is Test {
 
     function migrateToConditional() external {
         if (manager.emergencyExitArmedAt() != 0 || manager.emergencyExitExecuted()) return;
-        if (manager.inConditionalMode() || manager.spotLiquidity() == 0) return;
+        if (
+            manager.inConditionalMode() || manager.migrationActive() || manager.spotLiquidity() == 0
+        ) {
+            return;
+        }
 
         source.createProposalExtended(
             address(proposal),
@@ -209,7 +213,11 @@ contract FutarchyLiquidityManagerHandler is Test {
         );
 
         try source.activate(address(manager)) {
-            migrations++;
+            try manager.migrateSide(true) {
+                try manager.migrateSide(false) {
+                    migrations++;
+                } catch {}
+            } catch {}
         } catch {}
     }
 

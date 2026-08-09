@@ -134,8 +134,21 @@ contract FutarchyLiquidityManagerTest is Test {
         manager.activateOfficialProposal(activation);
 
         proposalSource.activate(address(manager));
-        assertTrue(manager.inConditionalMode());
+        assertTrue(manager.migrationActive());
+        assertFalse(manager.inConditionalMode());
         assertEq(manager.spotLiquidity(), 20 ether);
+
+        vm.expectRevert(FutarchyLiquidityManager.DepositsDisabledInConditionalMode.selector);
+        vm.prank(bootstrapRecipient);
+        manager.redeem(1 ether, bootstrapRecipient, false);
+
+        manager.migrateSide(false);
+        assertEq(manager.conditionalNoLiquidity(), 80 ether);
+        assertEq(manager.conditionalYesLiquidity(), 0);
+        vm.expectRevert(FutarchyLiquidityManager.ProposalAlreadyActive.selector);
+        manager.migrateSide(false);
+        manager.migrateSide(true);
+        assertTrue(manager.inConditionalMode());
         assertEq(manager.conditionalYesLiquidity(), 80 ether);
         assertEq(manager.conditionalNoLiquidity(), 80 ether);
     }
@@ -204,6 +217,8 @@ contract FutarchyLiquidityManagerTest is Test {
         _registerProposal(true);
 
         proposalSource.activate(address(manager));
+        manager.migrateSide(true);
+        manager.migrateSide(false);
 
         address yesPool = manager.activeYesPool();
         address noPool = manager.activeNoPool();
@@ -218,36 +233,49 @@ contract FutarchyLiquidityManagerTest is Test {
         assertFalse(manager.canActivateOfficialProposal());
     }
 
-    function test_activation_rejects_preexisting_pool_atomically() public {
+    function test_migration_rejects_preexisting_pool_and_owner_canAbort() public {
         _bootstrap();
         _registerProposalWithPools(true, address(0xCAFE), address(0xBEEF));
         conditionalAdapter.setFreshPool(address(yesCompany), address(yesCurrency), address(0xCAFE));
 
-        vm.expectRevert();
         proposalSource.activate(address(manager));
+        vm.expectRevert();
+        manager.migrateSide(true);
 
-        _assertActivationRolledBack();
+        manager.abortMigration();
+        assertFalse(manager.migrationActive());
+        assertEq(manager.spotLiquidity(), 100 ether);
+        assertEq(company.balanceOf(address(manager)), 0);
+        assertEq(wrappedNative.balanceOf(address(manager)), 0);
     }
 
-    function test_activation_rolls_back_first_pool_when_second_pool_is_precreated() public {
+    function test_migration_failure_doesNotRollBackCompletedSide_andAbortRestoresSpot() public {
         _bootstrap();
         _registerProposal(true);
         conditionalAdapter.setFreshPool(address(noCompany), address(noCurrency), address(0xBEEF));
 
-        vm.expectRevert();
         proposalSource.activate(address(manager));
+        manager.migrateSide(true);
+        vm.expectRevert();
+        manager.migrateSide(false);
 
-        _assertActivationRolledBack();
-        assertEq(
-            conditionalAdapter.freshPoolByPair(_pairKey(address(yesCompany), address(yesCurrency))),
-            address(0),
-            "first pool creation must roll back"
+        assertTrue(
+            conditionalAdapter.freshPoolByPair(_pairKey(address(yesCompany), address(yesCurrency)))
+                != address(0),
+            "completed first side must remain"
         );
         assertEq(
             conditionalAdapter.freshPoolByPair(_pairKey(address(noCompany), address(noCurrency))),
             address(0xBEEF),
             "pre-existing second pool must remain"
         );
+        vm.prank(depositor);
+        vm.expectRevert();
+        manager.abortMigration();
+        manager.abortMigration();
+        assertEq(manager.spotLiquidity(), 100 ether);
+        assertEq(manager.conditionalYesLiquidity(), 0);
+        assertEq(manager.conditionalNoLiquidity(), 0);
     }
 
     function test_activation_rejects_resolved_condition_before_removing_spot() public {
@@ -589,6 +617,8 @@ contract FutarchyLiquidityManagerTest is Test {
         router.setPayouts(0, 0, 0);
 
         proposalSource.activate(address(manager));
+        manager.migrateSide(true);
+        manager.migrateSide(false);
 
         assertTrue(manager.inConditionalMode());
         assertEq(manager.activeProposal(), address(nextProposal));
@@ -1667,6 +1697,8 @@ contract FutarchyLiquidityManagerTest is Test {
     function _activateProposal(bool winnerIsYes) internal {
         _registerProposal(winnerIsYes);
         proposalSource.activate(address(manager));
+        manager.migrateSide(true);
+        manager.migrateSide(false);
     }
 
     function _assertActivationRolledBack() internal view {
@@ -1913,6 +1945,8 @@ contract FutarchyLiquidityManagerTest is Test {
             address(0)
         );
         localSource.activate(address(localManager));
+        localManager.migrateSide(true);
+        localManager.migrateSide(false);
 
         uint160 expectedYes = companyIsToken0 == yesCompanyIsToken0
             ? guardedSqrtPriceX96

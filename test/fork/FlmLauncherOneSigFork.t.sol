@@ -69,6 +69,7 @@ contract LauncherForkOrganization {
 /// @dev Real Gnosis FutarchyFactory proposal creation plus a fresh local FLM stack.
 contract FlmLauncherOneSigForkTest is Test {
     uint256 internal constant GNOSIS_FORK_BLOCK = 47_439_000;
+    uint256 internal constant LAUNCH_TX_GAS_BUDGET = 10_200_000;
     uint256 internal constant BOOTSTRAP_GNO = 10 ether;
     uint256 internal constant BOOTSTRAP_SDAI = 859 ether;
     int24 internal constant FULL_RANGE_LOWER = -887_220;
@@ -100,7 +101,30 @@ contract FlmLauncherOneSigForkTest is Test {
         _bootstrap(fixture.manager);
 
         FLMMarketLauncher.MarketParams memory p = _params(uint32(block.timestamp + 1 days));
-        (address proposal,, uint256 proposalId) = fixture.launcher.launchMarket(p);
+        bytes memory prepareCall = abi.encodeCall(fixture.launcher.prepareMarket, (p));
+        uint256 gasBefore = gasleft();
+        (address proposal,, uint256 proposalId) = fixture.launcher.prepareMarket(p);
+        uint256 prepareGas = gasBefore - gasleft() + 21_000 + prepareCall.length * 16;
+        emit log_named_uint("prepareMarket conservative transaction gas", prepareGas);
+        assertLe(prepareGas, LAUNCH_TX_GAS_BUDGET, "prepareMarket exceeds gas budget");
+
+        gasBefore = gasleft();
+        fixture.launcher.activateMarket();
+        uint256 activateGas = gasBefore - gasleft() + 21_000 + 4 * 16;
+        emit log_named_uint("activateMarket conservative transaction gas", activateGas);
+        assertLe(activateGas, LAUNCH_TX_GAS_BUDGET, "activateMarket exceeds gas budget");
+
+        gasBefore = gasleft();
+        fixture.manager.migrateSide(true);
+        uint256 yesGas = gasBefore - gasleft() + 21_000 + 36 * 16;
+        emit log_named_uint("migrateSide YES conservative transaction gas", yesGas);
+        assertLe(yesGas, LAUNCH_TX_GAS_BUDGET, "YES migration exceeds gas budget");
+
+        gasBefore = gasleft();
+        fixture.manager.migrateSide(false);
+        uint256 noGas = gasBefore - gasleft() + 21_000 + 36 * 16;
+        emit log_named_uint("migrateSide NO conservative transaction gas", noGas);
+        assertLe(noGas, LAUNCH_TX_GAS_BUDGET, "NO migration exceeds gas budget");
 
         assertEq(proposalId, 0);
         assertEq(fixture.organization.metadataCount(), 1);
@@ -125,21 +149,24 @@ contract FlmLauncherOneSigForkTest is Test {
         assertEq(IERC20(SDAI).balanceOf(address(this)), sdaiBefore + sdaiOut);
     }
 
-    function testFork_unboundedOpeningTimeMakesOneCallLaunchRevert() public {
+    function testFork_unboundedOpeningTimeMakesActivationRevertAndPreservesPending() public {
         if (!vm.envOr("RUN_GNOSIS_FORK_TESTS", false)) return;
         Fixture memory fixture = _newFixture();
         _bootstrap(fixture.manager);
 
+        (address proposal,,) =
+            fixture.launcher.prepareMarket(_params(uint32(block.timestamp + 8 days)));
         vm.expectRevert(
             abi.encodeWithSelector(
                 FutarchyOfficialProposalSource.ProposalValidationFailed.selector,
                 FutarchyOfficialProposalSource.ProposalValidationFailure.OpeningTimeTooFar
             )
         );
-        fixture.launcher.launchMarket(_params(uint32(block.timestamp + 8 days)));
+        fixture.launcher.activateMarket();
 
-        assertEq(fixture.organization.metadataCount(), 0);
-        assertEq(fixture.launcher.nextProposalId(), 0);
+        assertEq(fixture.organization.metadataCount(), 1);
+        assertEq(fixture.launcher.nextProposalId(), 1);
+        assertEq(fixture.launcher.pendingProposal(), proposal);
         assertFalse(fixture.source.officialProposalExtended().exists);
     }
 
@@ -148,7 +175,11 @@ contract FlmLauncherOneSigForkTest is Test {
         Fixture memory fixture = _newFixture();
         _bootstrap(fixture.manager);
 
-        (address proposal,,) = fixture.launcher.launchMarket(_params(uint32(block.timestamp + 1 days)));
+        (address proposal,,) =
+            fixture.launcher.prepareMarket(_params(uint32(block.timestamp + 1 days)));
+        fixture.launcher.activateMarket();
+        fixture.manager.migrateSide(true);
+        fixture.manager.migrateSide(false);
         assertTrue(fixture.manager.inConditionalMode());
         uint128 spotLiquidityBeforeSettlement = fixture.manager.spotLiquidity();
 
