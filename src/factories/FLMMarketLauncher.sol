@@ -135,14 +135,14 @@ contract FLMMarketLauncher is Ownable2Step {
         proposal = IFutarchyFactory(factory)
             .createProposal(
                 IFutarchyFactory.CreateParams({
-                    marketName: p.marketName,
-                    companyToken: companyToken,
-                    currencyToken: currencyToken,
-                    category: category,
-                    language: language,
-                    minBond: p.minBond,
-                    openingTime: p.openingTime
-                })
+                marketName: p.marketName,
+                companyToken: companyToken,
+                currencyToken: currencyToken,
+                category: category,
+                language: language,
+                minBond: p.minBond,
+                openingTime: p.openingTime
+            })
             );
         metadataContract = IOrganization(organization)
             .createAndAddProposalMetadata(
