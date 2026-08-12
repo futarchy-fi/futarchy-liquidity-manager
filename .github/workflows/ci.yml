@@ -62,7 +62,7 @@ jobs:
       - name: Coverage summary
         run: >-
           forge coverage --ir-minimum --report summary
-          --no-match-test test_candidateCreationCodeHashesMatchMainnetManifest
+          --no-match-test CandidateCreationCodeHashesMatchMainnetManifest
 
   gnosis-operator-fork:
     runs-on: ubuntu-latest

@@ -1067,27 +1067,46 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
             bool isRedeem = i == 0;
             uint256 amount = isRedeem ? redeemAmount : losingAmount;
             if (amount == 0) continue;
-            IERC20 token = IERC20(isRedeem ? winningToken : losingToken);
-            IERC20 collateral = IERC20(collateralToken);
-            uint256 collateralBefore = collateral.balanceOf(address(this));
-            uint256 tokenBefore = token.balanceOf(address(this));
-            _forceApprove(token, address(CONDITIONAL_ROUTER), amount);
-            if (isRedeem) {
-                CONDITIONAL_ROUTER.redeemPositions(
-                    collateralToken, _capturedConditionId, yesToken, noToken, amount
-                );
-            } else {
-                CONDITIONAL_ROUTER.consumeLosingPositions(
-                    collateralToken, _capturedConditionId, yesToken, noToken, amount
-                );
-            }
-            _forceApprove(token, address(CONDITIONAL_ROUTER), 0);
-            if (
-                tokenBefore - token.balanceOf(address(this)) != amount
-                    || (isRedeem
-                        && collateral.balanceOf(address(this)) - collateralBefore != amount)
-            ) revert IncompleteOutcomeRecovery();
+            _settleOutcomeLeg(
+                collateralToken,
+                yesToken,
+                noToken,
+                isRedeem ? winningToken : losingToken,
+                amount,
+                isRedeem
+            );
         }
+    }
+
+    /// @dev Extracted so each settlement leg gets its own stack frame; inlining the
+    /// body in the twin loop above is one slot too deep under minimum optimization.
+    function _settleOutcomeLeg(
+        address collateralToken,
+        address yesToken,
+        address noToken,
+        address outcomeToken,
+        uint256 amount,
+        bool isRedeem
+    ) internal {
+        IERC20 token = IERC20(outcomeToken);
+        IERC20 collateral = IERC20(collateralToken);
+        uint256 collateralBefore = collateral.balanceOf(address(this));
+        uint256 tokenBefore = token.balanceOf(address(this));
+        _forceApprove(token, address(CONDITIONAL_ROUTER), amount);
+        if (isRedeem) {
+            CONDITIONAL_ROUTER.redeemPositions(
+                collateralToken, _capturedConditionId, yesToken, noToken, amount
+            );
+        } else {
+            CONDITIONAL_ROUTER.consumeLosingPositions(
+                collateralToken, _capturedConditionId, yesToken, noToken, amount
+            );
+        }
+        _forceApprove(token, address(CONDITIONAL_ROUTER), 0);
+        if (
+            tokenBefore - token.balanceOf(address(this)) != amount
+                || (isRedeem && collateral.balanceOf(address(this)) - collateralBefore != amount)
+        ) revert IncompleteOutcomeRecovery();
     }
 
     function _mergeAvailableOutcomeAmounts() internal {
