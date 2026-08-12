@@ -29,7 +29,7 @@ contract BuildActivationBundle is Script {
 
     function run() external {
         string memory configPath = vm.envOr(
-            "FLM_ACTIVATION_CONFIG", string("config/batches/activation-bundle.example.json")
+            "FLM_ACTIVATION_CONFIG", string("config/activation/activation-bundle.example.json")
         );
         string memory outputPath =
             vm.envOr("FLM_ACTIVATION_OUTPUT", string("out/flm-activation-bundle.json"));
