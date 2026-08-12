@@ -360,8 +360,8 @@
           "path": "docs/deployment.md"
         },
         {
-          "description": "The historical Gnosis FAO canary config binds the reviewed ownerless guard and hash-pinned permissionless factory; it is retained as canary evidence, not the selected production path.",
-          "path": "config/gnosis.fao-canary.json"
+          "description": "The historical Gnosis FAO canary config binds the reviewed ownerless guard and hash-pinned permissionless factory; it is quarantined under config/quarantine because it carries the compromised 0x693E key, and is retained as canary evidence only, not the selected production path.",
+          "path": "config/quarantine/gnosis.fao-canary.json"
         },
         {
           "description": "The historical Gnosis on-chain canary receipt records transaction hashes, runtime hashes, bundle addresses, and bounded bootstrap exposure.",
