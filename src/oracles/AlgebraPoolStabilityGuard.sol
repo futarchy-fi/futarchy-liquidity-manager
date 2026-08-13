@@ -18,10 +18,18 @@ contract AlgebraPoolStabilityGuard is IPoolStabilityGuard {
     error InvalidHistory(address pool);
     error MeanTickOutOfRange(address pool, int56 meanTick);
     error UnstablePool(address pool, int24 currentTick, int24 meanTick);
+    error LiquidityCooldownActive(address pool, uint32 liquidityCooldown);
 
     constructor(IAlgebraFactoryLike algebraFactory) {
         if (address(algebraFactory) == address(0)) revert ZeroAddress();
         ALGEBRA_FACTORY = algebraFactory;
+    }
+
+    /// @notice Alias exposing the bound Algebra factory under the name the bundle factory's
+    /// wiring check (`IAlgebraFactoryBoundGuard.FACTORY()`) expects, so the real guard is
+    /// accepted directly without a compatibility wrapper.
+    function FACTORY() external view returns (IAlgebraFactoryLike) {
+        return ALGEBRA_FACTORY;
     }
 
     function assertStable(address pool) external view {
@@ -48,6 +56,8 @@ contract AlgebraPoolStabilityGuard is IPoolStabilityGuard {
 
     function _assertStable(address pool) internal view {
         if (pool == address(0)) revert ZeroAddress();
+        uint32 liquidityCooldown = IAlgebraPoolLike(pool).liquidityCooldown();
+        if (liquidityCooldown != 0) revert LiquidityCooldownActive(pool, liquidityCooldown);
 
         int24 currentTick = _currentTick(pool);
         int24 twapTick = _twapTick(pool);

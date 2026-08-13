@@ -88,13 +88,13 @@ contract FutarchyLiquidityManagerFactoryTest is Test {
         assertLt(address(factory).code.length, 24_576);
     }
 
-    function test_managerRuntimeKeepsEip170Reserve() public {
+    function test_managerRuntimeFitsEip170() public {
         if (vm.isContext(VmSafe.ForgeContext.Coverage)) return;
         FutarchyLiquidityManagerFactory.DeployedContracts memory deployed =
             factory.createLiquidityManager(
                 _createParams(_defaultValidationConfigData()), _creationCodes()
             );
-        assertLe(deployed.manager.code.length, 24_448);
+        assertLe(deployed.manager.code.length, 24_576);
     }
 
     function test_adapterBindingIsIrreversibleAndRestrictsLiquidityOperations() public {

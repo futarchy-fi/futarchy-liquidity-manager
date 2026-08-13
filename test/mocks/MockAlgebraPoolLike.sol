@@ -6,6 +6,7 @@ contract MockAlgebraPoolLike {
 
     uint160 public sqrtPriceX96 = 1;
     int24 public tick;
+    uint32 public liquidityCooldown;
     int256 internal _older;
     int256 internal _newer;
     uint256 internal _historyLength = 2;
@@ -14,6 +15,10 @@ contract MockAlgebraPoolLike {
     function setGlobalState(uint160 newSqrtPriceX96, int24 newTick) external {
         sqrtPriceX96 = newSqrtPriceX96;
         tick = newTick;
+    }
+
+    function setLiquidityCooldown(uint32 newLiquidityCooldown) external {
+        liquidityCooldown = newLiquidityCooldown;
     }
 
     function setTickCumulatives(int56 older, int56 newer) external {

@@ -4,6 +4,13 @@ Do not sign or fund batches for the current Swapr Algebra prototype. Its mutable
 third-party position mints block burns, so the AMM cannot yet support the administrator-independent
 position-removal path required by redemption.
 
+## Operator-custody Gnosis configs
+
+This prohibition remains for public-LP configurations. It is lifted only for a Gnosis config whose
+depositor gate is verified on-chain to make the operator Safe the sole depositor. The resulting
+operator-custody exception does not make Swapr Algebra appropriate for public LPs, and does not
+alter the Ethereum v4 conclusions.
+
 `script/BuildLiquidityOperationBatch.s.sol` generates Safe transaction-builder JSON from
 `config/safe-batch.example.json` style files. The script emits exactly one logical operation per
 batch so reviewers can audit calldata and values independently.

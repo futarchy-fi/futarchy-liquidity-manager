@@ -49,6 +49,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
 
     bool public initializedFromBootstrap;
     bool public inConditionalMode;
+    bool public migrationActive;
     bool public emergencyExitExecuted;
     uint96 private _capturedProposalId;
     uint128 public conditionalNoLiquidity;
@@ -62,6 +63,9 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     address private _capturedNoCompanyToken;
     address private _capturedYesCurrencyToken;
     address private _capturedNoCurrencyToken;
+    uint160 private _migrationSqrtPriceX96;
+    uint256 private _migrationCompanyAmount;
+    uint256 private _migrationCollateralAmount;
 
     enum SyncAction {
         None,
@@ -128,7 +132,6 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     error ProposalAlreadyActive();
     error ConditionAlreadyResolved();
     error InvalidSqrtPrice();
-    error InvalidPool();
 
     event InitializedFromBootstrap(
         uint256 companyAmount, uint256 collateralAmount, uint128 spotLiquidityMinted
@@ -370,9 +373,10 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         uint256 collateralAmount,
         bool wrapNativeCollateral
     ) internal returns (uint256 sharesMinted) {
+        _assertOnlyBootstrap();
         _assertNotEmergencyMode();
         _prepareInitializedOperation();
-        if (inConditionalMode) revert DepositsDisabledInConditionalMode();
+        if (_hasActiveProposal()) revert DepositsDisabledInConditionalMode();
 
         _consolidateVault();
         uint256 supply = totalSupply();
@@ -438,6 +442,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         returns (uint256 companyOut, uint256 collateralOut)
     {
         _prepareInitializedOperation();
+        if (migrationActive) revert DepositsDisabledInConditionalMode();
         if (recipient == address(0)) revert ZeroRecipient();
         uint256 supply = totalSupply();
         if (shares == 0 || shares > balanceOf(msg.sender)) revert InvalidShares();
@@ -467,7 +472,8 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         emit SharesRedeemed(msg.sender, recipient, shares, companyOut, collateralOut);
     }
 
-    /// @dev Failure-isolated merge primitive. Only a self-call from redemption may invoke it.
+    /// @dev Failure-isolated merge primitive shared by redemption and abort.
+    /// Only a self-call may invoke it.
     function mergeOutcomeSlice(bool companyAsset, uint256 amount) external {
         if (msg.sender != address(this)) revert OnlySelf();
         _mergeOutcomeAmount(
@@ -478,13 +484,13 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         );
     }
 
-    /// @notice Whether the bound proposal source may atomically activate a fresh market now.
+    /// @notice Whether the bound proposal source may activate a fresh market now.
     function canActivateOfficialProposal() public view returns (bool) {
         return initializedFromBootstrap && totalSupply() != 0 && spotLiquidity != 0
-            && !inConditionalMode && emergencyExitArmedAt == 0;
+            && !_hasActiveProposal() && emergencyExitArmedAt == 0;
     }
 
-    /// @notice Atomically moves the configured spot slice into two fresh conditional pools.
+    /// @notice Moves the configured spot slice into conditional tokens for per-side migration.
     /// @dev Only the immutable proposal source may call this hook, from inside its official
     /// proposal write. Any failure rolls that write and every AMM side effect back together.
     function activateOfficialProposal(
@@ -493,7 +499,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         if (msg.sender != address(PROPOSAL_SOURCE)) revert OnlyProposalSource();
         _assertNotEmergencyMode();
         _prepareInitializedOperation();
-        if (inConditionalMode) revert ProposalAlreadyActive();
+        if (_hasActiveProposal()) revert ProposalAlreadyActive();
 
         _validateProposal(proposal);
         bytes32 conditionId = proposal.conditionId;
@@ -521,25 +527,8 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
             proposal.yesCurrencyToken,
             proposal.noCurrencyToken,
             collateralOut,
-            address(CONDITIONAL_ADAPTER)
+            address(this)
         );
-
-        (, uint128 yesAdded) = _addFreshConditionalPair(
-            proposal.yesCompanyToken,
-            proposal.yesCurrencyToken,
-            companyOut,
-            collateralOut,
-            spotSqrtPriceX96
-        );
-        (, uint128 noAdded) = _addFreshConditionalPair(
-            proposal.noCompanyToken,
-            proposal.noCurrencyToken,
-            companyOut,
-            collateralOut,
-            spotSqrtPriceX96
-        );
-
-        inConditionalMode = true;
         _capturedProposal = proposal.proposal;
         _capturedProposalId = uint96(proposal.proposalId);
         _capturedConditionId = conditionId;
@@ -547,11 +536,49 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         _capturedNoCompanyToken = proposal.noCompanyToken;
         _capturedYesCurrencyToken = proposal.yesCurrencyToken;
         _capturedNoCurrencyToken = proposal.noCurrencyToken;
-        conditionalYesLiquidity = yesAdded;
-        conditionalNoLiquidity = noAdded;
-        emit LiquidityMigratedToConditional(
-            proposal.proposalId, liquidityToMove, uint256(yesAdded) + uint256(noAdded)
+        _migrationSqrtPriceX96 = spotSqrtPriceX96;
+        _migrationCompanyAmount = companyOut;
+        _migrationCollateralAmount = collateralOut;
+        migrationActive = true;
+    }
+
+    /// @notice Permissionlessly creates one conditional pool and its full-range position.
+    function migrateSide(bool yesSide) external nonReentrant {
+        if (!migrationActive) revert ProposalAlreadyActive();
+        if (yesSide ? conditionalYesLiquidity != 0 : conditionalNoLiquidity != 0) {
+            revert ProposalAlreadyActive();
+        }
+
+        uint128 liquidityAdded = _addFreshConditionalPair(
+            yesSide ? _capturedYesCompanyToken : _capturedNoCompanyToken,
+            yesSide ? _capturedYesCurrencyToken : _capturedNoCurrencyToken,
+            _migrationCompanyAmount,
+            _migrationCollateralAmount,
+            _migrationSqrtPriceX96
         );
+        if (yesSide) {
+            conditionalYesLiquidity = liquidityAdded;
+        } else {
+            conditionalNoLiquidity = liquidityAdded;
+        }
+        if (conditionalYesLiquidity != 0 && conditionalNoLiquidity != 0) {
+            migrationActive = false;
+            inConditionalMode = true;
+        }
+    }
+
+    /// @notice Aborts a stuck migration, merges outcome tokens, and restores spot liquidity.
+    function abortMigration() external nonReentrant {
+        _checkOwner();
+        if (!migrationActive) revert ProposalAlreadyActive();
+        _consolidateVault();
+        // A migrated side returns its pool principal, which rounding (or trades against the
+        // fresh pool) can leave below the stored split amount; merge what both sides can cover
+        // and sweep whatever remains.
+        _mergeAvailableOutcomeAmounts();
+        _sweepActiveOutcomeTokensTo(BOOTSTRAP_RECIPIENT);
+        migrationActive = false;
+        _restoreSpotLiquidity();
     }
 
     /// @notice Permissionlessly settles the stored active CTF condition.
@@ -576,6 +603,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     /// assets.
     function armEmergencyExit() external {
         _checkOwner();
+        if (migrationActive) revert ProposalAlreadyActive();
         if (emergencyExitExecuted) revert EmergencyExitAlreadyExecuted();
         if (emergencyExitArmedAt != 0) revert EmergencyExitAlreadyArmed();
         emergencyExitArmedAt = block.timestamp;
@@ -742,7 +770,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         uint256 companyAmount,
         uint256 currencyAmount,
         uint160 spotSqrtPriceX96
-    ) internal returns (address pool, uint128 liquidityMinted) {
+    ) internal returns (uint128 liquidityMinted) {
         if (companyAmount == 0 || currencyAmount == 0) {
             revert ZeroLiquidityMinted();
         }
@@ -758,17 +786,13 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
 
         uint256 amount0Used;
         uint256 amount1Used;
-        (pool, liquidityMinted, amount0Used, amount1Used) = IFutarchyPrefundedLiquidityAdapter(
-                address(CONDITIONAL_ADAPTER)
-            )
-            .addPrefundedFreshFullRangeLiquidity(
+        _forceApprove(IERC20(token0), address(CONDITIONAL_ADAPTER), amount0Desired);
+        _forceApprove(IERC20(token1), address(CONDITIONAL_ADAPTER), amount1Desired);
+        (, liquidityMinted, amount0Used, amount1Used) =
+            CONDITIONAL_ADAPTER.addFreshFullRangeLiquidity(
                 token0, token1, amount0Desired, amount1Desired, sqrtPriceX96
             );
-        if (pool.code.length == 0 || liquidityMinted == 0) revert ZeroLiquidityMinted();
-        if (
-            IFutarchyPrefundedLiquidityAdapter(address(CONDITIONAL_ADAPTER))
-                    .poolByPair(token0, token1) != pool
-        ) revert InvalidPool();
+        if (liquidityMinted == 0) revert ZeroLiquidityMinted();
         if (amount0Used > amount0Desired || amount1Used > amount1Desired) {
             revert AdapterOverusedInput();
         }
@@ -812,11 +836,18 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         address token1,
         uint128 liquidity
     ) internal returns (IFutarchyLiquidityAdapter.Removal memory removed) {
-        (removed.fees0, removed.fees1) = _removeLiquidityReceiptExact(adapter, token0, token1, 0);
-        if (liquidity == 0) return removed;
-
-        (removed.principal0, removed.principal1) =
-            _removeLiquidityReceiptExact(adapter, token0, token1, liquidity);
+        // Fees pass (liquidity 0) then principal pass share one loop body so the
+        // receipt helper is not inlined twice (code-size).
+        for (uint256 pass; pass < 2; ++pass) {
+            if (pass == 1 && liquidity == 0) break;
+            (uint256 amount0, uint256 amount1) =
+                _removeLiquidityReceiptExact(adapter, token0, token1, pass == 0 ? 0 : liquidity);
+            if (pass == 0) {
+                (removed.fees0, removed.fees1) = (amount0, amount1);
+            } else {
+                (removed.principal0, removed.principal1) = (amount0, amount1);
+            }
+        }
     }
 
     function _removeLiquidityReceiptExact(
@@ -1028,37 +1059,70 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         uint256 yesRemainder = yesAmount - mergeAmount;
         uint256 noRemainder = noAmount - mergeAmount;
         uint256 redeemAmount = yesWins ? yesRemainder : noRemainder;
-        address winningToken = yesWins ? yesToken : noToken;
-        if (redeemAmount > 0) {
-            IERC20 collateral = IERC20(collateralToken);
-            IERC20 winner = IERC20(winningToken);
-            uint256 collateralBefore = collateral.balanceOf(address(this));
-            uint256 winnerBefore = winner.balanceOf(address(this));
-            _forceApprove(winner, address(CONDITIONAL_ROUTER), redeemAmount);
-            CONDITIONAL_ROUTER.redeemPositions(
-                collateralToken, _capturedConditionId, yesToken, noToken, redeemAmount
-            );
-            _forceApprove(winner, address(CONDITIONAL_ROUTER), 0);
-            if (
-                collateral.balanceOf(address(this)) - collateralBefore != redeemAmount
-                    || winnerBefore - winner.balanceOf(address(this)) != redeemAmount
-            ) revert IncompleteOutcomeRecovery();
-        }
-
         uint256 losingAmount = yesWins ? noRemainder : yesRemainder;
+        address winningToken = yesWins ? yesToken : noToken;
         address losingToken = yesWins ? noToken : yesToken;
-        if (losingAmount > 0) {
-            IERC20 loser = IERC20(losingToken);
-            uint256 losingBefore = loser.balanceOf(address(this));
-            _forceApprove(loser, address(CONDITIONAL_ROUTER), losingAmount);
-            CONDITIONAL_ROUTER.consumeLosingPositions(
-                collateralToken, _capturedConditionId, yesToken, noToken, losingAmount
+        // Single loop body for the twin redeem/consume settlements (code-size).
+        for (uint256 i; i < 2; ++i) {
+            bool isRedeem = i == 0;
+            uint256 amount = isRedeem ? redeemAmount : losingAmount;
+            if (amount == 0) continue;
+            _settleOutcomeLeg(
+                collateralToken,
+                yesToken,
+                noToken,
+                isRedeem ? winningToken : losingToken,
+                amount,
+                isRedeem
             );
-            _forceApprove(loser, address(CONDITIONAL_ROUTER), 0);
-            if (losingBefore - loser.balanceOf(address(this)) != losingAmount) {
-                revert IncompleteOutcomeRecovery();
-            }
         }
+    }
+
+    /// @dev Extracted so each settlement leg gets its own stack frame; inlining the
+    /// body in the twin loop above is one slot too deep under minimum optimization.
+    function _settleOutcomeLeg(
+        address collateralToken,
+        address yesToken,
+        address noToken,
+        address outcomeToken,
+        uint256 amount,
+        bool isRedeem
+    ) internal {
+        IERC20 token = IERC20(outcomeToken);
+        IERC20 collateral = IERC20(collateralToken);
+        uint256 collateralBefore = collateral.balanceOf(address(this));
+        uint256 tokenBefore = token.balanceOf(address(this));
+        _forceApprove(token, address(CONDITIONAL_ROUTER), amount);
+        if (isRedeem) {
+            CONDITIONAL_ROUTER.redeemPositions(
+                collateralToken, _capturedConditionId, yesToken, noToken, amount
+            );
+        } else {
+            CONDITIONAL_ROUTER.consumeLosingPositions(
+                collateralToken, _capturedConditionId, yesToken, noToken, amount
+            );
+        }
+        _forceApprove(token, address(CONDITIONAL_ROUTER), 0);
+        if (
+            tokenBefore - token.balanceOf(address(this)) != amount
+                || (isRedeem && collateral.balanceOf(address(this)) - collateralBefore != amount)
+        ) revert IncompleteOutcomeRecovery();
+    }
+
+    function _mergeAvailableOutcomeAmounts() internal {
+        // Failure-isolated: an unmergeable slice is left for the sweep to
+        // BOOTSTRAP_RECIPIENT that follows in abortMigration, so the abort
+        // rescue path can never be blocked by a reverting merge.
+        uint256 amount = _min(
+            IERC20(_capturedYesCompanyToken).balanceOf(address(this)),
+            IERC20(_capturedNoCompanyToken).balanceOf(address(this))
+        );
+        if (amount != 0) _tryMergeOutcomeAmount(true, amount);
+        amount = _min(
+            IERC20(_capturedYesCurrencyToken).balanceOf(address(this)),
+            IERC20(_capturedNoCurrencyToken).balanceOf(address(this))
+        );
+        if (amount != 0) _tryMergeOutcomeAmount(false, amount);
     }
 
     function _mergeOutcomeAmount(
@@ -1119,6 +1183,10 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         conditionalYesLiquidity = 0;
         conditionalNoLiquidity = 0;
         inConditionalMode = false;
+    }
+
+    function _hasActiveProposal() internal view returns (bool) {
+        return inConditionalMode || migrationActive;
     }
 
     function _conditionalPool(address tokenA, address tokenB) internal view returns (address pool) {
@@ -1303,7 +1371,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     /// snapshot so they are priced for current shareholders and cannot be orphaned by reactivation.
     function _prepareInitializedOperation() internal {
         if (!initializedFromBootstrap) revert NotInitialized();
-        if (!inConditionalMode && _capturedConditionId != bytes32(0)) {
+        if (!_hasActiveProposal() && _capturedConditionId != bytes32(0)) {
             _recoverIdleOutcomeBalances(_capturedYesWon);
         }
     }

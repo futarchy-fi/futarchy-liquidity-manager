@@ -3,6 +3,8 @@ pragma solidity ^0.8.20;
 
 /// @notice Minimal Swapr Algebra pool surface needed for a current-tick/TWAP check.
 interface IAlgebraPoolLike {
+    function liquidityCooldown() external view returns (uint32);
+
     function globalState()
         external
         view

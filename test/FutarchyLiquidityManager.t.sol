@@ -134,8 +134,21 @@ contract FutarchyLiquidityManagerTest is Test {
         manager.activateOfficialProposal(activation);
 
         proposalSource.activate(address(manager));
-        assertTrue(manager.inConditionalMode());
+        assertTrue(manager.migrationActive());
+        assertFalse(manager.inConditionalMode());
         assertEq(manager.spotLiquidity(), 20 ether);
+
+        vm.expectRevert(FutarchyLiquidityManager.DepositsDisabledInConditionalMode.selector);
+        vm.prank(bootstrapRecipient);
+        manager.redeem(1 ether, bootstrapRecipient, false);
+
+        manager.migrateSide(false);
+        assertEq(manager.conditionalNoLiquidity(), 80 ether);
+        assertEq(manager.conditionalYesLiquidity(), 0);
+        vm.expectRevert(FutarchyLiquidityManager.ProposalAlreadyActive.selector);
+        manager.migrateSide(false);
+        manager.migrateSide(true);
+        assertTrue(manager.inConditionalMode());
         assertEq(manager.conditionalYesLiquidity(), 80 ether);
         assertEq(manager.conditionalNoLiquidity(), 80 ether);
     }
@@ -204,6 +217,8 @@ contract FutarchyLiquidityManagerTest is Test {
         _registerProposal(true);
 
         proposalSource.activate(address(manager));
+        manager.migrateSide(true);
+        manager.migrateSide(false);
 
         address yesPool = manager.activeYesPool();
         address noPool = manager.activeNoPool();
@@ -218,36 +233,49 @@ contract FutarchyLiquidityManagerTest is Test {
         assertFalse(manager.canActivateOfficialProposal());
     }
 
-    function test_activation_rejects_preexisting_pool_atomically() public {
+    function test_migration_rejects_preexisting_pool_and_owner_canAbort() public {
         _bootstrap();
         _registerProposalWithPools(true, address(0xCAFE), address(0xBEEF));
         conditionalAdapter.setFreshPool(address(yesCompany), address(yesCurrency), address(0xCAFE));
 
-        vm.expectRevert();
         proposalSource.activate(address(manager));
+        vm.expectRevert();
+        manager.migrateSide(true);
 
-        _assertActivationRolledBack();
+        manager.abortMigration();
+        assertFalse(manager.migrationActive());
+        assertEq(manager.spotLiquidity(), 100 ether);
+        assertEq(company.balanceOf(address(manager)), 0);
+        assertEq(wrappedNative.balanceOf(address(manager)), 0);
     }
 
-    function test_activation_rolls_back_first_pool_when_second_pool_is_precreated() public {
+    function test_migration_failure_doesNotRollBackCompletedSide_andAbortRestoresSpot() public {
         _bootstrap();
         _registerProposal(true);
         conditionalAdapter.setFreshPool(address(noCompany), address(noCurrency), address(0xBEEF));
 
-        vm.expectRevert();
         proposalSource.activate(address(manager));
+        manager.migrateSide(true);
+        vm.expectRevert();
+        manager.migrateSide(false);
 
-        _assertActivationRolledBack();
-        assertEq(
-            conditionalAdapter.freshPoolByPair(_pairKey(address(yesCompany), address(yesCurrency))),
-            address(0),
-            "first pool creation must roll back"
+        assertTrue(
+            conditionalAdapter.freshPoolByPair(_pairKey(address(yesCompany), address(yesCurrency)))
+                != address(0),
+            "completed first side must remain"
         );
         assertEq(
             conditionalAdapter.freshPoolByPair(_pairKey(address(noCompany), address(noCurrency))),
             address(0xBEEF),
             "pre-existing second pool must remain"
         );
+        vm.prank(depositor);
+        vm.expectRevert();
+        manager.abortMigration();
+        manager.abortMigration();
+        assertEq(manager.spotLiquidity(), 100 ether);
+        assertEq(manager.conditionalYesLiquidity(), 0);
+        assertEq(manager.conditionalNoLiquidity(), 0);
     }
 
     function test_activation_rejects_resolved_condition_before_removing_spot() public {
@@ -508,8 +536,10 @@ contract FutarchyLiquidityManagerTest is Test {
         yesCompany.mint(address(manager), 20 ether);
         company.mint(address(router), 20 ether);
 
-        vm.prank(depositor);
+        vm.startPrank(bootstrapRecipient);
         uint256 minted = manager.depositToSpot{value: 100 ether}(120 ether);
+        manager.transfer(depositor, minted);
+        vm.stopPrank();
 
         assertEq(minted, 100 ether);
         assertEq(yesCompany.balanceOf(address(manager)), 0);
@@ -587,6 +617,8 @@ contract FutarchyLiquidityManagerTest is Test {
         router.setPayouts(0, 0, 0);
 
         proposalSource.activate(address(manager));
+        manager.migrateSide(true);
+        manager.migrateSide(false);
 
         assertTrue(manager.inConditionalMode());
         assertEq(manager.activeProposal(), address(nextProposal));
@@ -628,8 +660,10 @@ contract FutarchyLiquidityManagerTest is Test {
 
     function test_spot_redeem_is_proportional_across_principal_fees_and_idle() public {
         _bootstrap();
-        vm.prank(depositor);
+        vm.startPrank(bootstrapRecipient);
         manager.depositToSpot{value: 100 ether}(100 ether);
+        manager.transfer(depositor, 100 ether);
+        vm.stopPrank();
         _accruePairFees(spotAdapter, company, wrappedNative, 20 ether, 40 ether);
         spotAdapter.setMisclassifyRemoveOutput(true);
         company.mint(address(manager), 10 ether);
@@ -786,8 +820,10 @@ contract FutarchyLiquidityManagerTest is Test {
 
     function test_conditional_redeem_is_proportional_without_add_or_guard() public {
         _bootstrap();
-        vm.prank(depositor);
+        vm.startPrank(bootstrapRecipient);
         manager.depositToSpot{value: 100 ether}(100 ether);
+        manager.transfer(depositor, 100 ether);
+        vm.stopPrank();
         _activateProposal(true);
 
         _accruePairFees(conditionalAdapter, yesCompany, yesCurrency, 4 ether, 8 ether);
@@ -1098,24 +1134,54 @@ contract FutarchyLiquidityManagerTest is Test {
         assertEq(manager.totalSupply(), 0);
     }
 
-    function test_deposit_mints_proportional_shares() public {
+    function test_only_bootstrap_can_use_both_deposit_variants() public {
         _bootstrap();
 
         vm.prank(depositor);
+        vm.expectRevert(FutarchyLiquidityManager.OnlyBootstrapRecipient.selector);
+        manager.depositToSpot{value: 50 ether}(50 ether);
+
+        vm.prank(depositor);
+        vm.expectRevert(FutarchyLiquidityManager.OnlyBootstrapRecipient.selector);
+        manager.depositToSpot(50 ether, 50 ether);
+
+        vm.prank(bootstrapRecipient);
         uint256 sharesMinted = manager.depositToSpot{value: 50 ether}(50 ether);
 
         assertEq(sharesMinted, 50 ether);
-        assertEq(manager.balanceOf(depositor), 50 ether);
+        assertEq(manager.balanceOf(bootstrapRecipient), 150 ether);
         assertEq(manager.totalSupply(), 150 ether);
         assertEq(manager.spotLiquidity(), 150 ether);
+
+        wrappedNative.mint(bootstrapRecipient, 50 ether);
+        vm.startPrank(bootstrapRecipient);
+        wrappedNative.approve(address(manager), 50 ether);
+        sharesMinted = manager.depositToSpot(50 ether, 50 ether);
+        vm.stopPrank();
+        assertEq(sharesMinted, 50 ether);
+        assertEq(manager.balanceOf(bootstrapRecipient), 200 ether);
     }
 
-    function test_single_leg_donation_before_first_public_deposit_cannot_inflate_shares() public {
+    function test_existing_shareholder_can_redeem_after_deposit_gate() public {
+        _bootstrap();
+        vm.prank(bootstrapRecipient);
+        manager.transfer(depositor, 50 ether);
+
+        vm.prank(depositor);
+        (uint256 companyOut, uint256 collateralOut) = manager.redeem(50 ether, depositor, false);
+
+        assertEq(companyOut, 50 ether);
+        assertEq(collateralOut, 50 ether);
+    }
+
+    function test_single_leg_donation_before_first_operator_deposit_cannot_inflate_shares() public {
         _bootstrap();
         company.mint(address(manager), 100 ether);
 
-        vm.prank(depositor);
+        vm.startPrank(bootstrapRecipient);
         uint256 sharesMinted = manager.depositToSpot{value: 100 ether}(100 ether);
+        manager.transfer(depositor, sharesMinted);
+        vm.stopPrank();
 
         assertEq(sharesMinted, 50 ether);
         assertEq(manager.balanceOf(depositor), 50 ether);
@@ -1136,8 +1202,10 @@ contract FutarchyLiquidityManagerTest is Test {
 
     function test_fees_and_donations_after_partial_redemption_belong_to_survivors() public {
         _bootstrap();
-        vm.prank(depositor);
+        vm.startPrank(bootstrapRecipient);
         manager.depositToSpot{value: 100 ether}(100 ether);
+        manager.transfer(depositor, 100 ether);
+        vm.stopPrank();
 
         vm.prank(bootstrapRecipient);
         (uint256 firstCompany, uint256 firstCollateral) =
@@ -1217,14 +1285,15 @@ contract FutarchyLiquidityManagerTest is Test {
         erc20Manager.initializeFromBootstrap(SEED_COMPANY, SEED_NATIVE);
         vm.stopPrank();
 
-        collateral.mint(depositor, 1000 ether);
-        vm.startPrank(depositor);
-        company.approve(address(erc20Manager), type(uint256).max);
-        collateral.approve(address(erc20Manager), type(uint256).max);
+        collateral.mint(bootstrapRecipient, 50 ether);
+        vm.startPrank(bootstrapRecipient);
         uint256 sharesMinted = erc20Manager.depositToSpot(50 ether, 50 ether);
+        erc20Manager.transfer(depositor, sharesMinted);
+        vm.stopPrank();
+
+        vm.prank(depositor);
         (uint256 companyOut, uint256 collateralOut) =
             erc20Manager.redeem(25 ether, depositor, false);
-        vm.stopPrank();
 
         assertEq(sharesMinted, 50 ether);
         assertEq(companyOut, 25 ether);
@@ -1236,7 +1305,7 @@ contract FutarchyLiquidityManagerTest is Test {
         _registerProposal(true);
         manager.armEmergencyExit();
 
-        vm.prank(depositor);
+        vm.prank(bootstrapRecipient);
         vm.expectRevert(FutarchyLiquidityManager.EmergencyModeActive.selector);
         manager.depositToSpot{value: 1 ether}(1 ether);
 
@@ -1387,7 +1456,7 @@ contract FutarchyLiquidityManagerTest is Test {
     function test_lifecycle_requires_bootstrap() public {
         _registerProposal(true);
 
-        vm.prank(depositor);
+        vm.prank(bootstrapRecipient);
         vm.expectRevert(FutarchyLiquidityManager.NotInitialized.selector);
         manager.depositToSpot{value: 1 ether}(1 ether);
 
@@ -1451,8 +1520,10 @@ contract FutarchyLiquidityManagerTest is Test {
     ) public {
         _bootstrap();
         uint256 depositAmount = bound(uint256(depositSeed), 1e9, 250 ether);
-        vm.prank(depositor);
+        vm.startPrank(bootstrapRecipient);
         manager.depositToSpot{value: depositAmount}(depositAmount);
+        manager.transfer(depositor, depositAmount);
+        vm.stopPrank();
         uint256 shares = bound(uint256(redeemSeed), 1, depositAmount);
         uint256 supplyBefore = manager.totalSupply();
         uint128 liquidityBefore = manager.spotLiquidity();
@@ -1626,6 +1697,8 @@ contract FutarchyLiquidityManagerTest is Test {
     function _activateProposal(bool winnerIsYes) internal {
         _registerProposal(winnerIsYes);
         proposalSource.activate(address(manager));
+        manager.migrateSide(true);
+        manager.migrateSide(false);
     }
 
     function _assertActivationRolledBack() internal view {
@@ -1872,6 +1945,8 @@ contract FutarchyLiquidityManagerTest is Test {
             address(0)
         );
         localSource.activate(address(localManager));
+        localManager.migrateSide(true);
+        localManager.migrateSide(false);
 
         uint160 expectedYes = companyIsToken0 == yesCompanyIsToken0
             ? guardedSqrtPriceX96
