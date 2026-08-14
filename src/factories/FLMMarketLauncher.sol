@@ -138,14 +138,14 @@ contract FLMMarketLauncher is Ownable2Step {
         proposal = IFutarchyFactory(factory)
             .createProposal(
                 IFutarchyFactory.CreateParams({
-                    marketName: p.marketName,
-                    companyToken: companyToken,
-                    currencyToken: currencyToken,
-                    category: category,
-                    language: language,
-                    minBond: p.minBond,
-                    openingTime: p.openingTime
-                })
+                marketName: p.marketName,
+                companyToken: companyToken,
+                currencyToken: currencyToken,
+                category: category,
+                language: language,
+                minBond: p.minBond,
+                openingTime: p.openingTime
+            })
             );
         metadataContract = IOrganization(organization)
             .createAndAddProposalMetadata(
@@ -177,10 +177,10 @@ contract FLMMarketLauncher is Ownable2Step {
 
     /// @notice Activates an already-created proposal without creating metadata or a new market.
     /// @dev The proposal source performs the full token, condition, and policy validation before
-    /// atomically activating the bound liquidity manager.
+    /// atomically activating the bound liquidity manager. The manager rejects proposals whose
+    /// conditional pools already exist because its conditional adapter supports fresh pools only.
     function activateExistingMarket(uint256 proposalId, address proposal) external onlyOwner {
         if (!bound) revert NotBound();
-        if (pendingProposal != address(0)) revert MarketAlreadyPending();
         IFutarchyOfficialProposalSourceWriter(source)
             .setOfficialProposal(proposalId, proposal, address(this));
         emit ExistingMarketActivated(proposalId, proposal);

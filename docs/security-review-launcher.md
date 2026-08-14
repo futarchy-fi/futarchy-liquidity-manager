@@ -1,5 +1,9 @@
 # FLMMarketLauncher + operator-mode — internal adversarial pre-review
 
+> **Historical record:** this review predates split migration and
+> `activateExistingMarket`. It does not approve the current launcher/manager
+> code; use the PR-specific review and current Gnosis fork evidence instead.
+
 > **Status: internal adversarial review, NOT the independent sign-off.** This is
 > the grounding package for a named independent reviewer to validate. Four
 > independent lenses each tried to *break* one security invariant against the
@@ -27,8 +31,8 @@ Safe's).
 
 ## 1. No theft path
 
-The launcher has exactly two owner entrypoints: one-shot `bind()` and
-`launchMarket()`. `launchMarket` passes only a *proposal address* to
+The reviewed launcher had two owner entrypoints: one-shot `bind()` and the
+then-current launch method. That method passed only a *proposal address* to
 `source.setOfficialProposal(id, proposal, address(this))` — it cannot inject
 activation data. The source **reads and validates** the outcome tokens and
 `conditionId` from the proposal itself, cryptographically pins

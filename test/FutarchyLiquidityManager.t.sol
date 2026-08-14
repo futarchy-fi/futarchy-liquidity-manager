@@ -233,29 +233,28 @@ contract FutarchyLiquidityManagerTest is Test {
         assertFalse(manager.canActivateOfficialProposal());
     }
 
-    function test_migration_rejects_preexisting_pool_and_owner_canAbort() public {
+    function test_activation_rejects_preexisting_pool_before_spot_movement() public {
         _bootstrap();
         _registerProposalWithPools(true, address(0xCAFE), address(0xBEEF));
         conditionalAdapter.setFreshPool(address(yesCompany), address(yesCurrency), address(0xCAFE));
 
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                FutarchyLiquidityManager.ConditionalPoolAlreadyExists.selector, address(0xCAFE)
+            )
+        );
         proposalSource.activate(address(manager));
-        vm.expectRevert();
-        manager.migrateSide(true);
 
-        manager.abortMigration();
-        assertFalse(manager.migrationActive());
-        assertEq(manager.spotLiquidity(), 100 ether);
-        assertEq(company.balanceOf(address(manager)), 0);
-        assertEq(wrappedNative.balanceOf(address(manager)), 0);
+        _assertActivationRolledBack();
     }
 
     function test_migration_failure_doesNotRollBackCompletedSide_andAbortRestoresSpot() public {
         _bootstrap();
         _registerProposal(true);
-        conditionalAdapter.setFreshPool(address(noCompany), address(noCurrency), address(0xBEEF));
 
         proposalSource.activate(address(manager));
         manager.migrateSide(true);
+        conditionalAdapter.setFreshPool(address(noCompany), address(noCurrency), address(0xBEEF));
         vm.expectRevert();
         manager.migrateSide(false);
 

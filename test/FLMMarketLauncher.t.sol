@@ -210,13 +210,16 @@ contract FLMMarketLauncherTest is Test {
         unbound.activateExistingMarket(42, address(0xBEEF));
     }
 
-    function test_activateExistingMarket_revertsWhileAnotherMarketIsPending() public {
+    function test_activateExistingMarket_preservesPendingMarket() public {
         vm.prank(OWNER);
-        launcher.prepareMarket(_params());
+        (address pending,,) = launcher.prepareMarket(_params());
 
-        vm.expectRevert(FLMMarketLauncher.MarketAlreadyPending.selector);
         vm.prank(OWNER);
         launcher.activateExistingMarket(42, address(0xBEEF));
+
+        assertEq(source.proposalId(), 42);
+        assertEq(source.proposal(), address(0xBEEF));
+        assertEq(launcher.pendingProposal(), pending);
     }
 
     function test_prepareAndActivateMarket_revertForNonOwner() public {

@@ -131,6 +131,7 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
     error OnlyProposalSource();
     error ProposalAlreadyActive();
     error ConditionAlreadyResolved();
+    error ConditionalPoolAlreadyExists(address pool);
     error InvalidSqrtPrice();
 
     event InitializedFromBootstrap(
@@ -502,6 +503,10 @@ contract FutarchyLiquidityManager is ERC20, Ownable2Step, ReentrancyGuard {
         if (_hasActiveProposal()) revert ProposalAlreadyActive();
 
         _validateProposal(proposal);
+        address existingPool = _conditionalPool(proposal.yesCompanyToken, proposal.yesCurrencyToken);
+        if (existingPool != address(0)) revert ConditionalPoolAlreadyExists(existingPool);
+        existingPool = _conditionalPool(proposal.noCompanyToken, proposal.noCurrencyToken);
+        if (existingPool != address(0)) revert ConditionalPoolAlreadyExists(existingPool);
         bytes32 conditionId = proposal.conditionId;
         (uint256 denominator,,) = CONDITIONAL_ROUTER.getPayouts(conditionId);
         if (denominator != 0) revert ConditionAlreadyResolved();

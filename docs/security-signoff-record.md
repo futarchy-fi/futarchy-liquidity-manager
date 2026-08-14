@@ -1,5 +1,9 @@
 # Independent sign-off record — FLM operator mode + FLMMarketLauncher
 
+> **Historical record:** this sign-off predates split migration and
+> `activateExistingMarket`. It is superseded for current deployments and must
+> not be used as approval of repository head or PR #14.
+
 **Reviewer:** independent agent (separate from the implementing agent), commissioned
 per Kelvin's direction 2026-07-29 that a separate agent serves as the independent
 reviewer of record. Full internal adversarial pre-review: `security-review-launcher.md`.
