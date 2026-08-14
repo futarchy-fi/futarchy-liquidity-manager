@@ -206,14 +206,14 @@ contract FlmLauncherOneSigForkTest is Test {
         address proposal = IFutarchyFactory(FUTARCHY_FACTORY)
             .createProposal(
                 IFutarchyFactory.CreateParams({
-                    marketName: "Existing FLM fork test",
-                    companyToken: GNO,
-                    currencyToken: SDAI,
-                    category: "governance",
-                    language: "en_US",
-                    minBond: 1 ether,
-                    openingTime: uint32(block.timestamp + 1 days)
-                })
+                marketName: "Existing FLM fork test",
+                companyToken: GNO,
+                currencyToken: SDAI,
+                category: "governance",
+                language: "en_US",
+                minBond: 1 ether,
+                openingTime: uint32(block.timestamp + 1 days)
+            })
             );
 
         fixture.launcher.activateExistingMarket(42, proposal);
