@@ -48,16 +48,16 @@ contract MockOfficialProposalSource is IFutarchyOfficialProposalSource {
         IMockActivationTarget(target)
             .activateOfficialProposal(
                 IFutarchyOfficialProposalSource.ProposalActivationData({
-                proposalId: proposalId,
-                proposal: proposal,
-                conditionId: conditionId,
-                proposalToken: proposalToken,
-                collateralToken: collateralToken,
-                yesCompanyToken: yesCompanyToken,
-                noCompanyToken: noCompanyToken,
-                yesCurrencyToken: yesCurrencyToken,
-                noCurrencyToken: noCurrencyToken
-            })
+                    proposalId: proposalId,
+                    proposal: proposal,
+                    conditionId: conditionId,
+                    proposalToken: proposalToken,
+                    collateralToken: collateralToken,
+                    yesCompanyToken: yesCompanyToken,
+                    noCompanyToken: noCompanyToken,
+                    yesCurrencyToken: yesCurrencyToken,
+                    noCurrencyToken: noCurrencyToken
+                })
             );
     }
 

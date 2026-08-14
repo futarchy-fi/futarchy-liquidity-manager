@@ -32,9 +32,9 @@ interface IFutarchyOfficialProposalSourceWriter {
     function setOfficialProposal(uint256 proposalId, address proposal, address creator) external;
 }
 
-/// @notice Owner-operated two-transaction bridge from a Futarchy proposal to an active FLM market.
-/// @dev The organization owner must call `organization.setEditor(address(this))` once before
-/// launch.
+/// @notice Owner-operated bridge from a Futarchy proposal to an active FLM market.
+/// @dev New-market launches require the organization owner to call
+/// `organization.setEditor(address(this))` once. Existing-market launches do not.
 contract FLMMarketLauncher is Ownable2Step {
     struct MarketParams {
         string marketName;
@@ -63,6 +63,7 @@ contract FLMMarketLauncher is Ownable2Step {
     error AlreadyBound();
     error MarketAlreadyPending();
     error NoPendingMarket();
+    error NotBound();
 
     event Bound(
         address indexed source,
@@ -78,6 +79,7 @@ contract FLMMarketLauncher is Ownable2Step {
         uint256 indexed proposalId, address indexed proposal, address metadataContract
     );
     event MarketActivated(uint256 indexed proposalId, address indexed proposal);
+    event ExistingMarketActivated(uint256 indexed proposalId, address indexed proposal);
 
     constructor(address initialOwner) {
         if (initialOwner == address(0)) revert ZeroAddress();
@@ -131,18 +133,19 @@ contract FLMMarketLauncher is Ownable2Step {
         onlyOwner
         returns (address proposal, address metadataContract, uint256 proposalId)
     {
+        if (!bound) revert NotBound();
         if (pendingProposal != address(0)) revert MarketAlreadyPending();
         proposal = IFutarchyFactory(factory)
             .createProposal(
                 IFutarchyFactory.CreateParams({
-                marketName: p.marketName,
-                companyToken: companyToken,
-                currencyToken: currencyToken,
-                category: category,
-                language: language,
-                minBond: p.minBond,
-                openingTime: p.openingTime
-            })
+                    marketName: p.marketName,
+                    companyToken: companyToken,
+                    currencyToken: currencyToken,
+                    category: category,
+                    language: language,
+                    minBond: p.minBond,
+                    openingTime: p.openingTime
+                })
             );
         metadataContract = IOrganization(organization)
             .createAndAddProposalMetadata(
@@ -161,6 +164,7 @@ contract FLMMarketLauncher is Ownable2Step {
 
     /// @notice Activates the prepared market and clears the pending slot.
     function activateMarket() external onlyOwner {
+        if (!bound) revert NotBound();
         address proposal = pendingProposal;
         if (proposal == address(0)) revert NoPendingMarket();
         uint256 proposalId = pendingProposalId;
@@ -169,5 +173,16 @@ contract FLMMarketLauncher is Ownable2Step {
         IFutarchyOfficialProposalSourceWriter(source)
             .setOfficialProposal(proposalId, proposal, address(this));
         emit MarketActivated(proposalId, proposal);
+    }
+
+    /// @notice Activates an already-created proposal without creating metadata or a new market.
+    /// @dev The proposal source performs the full token, condition, and policy validation before
+    /// atomically activating the bound liquidity manager.
+    function activateExistingMarket(uint256 proposalId, address proposal) external onlyOwner {
+        if (!bound) revert NotBound();
+        if (pendingProposal != address(0)) revert MarketAlreadyPending();
+        IFutarchyOfficialProposalSourceWriter(source)
+            .setOfficialProposal(proposalId, proposal, address(this));
+        emit ExistingMarketActivated(proposalId, proposal);
     }
 }

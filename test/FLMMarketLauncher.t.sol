@@ -187,6 +187,38 @@ contract FLMMarketLauncherTest is Test {
         assertEq(launcher.pendingProposal(), address(0));
     }
 
+    function test_activateExistingMarket_skipsCreationAndMetadata() public {
+        address existingProposal = address(0xBEEF);
+
+        vm.prank(OWNER);
+        launcher.activateExistingMarket(42, existingProposal);
+
+        assertEq(callLog.factoryCall(), 0);
+        assertEq(callLog.organizationCall(), 0);
+        assertEq(callLog.sourceCall(), 1);
+        assertEq(source.proposalId(), 42);
+        assertEq(source.proposal(), existingProposal);
+        assertEq(source.creator(), address(launcher));
+        assertEq(launcher.pendingProposal(), address(0));
+    }
+
+    function test_activateExistingMarket_revertsWhenUnbound() public {
+        FLMMarketLauncher unbound = new FLMMarketLauncher(OWNER);
+
+        vm.expectRevert(FLMMarketLauncher.NotBound.selector);
+        vm.prank(OWNER);
+        unbound.activateExistingMarket(42, address(0xBEEF));
+    }
+
+    function test_activateExistingMarket_revertsWhileAnotherMarketIsPending() public {
+        vm.prank(OWNER);
+        launcher.prepareMarket(_params());
+
+        vm.expectRevert(FLMMarketLauncher.MarketAlreadyPending.selector);
+        vm.prank(OWNER);
+        launcher.activateExistingMarket(42, address(0xBEEF));
+    }
+
     function test_prepareAndActivateMarket_revertForNonOwner() public {
         vm.expectRevert();
         vm.prank(OTHER);
