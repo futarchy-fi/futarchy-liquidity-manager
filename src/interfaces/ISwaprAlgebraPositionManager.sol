@@ -3,6 +3,8 @@ pragma solidity ^0.8.20;
 
 /// @notice Minimal Swapr Algebra non-fungible position manager surface used by the adapter.
 interface ISwaprAlgebraPositionManager {
+    function factory() external view returns (address);
+
     /// @notice Parameters for minting a new concentrated liquidity position.
     struct MintParams {
         address token0;

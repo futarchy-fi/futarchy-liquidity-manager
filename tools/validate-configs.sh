@@ -6,12 +6,14 @@ cd "$ROOT"
 
 ALLOW_PLACEHOLDERS=false
 DEPLOY_FILES=()
+V4_FACTORY_FILES=()
 BATCH_FILES=()
 
 usage() {
   cat >&2 <<'USAGE'
 Usage:
-  tools/validate-configs.sh [--allow-placeholders] --deploy <file> [--batch <file> ...]
+  tools/validate-configs.sh [--allow-placeholders] [--deploy <file>] \
+    [--v4-factory <file>] [--batch <file> ...]
 
 Examples:
   tools/validate-configs.sh --allow-placeholders \
@@ -21,6 +23,9 @@ Examples:
   tools/validate-configs.sh \
     --deploy config/gnosis.production.json \
     --batch config/batches/bootstrap.production.json
+
+  tools/validate-configs.sh \
+    --v4-factory config/mainnet-v4-factory.production.json
 USAGE
 }
 
@@ -33,6 +38,11 @@ while [[ $# -gt 0 ]]; do
     --deploy)
       [[ $# -ge 2 ]] || { usage; exit 64; }
       DEPLOY_FILES+=("$2")
+      shift 2
+      ;;
+    --v4-factory)
+      [[ $# -ge 2 ]] || { usage; exit 64; }
+      V4_FACTORY_FILES+=("$2")
       shift 2
       ;;
     --batch)
@@ -52,7 +62,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ ${#DEPLOY_FILES[@]} -eq 0 && ${#BATCH_FILES[@]} -eq 0 ]]; then
+if [[ ${#DEPLOY_FILES[@]} -eq 0 && ${#V4_FACTORY_FILES[@]} -eq 0 && ${#BATCH_FILES[@]} -eq 0 ]]; then
   usage
   exit 64
 fi
@@ -61,6 +71,25 @@ if ! command -v jq >/dev/null 2>&1; then
   echo "config validation failed: jq is required" >&2
   exit 1
 fi
+
+COMPROMISED_KEY='0x693e3fb46bb36ee43c702fe94f9463df0691b43d'
+QUARANTINE_DIR='config/quarantine'
+
+require_no_compromised_key() {
+  local file="$1"
+  if grep -qi "$COMPROMISED_KEY" "$file"; then
+    echo "config validation failed (${file}): contains compromised key ${COMPROMISED_KEY}" >&2
+    exit 1
+  fi
+}
+
+if [[ -d "$QUARANTINE_DIR" ]]; then
+  echo "config validation skipped quarantined configs: $QUARANTINE_DIR"
+fi
+
+while IFS= read -r -d '' file; do
+  require_no_compromised_key "$file"
+done < <(find config -type f -name '*.json' ! -path "$QUARANTINE_DIR/*" -print0)
 
 require_jq() {
   local file="$1"
@@ -114,8 +143,8 @@ deploy_schema_filter='
   and (.validation.minTimeout | type == "number" and . >= 0)
   and (.validation.maxTimeout | type == "number" and . >= 0)
   and (.validation.maxTimeout >= .validation.minTimeout)
+  and (.validation.minConditionalLifetime | type == "number" and . >= 0)
   and (.validation.maxMinBond | type == "number" and . >= 0)
-  and (.validation.requirePools | type == "boolean")
 '
 
 deploy_strict_filter='
@@ -130,6 +159,7 @@ deploy_strict_filter='
   and (.companyToken | nzaddress)
   and (.officialProposer | nzaddress)
   and (.wrappedNative | nzaddress)
+  and ((.companyToken | ascii_downcase) != (.wrappedNative | ascii_downcase))
   and (.positionManager | nzaddress)
   and (.algebraFactory | nzaddress)
   and (.poolStabilityGuard | nzaddress)
@@ -137,6 +167,14 @@ deploy_strict_filter='
   and (.validation.enabled == true)
   and (.validation.expectedProposalToken | nzaddress)
   and (.validation.expectedCollateralToken | nzaddress)
+  and (
+    (.validation.expectedProposalToken | ascii_downcase)
+    == (.companyToken | ascii_downcase)
+  )
+  and (
+    (.validation.expectedCollateralToken | ascii_downcase)
+    == (.wrappedNative | ascii_downcase)
+  )
   and (.validation.conditionalTokens | nzaddress)
   and (
     if .deployDeadlineProxy == true
@@ -149,16 +187,64 @@ deploy_strict_filter='
   and (.validation.maxOpeningDelay > 0)
   and (.validation.minTimeout > 0)
   and (.validation.maxTimeout >= .validation.minTimeout)
-  and (.validation.requirePools == true)
+  and (.validation.minConditionalLifetime >= 86400)
+  and (
+    .validation.maxOpeningDelay + .validation.maxTimeout
+    >= .validation.minConditionalLifetime
+  )
   and (
     if .deployDeadlineProxy == true
     then
       (.deadlineProxy.conditionalTokens | nzaddress)
       and (.deadlineProxy.realitio | nzaddress)
       and (.deadlineProxy.maxQuestionDuration > 0)
+      and (.deadlineProxy.maxQuestionDuration >= .validation.minConditionalLifetime)
     else true
     end
   )
+'
+
+v4_factory_schema_filter='
+  def address: type == "string" and test("^0x[0-9a-fA-F]{40}$");
+  def bytes32: type == "string" and test("^0x[0-9a-fA-F]{64}$");
+  type == "object"
+  and (.chainId | type == "number" and . == 1)
+  and (.conditionalRouter | address)
+  and (.conditionalRouterCodeHash | bytes32)
+  and (.conditionalTokens | address)
+  and (.conditionalTokensCodeHash | bytes32)
+  and (.wrapped1155Factory | address)
+  and (.wrapped1155FactoryCodeHash | bytes32)
+  and (.poolStabilityGuard | address)
+  and (.poolStabilityGuardCodeHash | bytes32)
+  and (.wrappedNative | address)
+  and (.wrappedNativeCodeHash | bytes32)
+  and (.spotTickLower | type == "number")
+  and (.spotTickUpper | type == "number")
+'
+
+v4_factory_strict_filter='
+  def address: type == "string" and test("^0x[0-9a-fA-F]{40}$");
+  def bytes32: type == "string" and test("^0x[0-9a-fA-F]{64}$");
+  def zero: "0x0000000000000000000000000000000000000000";
+  def zero32: "0x0000000000000000000000000000000000000000000000000000000000000000";
+  def nzaddress: address and (ascii_downcase != zero);
+  def nzbytes32: bytes32 and (ascii_downcase != zero32);
+  (.conditionalRouter | nzaddress)
+  and (.conditionalRouterCodeHash | nzbytes32)
+  and (.conditionalTokens | nzaddress)
+  and (.conditionalTokensCodeHash | nzbytes32)
+  and (.wrapped1155Factory | nzaddress)
+  and (.wrapped1155FactoryCodeHash | nzbytes32)
+  and (.poolStabilityGuard | nzaddress)
+  and (.poolStabilityGuardCodeHash | nzbytes32)
+  and (.wrappedNative | nzaddress)
+  and (.wrappedNativeCodeHash | nzbytes32)
+  and (.spotTickLower >= -887272)
+  and (.spotTickUpper <= 887272)
+  and (.spotTickLower < .spotTickUpper)
+  and ((.spotTickLower % 10) == 0)
+  and ((.spotTickUpper % 10) == 0)
 '
 
 batch_schema_filter='
@@ -208,8 +294,8 @@ batch_schema_filter='
   and (.validation.minTimeout | nonnegative)
   and (.validation.maxTimeout | nonnegative)
   and (.validation.maxTimeout >= .validation.minTimeout)
+  and (.validation.minConditionalLifetime | nonnegative)
   and (.validation.maxMinBond | nonnegative)
-  and (.validation.requirePools | type == "boolean")
   and (has("spotAdd") | not)
   and (has("spotExit") | not)
   and (has("yesAdd") | not)
@@ -235,7 +321,11 @@ batch_strict_filter='
     and (.validation.maxOpeningDelay > 0)
     and (.validation.minTimeout > 0)
     and (.validation.maxTimeout >= .validation.minTimeout)
-    and (.validation.requirePools == true);
+    and (.validation.minConditionalLifetime >= 86400)
+    and (
+      .validation.maxOpeningDelay + .validation.maxTimeout
+      >= .validation.minConditionalLifetime
+    );
   def fundingstrict:
     (
       (.nativeValue | positive)
@@ -306,6 +396,7 @@ batch_strict_filter='
 
 if [[ ${#DEPLOY_FILES[@]} -gt 0 ]]; then
   for file in "${DEPLOY_FILES[@]}"; do
+    require_no_compromised_key "$file"
     require_jq "$file" "$deploy_schema_filter" "deployment config schema is invalid"
     if [[ "$ALLOW_PLACEHOLDERS" == false ]]; then
       require_jq "$file" "$deploy_strict_filter" \
@@ -315,8 +406,21 @@ if [[ ${#DEPLOY_FILES[@]} -gt 0 ]]; then
   done
 fi
 
+if [[ ${#V4_FACTORY_FILES[@]} -gt 0 ]]; then
+  for file in "${V4_FACTORY_FILES[@]}"; do
+    require_no_compromised_key "$file"
+    require_jq "$file" "$v4_factory_schema_filter" "v4 mainnet factory config schema is invalid"
+    if [[ "$ALLOW_PLACEHOLDERS" == false ]]; then
+      require_jq "$file" "$v4_factory_strict_filter" \
+        "strict v4 factory config must pin code-bearing dependencies and aligned spot ticks"
+    fi
+    echo "v4 mainnet factory config validation passed: $file"
+  done
+fi
+
 if [[ ${#BATCH_FILES[@]} -gt 0 ]]; then
   for file in "${BATCH_FILES[@]}"; do
+    require_no_compromised_key "$file"
     require_jq "$file" "$batch_schema_filter" "batch config schema is invalid"
     if [[ "$ALLOW_PLACEHOLDERS" == false ]]; then
       require_jq "$file" "$batch_strict_filter" \

@@ -4,6 +4,14 @@ pragma solidity ^0.8.20;
 import {IFutarchyLiquidityAdapter} from "../../src/interfaces/IFutarchyLiquidityAdapter.sol";
 
 contract RevertingFutarchyLiquidityAdapter is IFutarchyLiquidityAdapter {
+    function addFreshFullRangeLiquidity(address, address, uint256, uint256, uint160)
+        external
+        pure
+        returns (address, uint128, uint256, uint256)
+    {
+        revert("LP add failed");
+    }
+
     function addFullRangeLiquidity(address, address, uint256, uint256, bytes calldata)
         external
         pure
@@ -15,21 +23,11 @@ contract RevertingFutarchyLiquidityAdapter is IFutarchyLiquidityAdapter {
         revert("LP add failed");
     }
 
-    function removeLiquidity(address, address, uint128, bytes calldata)
+    function removeLiquidityDetailed(address, address, uint128)
         external
         pure
-        returns (uint256 amount0Out, uint256 amount1Out)
+        returns (Removal memory)
     {
-        amount0Out = 0;
-        amount1Out = 0;
         revert("not used");
-    }
-
-    function compoundPosition(address, address, bytes calldata)
-        external
-        pure
-        returns (uint128 liquidityAdded)
-    {
-        liquidityAdded = 0;
     }
 }

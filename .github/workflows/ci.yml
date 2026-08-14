@@ -44,6 +44,7 @@ jobs:
           done
           bash tools/validate-configs.sh --allow-placeholders \
             --deploy config/gnosis.example.json \
+            --v4-factory config/mainnet-v4-factory.example.json \
             "${batch_args[@]}"
 
       - name: Batch template generation
@@ -59,4 +60,28 @@ jobs:
         run: forge test
 
       - name: Coverage summary
-        run: forge coverage --ir-minimum --report summary
+        run: >-
+          forge coverage --ir-minimum --report summary
+          --no-match-test CandidateCreationCodeHashesMatchMainnetManifest
+
+  gnosis-operator-fork:
+    runs-on: ubuntu-latest
+    env:
+      RUN_GNOSIS_FORK_TESTS: "true"
+      GNOSIS_RPC_URL: ${{ secrets.GNOSIS_RPC_URL || 'https://rpc.gnosischain.com' }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@b00af27efadbc7b4ca8b82abbd903b17cc874d2a # v1.9.0
+        with:
+          version: stable
+
+      - name: Gnosis operator-mode lifecycle fork
+        run: >-
+          forge test --match-path "test/fork/FlmOperatorLifecycleFork.t.sol" -vv
+
+      - name: Gnosis one-signature launcher fork
+        run: >-
+          forge test --match-path "test/fork/FlmLauncherOneSigFork.t.sol" -vv

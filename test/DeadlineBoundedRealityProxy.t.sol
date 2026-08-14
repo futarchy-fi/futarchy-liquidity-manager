@@ -91,4 +91,62 @@ contract DeadlineBoundedRealityProxyTest is Test {
         assertEq(conditionalTokens.payoutNumerators(conditionId, 0), 0);
         assertEq(conditionalTokens.payoutNumerators(conditionId, 1), 1);
     }
+
+    function test_force_fail_relays_finalized_yes_after_deadline() public {
+        realitio.setResult(questionId, bytes32(0));
+        vm.warp(uint256(openingTs) + MAX_QUESTION_DURATION);
+
+        proxy.forceFailByDeadline(address(proposal));
+
+        assertEq(conditionalTokens.payoutDenominator(conditionId), 1);
+        assertEq(conditionalTokens.payoutNumerators(conditionId, 0), 1);
+        assertEq(conditionalTokens.payoutNumerators(conditionId, 1), 0);
+    }
+
+    function test_force_fail_reverts_when_normal_finalized_result_is_unavailable() public {
+        realitio.setQuestionState(questionId, openingTs + 1, false);
+        vm.warp(uint256(openingTs) + MAX_QUESTION_DURATION);
+
+        vm.expectRevert(DeadlineBoundedRealityProxy.FinalizedResultUnavailable.selector);
+        proxy.forceFailByDeadline(address(proposal));
+
+        assertEq(conditionalTokens.payoutDenominator(conditionId), 0);
+    }
+
+    function test_force_fail_keeps_no_fallback_for_finalized_unresolved_answer() public {
+        realitio.setQuestionState(questionId, openingTs + 1, false);
+        realitio.setBestAnswer(questionId, bytes32(type(uint256).max - 1));
+        vm.warp(uint256(openingTs) + MAX_QUESTION_DURATION);
+
+        proxy.forceFailByDeadline(address(proposal));
+
+        assertEq(conditionalTokens.payoutDenominator(conditionId), 1);
+        assertEq(conditionalTokens.payoutNumerators(conditionId, 0), 0);
+        assertEq(conditionalTokens.payoutNumerators(conditionId, 1), 1);
+    }
+
+    function test_force_fail_reports_no_for_answer_still_inside_challenge_window() public {
+        uint32 finalizeTs = openingTs + 3 days + 1;
+        realitio.setQuestionState(questionId, finalizeTs, false);
+        realitio.setBestAnswer(questionId, bytes32(0));
+        vm.warp(uint256(finalizeTs) - 1);
+
+        proxy.forceFailByDeadline(address(proposal));
+
+        assertEq(conditionalTokens.payoutDenominator(conditionId), 1);
+        assertEq(conditionalTokens.payoutNumerators(conditionId, 0), 0);
+        assertEq(conditionalTokens.payoutNumerators(conditionId, 1), 1);
+    }
+
+    function test_force_fail_reports_no_while_arbitration_is_pending() public {
+        realitio.setQuestionState(questionId, openingTs + 1, true);
+        realitio.setBestAnswer(questionId, bytes32(0));
+        vm.warp(uint256(openingTs) + MAX_QUESTION_DURATION);
+
+        proxy.forceFailByDeadline(address(proposal));
+
+        assertEq(conditionalTokens.payoutDenominator(conditionId), 1);
+        assertEq(conditionalTokens.payoutNumerators(conditionId, 0), 0);
+        assertEq(conditionalTokens.payoutNumerators(conditionId, 1), 1);
+    }
 }

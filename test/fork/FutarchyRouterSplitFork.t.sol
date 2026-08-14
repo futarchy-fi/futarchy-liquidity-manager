@@ -26,6 +26,7 @@ contract FutarchyRouterSplitForkTest is Test {
         (address noCompany,) = proposal.wrappedOutcome(1);
         (address yesCurrency,) = proposal.wrappedOutcome(2);
         (address noCurrency,) = proposal.wrappedOutcome(3);
+        bytes32 conditionId = proposal.conditionId();
 
         uint256 amount = 1e15;
         deal(companyToken, address(this), amount);
@@ -35,9 +36,9 @@ contract FutarchyRouterSplitForkTest is Test {
         IERC20(collateralToken).approve(FUTARCHY_ROUTER, type(uint256).max);
 
         IFutarchyConditionalRouter(FUTARCHY_ROUTER)
-            .splitPosition(proposalAddress, companyToken, amount);
+            .splitPosition(companyToken, conditionId, yesCompany, noCompany, amount);
         IFutarchyConditionalRouter(FUTARCHY_ROUTER)
-            .splitPosition(proposalAddress, collateralToken, amount);
+            .splitPosition(collateralToken, conditionId, yesCurrency, noCurrency, amount);
 
         assertEq(IERC20(yesCompany).balanceOf(address(this)), amount);
         assertEq(IERC20(noCompany).balanceOf(address(this)), amount);

@@ -38,6 +38,12 @@ jq -e '
         or (.ciStep? | nonempty)
         or (.command? | nonempty)
       )
+      and (
+        if has("symbol")
+        then (.symbol | nonempty) and (.path | nonempty)
+        else true
+        end
+      )
     )
     and (.remaining | type == "array")
     and all(.remaining[]; nonempty)
@@ -57,6 +63,17 @@ while IFS= read -r path; do
     missing=1
   fi
 done < <(jq -r '.requirements[].evidence[] | select(.path? != null) | .path' "$MANIFEST")
+
+if [[ "$missing" -ne 0 ]]; then
+  exit 1
+fi
+
+while IFS=$'\t' read -r path symbol; do
+  if ! grep -Fq -- "$symbol" "$path"; then
+    echo "readiness evidence check failed: symbol not found in ${path}: ${symbol}" >&2
+    missing=1
+  fi
+done < <(jq -r '.requirements[].evidence[] | select(.symbol? != null) | [.path, .symbol] | @tsv' "$MANIFEST")
 
 if [[ "$missing" -ne 0 ]]; then
   exit 1

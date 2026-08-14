@@ -8,4 +8,9 @@ interface IPoolStabilityGuard {
 
     /// @notice Resolves a pool for `tokenA`/`tokenB` and reverts unless it is stable.
     function assertStablePair(address tokenA, address tokenB) external view;
+
+    function assertStablePairAndGetSqrtPrice(address tokenA, address tokenB)
+        external
+        view
+        returns (uint160 sqrtPriceX96);
 }

@@ -6,7 +6,6 @@ import {Test} from "forge-std/Test.sol";
 
 import {FutarchyConditionalRouter} from "../src/routers/FutarchyConditionalRouter.sol";
 import {MockMintableERC20} from "./mocks/MockMintableERC20.sol";
-import {MockFutarchyRootProposal} from "./mocks/MockFutarchyRootProposal.sol";
 import {MockRouterConditionalTokens} from "./mocks/MockRouterConditionalTokens.sol";
 import {
     MockRouterWrapped1155Factory,
@@ -22,29 +21,74 @@ contract FutarchyConditionalRouterDeployer {
     }
 }
 
+contract LateRecipientFeeToken is MockMintableERC20 {
+    address public feeRecipient;
+
+    constructor() MockMintableERC20("Company", "COMP") {}
+
+    function setFeeRecipient(address recipient) external {
+        feeRecipient = recipient;
+    }
+
+    function _transfer(address from, address to, uint256 amount) internal override {
+        if (to != feeRecipient) {
+            super._transfer(from, to, amount);
+            return;
+        }
+        uint256 fee = amount / 100;
+        super._transfer(from, to, amount - fee);
+        _burn(from, fee);
+    }
+}
+
+contract MalformedMetadataWrapper {
+    address public immutable factory;
+    address public immutable multiToken;
+    uint256 public immutable tokenId;
+
+    constructor(address factory_, address multiToken_, uint256 tokenId_) {
+        factory = factory_;
+        multiToken = multiToken_;
+        tokenId = tokenId_;
+    }
+
+    function name() external pure returns (string memory) {
+        assembly {
+            mstore(0, 1)
+            return(0, 1)
+        }
+    }
+
+    function symbol() external pure returns (string memory) {
+        return "OUT";
+    }
+
+    function decimals() external pure returns (uint8) {
+        return 18;
+    }
+}
+
 contract FutarchyConditionalRouterTest is Test {
     uint256 private constant AMOUNT = 10 ether;
     bytes32 private constant CONDITION_ID = keccak256("condition");
     address private constant DEAD = 0x000000000000000000000000000000000000dEaD;
 
-    MockMintableERC20 private company;
+    LateRecipientFeeToken private company;
     MockMintableERC20 private collateral;
     MockRouterConditionalTokens private conditionalTokens;
     MockRouterWrapped1155Factory private wrapped1155Factory;
     FutarchyConditionalRouter private router;
-    MockFutarchyRootProposal private proposal;
     address private user;
     address[4] private wrappers;
     bytes[4] private wrapperData;
 
     function setUp() public {
         user = makeAddr("user");
-        company = new MockMintableERC20("Company", "COMP");
+        company = new LateRecipientFeeToken();
         collateral = new MockMintableERC20("Collateral", "COLL");
         conditionalTokens = new MockRouterConditionalTokens();
         wrapped1155Factory = new MockRouterWrapped1155Factory();
         router = new FutarchyConditionalRouter(conditionalTokens, wrapped1155Factory);
-        proposal = new MockFutarchyRootProposal(address(company), address(collateral), CONDITION_ID);
         conditionalTokens.setOutcomeSlotCount(CONDITION_ID, 2);
 
         _installPair(address(company), 0);
@@ -63,6 +107,105 @@ contract FutarchyConditionalRouterTest is Test {
         _assertNoRouterDust();
     }
 
+    function test_split_rejects_late_ctf_transfer_fee_without_minting_wrappers() public {
+        company.setFeeRecipient(address(conditionalTokens));
+
+        vm.expectRevert(FutarchyConditionalRouter.InvalidBalanceDelta.selector);
+        vm.prank(user);
+        router.splitPosition(address(company), CONDITION_ID, wrappers[0], wrappers[1], AMOUNT);
+
+        assertEq(company.balanceOf(user), 100 ether);
+        assertEq(company.balanceOf(address(conditionalTokens)), 0);
+        assertEq(IERC20(wrappers[0]).balanceOf(user), 0);
+        assertEq(IERC20(wrappers[1]).balanceOf(user), 0);
+        _assertNoRouterDust();
+
+        company.setFeeRecipient(address(0));
+        _split(address(company));
+
+        assertEq(company.balanceOf(user), 90 ether);
+        assertEq(company.balanceOf(address(conditionalTokens)), AMOUNT);
+        assertEq(IERC20(wrappers[0]).balanceOf(user), AMOUNT);
+        assertEq(IERC20(wrappers[1]).balanceOf(user), AMOUNT);
+        _assertNoRouterDust();
+    }
+
+    function test_merge_rejects_late_transfer_fee_without_consuming_wrappers() public {
+        _split(address(company));
+        _approveWrapper(0);
+        _approveWrapper(1);
+        company.setFeeRecipient(user);
+
+        vm.expectRevert(FutarchyConditionalRouter.InvalidBalanceDelta.selector);
+        vm.prank(user);
+        router.mergePositions(address(company), CONDITION_ID, wrappers[0], wrappers[1], AMOUNT);
+
+        assertEq(company.balanceOf(user), 90 ether);
+        assertEq(IERC20(wrappers[0]).balanceOf(user), AMOUNT);
+        assertEq(IERC20(wrappers[1]).balanceOf(user), AMOUNT);
+        _assertNoRouterDust();
+
+        company.setFeeRecipient(address(0));
+        vm.prank(user);
+        router.mergePositions(address(company), CONDITION_ID, wrappers[0], wrappers[1], AMOUNT);
+
+        assertEq(company.balanceOf(user), 100 ether);
+        assertEq(IERC20(wrappers[0]).balanceOf(user), 0);
+        assertEq(IERC20(wrappers[1]).balanceOf(user), 0);
+        _assertNoRouterDust();
+    }
+
+    function test_split_pair_sends_exact_wrappers_to_contract_recipient() public {
+        uint256 companyBefore = company.balanceOf(user);
+        uint256 collateralBefore = collateral.balanceOf(user);
+
+        vm.prank(user);
+        router.splitPositionPairTo(
+            CONDITION_ID,
+            address(company),
+            wrappers[0],
+            wrappers[1],
+            AMOUNT,
+            address(collateral),
+            wrappers[2],
+            wrappers[3],
+            AMOUNT,
+            address(this)
+        );
+
+        assertEq(company.balanceOf(user), companyBefore - AMOUNT);
+        assertEq(collateral.balanceOf(user), collateralBefore - AMOUNT);
+        for (uint256 i; i < 4; ++i) {
+            assertEq(IERC20(wrappers[i]).balanceOf(address(this)), AMOUNT);
+            assertEq(IERC20(wrappers[i]).balanceOf(user), 0);
+        }
+        _assertNoRouterDust();
+    }
+
+    function test_split_pair_rejects_non_contract_recipient_before_moving_assets() public {
+        uint256 companyBefore = company.balanceOf(user);
+        uint256 collateralBefore = collateral.balanceOf(user);
+
+        vm.expectRevert(FutarchyConditionalRouter.InvalidRecipient.selector);
+        vm.prank(user);
+        router.splitPositionPairTo(
+            CONDITION_ID,
+            address(company),
+            wrappers[0],
+            wrappers[1],
+            AMOUNT,
+            address(collateral),
+            wrappers[2],
+            wrappers[3],
+            AMOUNT,
+            user
+        );
+
+        assertEq(company.balanceOf(user), companyBefore);
+        assertEq(collateral.balanceOf(user), collateralBefore);
+        _assertNoRouterDust();
+    }
+
     function test_redeem_yes_returns_exact_collateral_and_leaves_no_dust() public {
         _splitBoth();
         conditionalTokens.setPayout(CONDITION_ID, 1, 1, 0);
@@ -72,8 +215,8 @@ contract FutarchyConditionalRouterTest is Test {
         uint256 companyBefore = company.balanceOf(user);
         uint256 collateralBefore = collateral.balanceOf(user);
         vm.startPrank(user);
-        router.redeemPositions(address(proposal), address(company), 4 ether);
-        router.redeemPositions(address(proposal), address(collateral), 4 ether);
+        router.redeemPositions(address(company), CONDITION_ID, wrappers[0], wrappers[1], 4 ether);
+        router.redeemPositions(address(collateral), CONDITION_ID, wrappers[2], wrappers[3], 4 ether);
         vm.stopPrank();
 
         assertEq(company.balanceOf(user), companyBefore + 4 ether);
@@ -94,8 +237,8 @@ contract FutarchyConditionalRouterTest is Test {
         uint256 companyBefore = company.balanceOf(user);
         uint256 collateralBefore = collateral.balanceOf(user);
         vm.startPrank(user);
-        router.redeemPositions(address(proposal), address(company), 4 ether);
-        router.redeemPositions(address(proposal), address(collateral), 4 ether);
+        router.redeemPositions(address(company), CONDITION_ID, wrappers[0], wrappers[1], 4 ether);
+        router.redeemPositions(address(collateral), CONDITION_ID, wrappers[2], wrappers[3], 4 ether);
         vm.stopPrank();
 
         assertEq(company.balanceOf(user), companyBefore + 4 ether);
@@ -104,6 +247,32 @@ contract FutarchyConditionalRouterTest is Test {
         assertEq(IERC20(wrappers[1]).balanceOf(user), AMOUNT - 4 ether);
         assertEq(IERC20(wrappers[2]).balanceOf(user), AMOUNT);
         assertEq(IERC20(wrappers[3]).balanceOf(user), AMOUNT - 4 ether);
+        _assertNoRouterDust();
+    }
+
+    function test_consume_losing_positions_burns_zero_payout_without_moving_collateral() public {
+        _splitBoth();
+        conditionalTokens.setPayout(CONDITION_ID, 1, 1, 0);
+        _approveWrapper(1);
+        _approveWrapper(3);
+        uint256 companyBefore = company.balanceOf(user);
+        uint256 collateralBefore = collateral.balanceOf(user);
+
+        vm.startPrank(user);
+        router.consumeLosingPositions(
+            address(company), CONDITION_ID, wrappers[0], wrappers[1], 4 ether
+        );
+        router.consumeLosingPositions(
+            address(collateral), CONDITION_ID, wrappers[2], wrappers[3], 4 ether
+        );
+        vm.stopPrank();
+
+        assertEq(company.balanceOf(user), companyBefore);
+        assertEq(collateral.balanceOf(user), collateralBefore);
+        assertEq(IERC20(wrappers[1]).balanceOf(user), AMOUNT - 4 ether);
+        assertEq(IERC20(wrappers[3]).balanceOf(user), AMOUNT - 4 ether);
+        assertEq(conditionalTokens.balanceOf(address(router), _tokenId(address(company), 2)), 0);
+        assertEq(conditionalTokens.balanceOf(address(router), _tokenId(address(collateral), 2)), 0);
         _assertNoRouterDust();
     }
 
@@ -129,7 +298,9 @@ contract FutarchyConditionalRouterTest is Test {
 
         uint256 companyBefore = company.balanceOf(user);
         vm.prank(user);
-        prefundedRouter.redeemPositions(address(proposal), address(company), 4 ether);
+        prefundedRouter.redeemPositions(
+            address(company), CONDITION_ID, wrappers[0], wrappers[1], 4 ether
+        );
 
         assertEq(company.balanceOf(user), companyBefore + 4 ether);
         assertEq(IERC20(wrappers[0]).balanceOf(user), AMOUNT - 4 ether);
@@ -149,38 +320,101 @@ contract FutarchyConditionalRouterTest is Test {
         winning = router.getWinningOutcomes(CONDITION_ID);
         assertFalse(winning[0]);
         assertTrue(winning[1]);
+
+        (uint256 denominator, uint256 yesNumerator, uint256 noNumerator) =
+            router.getPayouts(CONDITION_ID);
+        assertEq(denominator, 1);
+        assertEq(yesNumerator, 0);
+        assertEq(noNumerator, 1);
     }
 
-    function test_rejects_non_root_non_binary_and_invalid_collateral() public {
-        proposal.setParentCollectionId(bytes32(uint256(1)));
-        vm.expectRevert(FutarchyConditionalRouter.NonRootProposal.selector);
-        vm.prank(user);
-        router.splitPosition(address(proposal), address(company), AMOUNT);
-
-        proposal.setParentCollectionId(bytes32(0));
+    function test_rejects_non_binary_and_invalid_collateral() public {
         conditionalTokens.setOutcomeSlotCount(CONDITION_ID, 3);
         vm.expectRevert(FutarchyConditionalRouter.NonBinaryCondition.selector);
         vm.prank(user);
-        router.splitPosition(address(proposal), address(company), AMOUNT);
+        router.splitPosition(address(company), CONDITION_ID, wrappers[0], wrappers[1], AMOUNT);
 
         conditionalTokens.setOutcomeSlotCount(CONDITION_ID, 2);
         vm.expectRevert(FutarchyConditionalRouter.InvalidCollateral.selector);
         vm.prank(user);
-        router.splitPosition(address(proposal), address(0xBEEF), AMOUNT);
+        router.splitPosition(address(0), CONDITION_ID, wrappers[0], wrappers[1], AMOUNT);
     }
 
-    function test_rejects_wrapper_not_derived_from_exact_token_id_and_metadata() public {
-        proposal.setWrappedOutcome(0, wrappers[1], wrapperData[0]);
+    function test_rejects_wrapper_identity_mismatches_even_when_factory_mapping_matches() public {
+        uint256 yesTokenId = _tokenId(address(company), 1);
+        address[3] memory invalidWrappers;
+        invalidWrappers[0] = address(
+            new MockWrappedOutcome(
+                DEAD, address(conditionalTokens), yesTokenId, "Wrapped outcome", "OUT", 18
+            )
+        );
+        invalidWrappers[1] = address(
+            new MockWrappedOutcome(
+                address(wrapped1155Factory), DEAD, yesTokenId, "Wrapped outcome", "OUT", 18
+            )
+        );
+        invalidWrappers[2] = address(
+            new MockWrappedOutcome(
+                address(wrapped1155Factory),
+                address(conditionalTokens),
+                yesTokenId + 1,
+                "Wrapped outcome",
+                "OUT",
+                18
+            )
+        );
+
+        for (uint256 i; i < invalidWrappers.length; ++i) {
+            wrapped1155Factory.setWrapped1155(
+                address(conditionalTokens), yesTokenId, wrapperData[0], invalidWrappers[i]
+            );
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    FutarchyConditionalRouter.InvalidWrapperMetadata.selector, invalidWrappers[i]
+                )
+            );
+            vm.prank(user);
+            router.splitPosition(
+                address(company), CONDITION_ID, invalidWrappers[i], wrappers[1], AMOUNT
+            );
+        }
+    }
+
+    function test_rejects_long_and_malformed_wrapper_metadata() public {
+        uint256 yesTokenId = _tokenId(address(company), 1);
+        address longMetadata = address(
+            new MockWrappedOutcome(
+                address(wrapped1155Factory),
+                address(conditionalTokens),
+                yesTokenId,
+                "12345678901234567890123456789012",
+                "OUT",
+                18
+            )
+        );
+        address malformedMetadata = address(
+            new MalformedMetadataWrapper(
+                address(wrapped1155Factory), address(conditionalTokens), yesTokenId
+            )
+        );
+
+        wrapped1155Factory.setWrapped1155(
+            address(conditionalTokens), yesTokenId, wrapperData[0], longMetadata
+        );
         vm.expectRevert(
             abi.encodeWithSelector(
-                FutarchyConditionalRouter.InvalidWrapper.selector,
-                uint256(0),
-                wrappers[0],
-                wrappers[1]
+                FutarchyConditionalRouter.InvalidWrapperMetadata.selector, longMetadata
             )
         );
         vm.prank(user);
-        router.splitPosition(address(proposal), address(company), AMOUNT);
+        router.splitPosition(address(company), CONDITION_ID, longMetadata, wrappers[1], AMOUNT);
+
+        wrapped1155Factory.setWrapped1155(
+            address(conditionalTokens), yesTokenId, wrapperData[0], malformedMetadata
+        );
+        vm.expectRevert();
+        vm.prank(user);
+        router.splitPosition(address(company), CONDITION_ID, malformedMetadata, wrappers[1], AMOUNT);
     }
 
     function test_rejects_unresolved_ambiguous_and_fractional_winners() public {
@@ -190,24 +424,33 @@ contract FutarchyConditionalRouterTest is Test {
 
         vm.expectRevert(FutarchyConditionalRouter.InvalidWinningOutcome.selector);
         vm.prank(user);
-        router.redeemPositions(address(proposal), address(company), 1 ether);
+        router.redeemPositions(address(company), CONDITION_ID, wrappers[0], wrappers[1], 1 ether);
 
         conditionalTokens.setPayout(CONDITION_ID, 2, 1, 1);
         vm.expectRevert(FutarchyConditionalRouter.InvalidWinningOutcome.selector);
         vm.prank(user);
-        router.redeemPositions(address(proposal), address(company), 1 ether);
+        router.redeemPositions(address(company), CONDITION_ID, wrappers[0], wrappers[1], 1 ether);
 
         conditionalTokens.setPayout(CONDITION_ID, 2, 1, 0);
         vm.expectRevert(FutarchyConditionalRouter.InvalidWinningOutcome.selector);
         vm.prank(user);
-        router.redeemPositions(address(proposal), address(company), 1 ether);
+        router.redeemPositions(address(company), CONDITION_ID, wrappers[0], wrappers[1], 1 ether);
     }
 
     function test_exact_wrapper_mint_delta_is_enforced() public {
         wrapped1155Factory.setMintShortfall(1);
         vm.expectRevert(FutarchyConditionalRouter.InvalidBalanceDelta.selector);
         vm.prank(user);
-        router.splitPosition(address(proposal), address(company), AMOUNT);
+        router.splitPosition(address(company), CONDITION_ID, wrappers[0], wrappers[1], AMOUNT);
+        assertEq(company.balanceOf(user), 100 ether);
+        _assertNoRouterDust();
+    }
+
+    function test_exact_ctf_split_receipt_is_enforced() public {
+        conditionalTokens.setSplitShortfallCollateral(address(company));
+        vm.expectRevert();
+        vm.prank(user);
+        router.splitPosition(address(company), CONDITION_ID, wrappers[0], wrappers[1], AMOUNT);
         assertEq(company.balanceOf(user), 100 ether);
         _assertNoRouterDust();
     }
@@ -248,7 +491,7 @@ contract FutarchyConditionalRouterTest is Test {
     function test_zero_amount_and_invalid_dependencies_revert() public {
         vm.expectRevert(FutarchyConditionalRouter.ZeroAmount.selector);
         vm.prank(user);
-        router.splitPosition(address(proposal), address(company), 0);
+        router.splitPosition(address(company), CONDITION_ID, wrappers[0], wrappers[1], 0);
 
         vm.expectRevert(FutarchyConditionalRouter.InvalidDependency.selector);
         new FutarchyConditionalRouter(MockRouterConditionalTokens(address(0)), wrapped1155Factory);
@@ -270,7 +513,9 @@ contract FutarchyConditionalRouterTest is Test {
         }
 
         vm.prank(user);
-        router.mergePositions(address(proposal), baseToken, AMOUNT);
+        router.mergePositions(
+            baseToken, CONDITION_ID, wrappers[wrapperOffset], wrappers[wrapperOffset + 1], AMOUNT
+        );
         assertEq(base.balanceOf(user), baseBefore);
         for (uint256 i; i < 2; ++i) {
             uint256 wrapperIndex = wrapperOffset + i;
@@ -287,8 +532,11 @@ contract FutarchyConditionalRouterTest is Test {
     }
 
     function _split(address baseToken) private {
+        uint256 wrapperOffset = baseToken == address(company) ? 0 : 2;
         vm.prank(user);
-        router.splitPosition(address(proposal), baseToken, AMOUNT);
+        router.splitPosition(
+            baseToken, CONDITION_ID, wrappers[wrapperOffset], wrappers[wrapperOffset + 1], AMOUNT
+        );
     }
 
     function _approveWrapper(uint256 index) private {
@@ -299,16 +547,26 @@ contract FutarchyConditionalRouterTest is Test {
     function _installPair(address baseToken, uint256 wrapperOffset) private {
         for (uint256 i; i < 2; ++i) {
             uint256 wrapperIndex = wrapperOffset + i;
-            wrapperData[wrapperIndex] =
-                abi.encodePacked(bytes32(wrapperIndex + 1), bytes32(wrapperIndex + 1), uint8(18));
+            wrapperData[wrapperIndex] = _wrapperMetadata();
             uint256 tokenId = _tokenId(baseToken, i + 1);
             wrappers[wrapperIndex] = wrapped1155Factory.requireWrapped1155(
                 address(conditionalTokens), tokenId, wrapperData[wrapperIndex]
             );
-            proposal.setWrappedOutcome(
-                wrapperIndex, wrappers[wrapperIndex], wrapperData[wrapperIndex]
-            );
         }
+    }
+
+    function _wrapperMetadata() private pure returns (bytes memory) {
+        return abi.encodePacked(_toString31("Wrapped outcome"), _toString31("OUT"), uint8(18));
+    }
+
+    function _toString31(string memory value) private pure returns (bytes32 encoded) {
+        uint256 length = bytes(value).length;
+        require(length < 32, "string too long");
+        assembly {
+            encoded := mload(add(value, 0x20))
+        }
+        encoded &= bytes32(type(uint256).max << ((32 - length) << 3));
+        encoded |= bytes32(length << 1);
     }
 
     function _tokenId(address baseToken, uint256 indexSet) private view returns (uint256) {

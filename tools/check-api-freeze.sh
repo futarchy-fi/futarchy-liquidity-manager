@@ -43,6 +43,15 @@ check_contract \
   "UniswapV3LiquidityAdapter" \
   "src/adapters/UniswapV3LiquidityAdapter.sol:UniswapV3LiquidityAdapter"
 check_contract \
+  "V4InitializationGate" \
+  "src/adapters/V4InitializationGate.sol:V4InitializationGate"
+check_contract \
+  "V4ConditionalLiquidityAdapter" \
+  "src/adapters/V4ConditionalLiquidityAdapter.sol:V4ConditionalLiquidityAdapter"
+check_contract \
+  "V4FutarchyLiquidityManagerFactory" \
+  "src/factories/V4FutarchyLiquidityManagerFactory.sol:V4FutarchyLiquidityManagerFactory"
+check_contract \
   "UniV3PoolStabilityGuard" \
   "src/oracles/UniV3PoolStabilityGuard.sol:UniV3PoolStabilityGuard"
 check_contract \

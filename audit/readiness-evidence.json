@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "status": "ready-to-audit; limited-funds-gnosis-canary-live",
+  "status": "ready-to-audit; no-funds-prototype",
   "requirements": [
     {
       "id": "api-and-scope-freeze",
@@ -22,6 +22,14 @@
           "path": "audit/api-freeze/FutarchyLiquidityManager.method-identifiers.json"
         },
         {
+          "description": "Frozen selector manifest for the direct v4 conditional adapter.",
+          "path": "audit/api-freeze/V4ConditionalLiquidityAdapter.method-identifiers.json"
+        },
+        {
+          "description": "Frozen selector manifest for the atomic v4 bundle factory.",
+          "path": "audit/api-freeze/V4FutarchyLiquidityManagerFactory.method-identifiers.json"
+        },
+        {
           "description": "Audit scope documents core boundaries and out-of-scope FAO/SnapshotX behavior.",
           "path": "docs/audit-scope.md"
         }
@@ -34,8 +42,24 @@
       "status": "ready-to-audit",
       "evidence": [
         {
-          "description": "Swapr Algebra NFPM smoke test plus real full-unwind spot and conditional public-vault gas checks.",
+          "description": "Swapr Algebra NFPM smoke test proves exact add-time caller balance deltas, zero adapter residue, zero residual position-manager allowances, real zero-liquidity fee materialization preserving position liquidity and NFT identity, and fee drainage before principal removal; it also proves the public-vault manager preserves its spot NFT across a partial exit and clears it on the final exit, and covers full-unwind spot and source-activated fresh-pool conditional public-vault gas checks.",
           "path": "test/fork/SwaprAlgebraLiquidityAdapterFork.t.sol"
+        },
+        {
+          "description": "Real direct-Algebra removal proves zero-liquidity fee realization preserves liquidity and drains fees before an immediate principal removal, fee-bearing partial removal at 116,245 gas under a 150,000-gas bound, final removal, pair isolation, donation accounting, and the mutable-cooldown liveness failure.",
+          "path": "test/fork/SwaprAlgebraDirectConditionalAdapterFork.t.sol"
+        },
+        {
+          "description": "Real Uniswap V3 integration exercises adapter-owned fresh pool creation, initialization, and first-NFT mint; proves zero-liquidity live-fee materialization preserves liquidity and NFT identity and drains fees before an immediate principal removal; and rejects reuse of the initialized pool.",
+          "path": "test/fork/UniswapV3SepoliaFork.t.sol"
+        },
+        {
+          "description": "A pinned Ethereum-mainnet fork verifies the official v4 PoolManager runtime code hash and proves the exact initialization-gate ABI rejects outsider preinitialization before accepting the bound adapter on the same pool key.",
+          "path": "test/fork/V4InitializationGateMainnetFork.t.sol"
+        },
+        {
+          "description": "A pinned Ethereum-mainnet fork proves the direct v4 adapter initializes and adds through the official PoolManager, realizes a third-party donation as fees, and performs sequential proportional and final removal without residue.",
+          "path": "test/fork/V4ConditionalLiquidityAdapterMainnetFork.t.sol"
         },
         {
           "description": "Real futarchy proposal, Reality question, and CTF condition wiring fork test.",
@@ -64,20 +88,88 @@
       "status": "ready-to-audit",
       "evidence": [
         {
-          "description": "Core manager tests cover proportional principal/fee/idle accounting, deposit dilution, conditional in-kind fallback, non-custodial emergency exit, and fuzz cases.",
-          "path": "test/FutarchyLiquidityManager.t.sol"
+          "description": "Core manager tests cover constructor rejection of an identical company/collateral token and code-less dependencies, independent rejection of every outcome-to-outcome and outcome-to-base alias before spot movement, every independent base/YES/NO token-ordering parity, proportional principal/fee/idle accounting with adversarial receipt-label misclassification, exact two-phase adapter-removal deltas with spot and conditional overreport rollback, divergent YES/NO liquidity and post-swap principal composition, sequential six-token conservation and nondecreasing survivor value per share, rejection of a nonfinal all-zero liquidity plan without burning the dust holder's shares followed by successful redemption after aggregation, complete rollback and exact-retry success when any of four in-kind wrapper transfers fails after merge fallback, including restoration of preceding wrapper payments, complete rollback and identical native-retry success when company-token payout, wrapped-collateral payout, or post-unwrap native delivery fails after removal, share burn, and complete-set merging, including rollback of preceding payouts and WETH withdrawal, rejection of nested redemption from a gas-forwarded native recipient callback while the outer exact exit succeeds, exact settlement after randomized one-to-four partial exits, donation-resistant deposit pricing, spot and conditional six-token post-exit fee/donation ownership, resolved-wrapper donation recovery before spot redemption, deposit pricing, and later activation, rejection of direct native transfers outside that accounting model while wrapper unwrapping remains live, second-pool activation rollback, per-underlying conditional merge isolation with approval-failure, partial-consumption, and underpayment fallback, exact-delta merge and winner underconsumption/underpayment, late second-underlying rollback of prior recovery, losing-wrapper settlement rollback including after zero-supply final redemption, owner-authorized delayed permissionless non-custodial emergency exit, and permissionless settlement while emergency mode is armed or executed.",
+          "path": "test/FutarchyLiquidityManager.t.sol",
+          "symbol": "testFuzz_conditional_sequential_redemptions_conserve_every_token"
+        },
+        {
+          "description": "A fourth captured-wrapper transfer fault after the final unresolved share burn restores every earlier wrapper payment and manager balance before an identical exact sweep retry.",
+          "path": "test/FutarchyLiquidityManager.t.sol",
+          "symbol": "test_zero_supply_outcome_sweep_rolls_back_and_retries_atomically"
+        },
+        {
+          "description": "Adapter-safety tests require exact recipient deltas for ERC20 payouts, including rollback without a share burn when a company token enables a recipient fee only after bootstrap and successful identical retry after the fee is disabled.",
+          "path": "test/FutarchyLiquidityManagerAdapterSafety.t.sol",
+          "symbol": "test_redemption_rejects_late_transfer_fee_without_burning_shares"
+        },
+        {
+          "description": "Factory tests prove constructor rejection of code-less shared dependencies and that identical or code-less company-token manager wiring rolls back the permissionless bundle.",
+          "path": "test/FutarchyLiquidityManagerFactory.t.sol"
+        },
+        {
+          "description": "The v4 factory suite proves caller-bound CREATE2 prediction and hook permissions, exact source/hook/adapter/manager bindings, front-run salt separation, mutation rejection, and complete rollback when the final manager deployment fails.",
+          "path": "test/V4FutarchyLiquidityManagerFactory.t.sol"
+        },
+        {
+          "description": "A pinned Ethereum-mainnet fork drives the factory-deployed source, official v3 position manager, canonical Conditional Tokens, deployed Wrapped1155 factory, router, manager, and two conditional positions through atomic activation and settlement against the official v4 PoolManager. Ten fault variants independently revert spot principal removal, each CTF split, wrapper conversion on each underlying, each v4 initialization and first-liquidity call, and source capture verification after activation completes; they compare actual protocol custody and position state as well as manager accounting, then prove the identical proposal activates after every fault is cleared. A late redemption-removal fault occurs after the first proportional official-v4 unwind and proves shares, positions, spot identity, and all six holder/manager/PoolManager balances restore. Its identical retry makes the canonical company-side CTF merge revert, proves collateral still merges while the company slice is paid as exact YES/NO wrappers, then redeems the winner, consumes the loser, settles the survivor, and conserves both assets through final exit. A late settlement fault occurs after both v4 removals and canonical company merge/winner recovery, then proves manager binding/accounting, adapter positions, PoolManager balances, CTF collateral/underlying custody, wrapper supply/custody, and allowances all roll back before the identical settlement succeeds. A conditional emergency run faults the second adapter removal after the first official-v4 unwind, proves positions, custody, accounting, shares, and the emergency flag roll back, then lets the same unrelated caller retry with zero gain, a shareholder redeem proportionally while canonical CTF remains unresolved, and the survivor settle permissionlessly after the source registry is cleared. Two spot-mode emergency runs separately fault official-v3 principal removal after fee collection and NFT burn after fee collection, full principal removal, and principal collection. Both prove the NFT/liquidity, manager/adapter/v3-pool/NPM balances, shares, and emergency flag restore, then complete the identical outsider retry with zero gain and recover both bootstrap assets within two wei.",
+          "path": "test/fork/V4FutarchyLiquidityManagerLifecycleMainnetFork.t.sol"
+        },
+        {
+          "description": "The production router test proves exact CTF collateral receipts and wrapper mint deltas, including complete split rollback when a late recipient fee underpays CTF and complete merge rollback when it underpays the caller, followed by identical fee-free retries.",
+          "path": "test/FutarchyConditionalRouter.t.sol"
+        },
+        {
+          "description": "The official proposal source test proves that every outcome-to-outcome and outcome-to-base alias is rejected, every captured activation field must match the validated snapshot, and a corrupt capture rolls back both source and target state.",
+          "path": "test/FutarchyOfficialProposalSource.t.sol"
+        },
+        {
+          "description": "The immutable coordinator authority test rejects a replacement proposal manager's forged creator attribution before any official write or activation.",
+          "path": "test/FutarchyOfficialProposalSource.t.sol",
+          "symbol": "test_only_immutable_coordinator_can_attest_official_creator"
+        },
+        {
+          "description": "Deadline proxy tests prove the post-deadline fallback relays an already-finalized Reality result, fails closed when a normal finalized result is unavailable, and forces NO for unresolved state including a normal answer still inside its challenge window, pending arbitration, and Reality's canonical unresolved-answer sentinel.",
+          "path": "test/DeadlineBoundedRealityProxy.t.sol"
+        },
+        {
+          "description": "The real source-manager-router binding test proves already-resolved-condition, first-conditional-add, canonical fresh-pool identity, first- and second-CTF-split, second-fresh-position, and external post-activation resolver-binding rollback across coordinator state, registry, spot position, manager binding, CTF collateral, wrapper total supply and custody, base custody, router allowances, and fresh pools; and exact-replay or second-live-proposal rejection without changing active positions or binding.",
+          "path": "test/FutarchyProposalBinding.t.sol",
+          "symbol": "test_split_activation_uses_captured_source_snapshot"
         },
         {
           "description": "Adapter over-pull safety test.",
           "path": "test/FutarchyLiquidityManagerAdapterSafety.t.sol"
         },
         {
+          "description": "Deterministic Uniswap V3 adapter tests separate fee-only, partial-principal, and final-principal removal fields exactly; cover fresh create-initialize-first-mint ownership; reject uninitialized and initialized guarded/manipulated-price pre-existing pools before custody changes; prove distinct pool-creation, initialization, and first-mint failures roll back pool creation, initialization, balances, and approvals; and require exact manager refund receipts when token fee behavior changes after input custody.",
+          "path": "test/UniswapV3LiquidityAdapter.t.sol"
+        },
+        {
+          "description": "The selector-frozen v4 initialization gate enables only the before-initialize hook bit, binds once to a code-bearing adapter, rejects direct and wrong-key callbacks, prevents outsider preinitialization, and still lets the bound adapter initialize the same predictable key.",
+          "path": "test/V4InitializationGate.t.sol"
+        },
+        {
+          "description": "The selector-frozen direct v4 adapter tests exact prefunded settlement and manager refunds, donation fees, sequential partial/final removal, atomic initialization rollback including late refund-fee behavior, PoolManager codehash drift, dishonest poke reports, second-phase fee leakage, and manager-only operation.",
+          "path": "test/V4ConditionalLiquidityAdapter.t.sol"
+        },
+        {
           "description": "Algebra guard tests cover inclusive 50-tick boundaries, signed TWAP rounding, and fail-closed history reads.",
           "path": "test/AlgebraPoolStabilityGuard.t.sol"
         },
         {
-          "description": "Invariant suite covers LP backing, conditional accounting, and adapter liquidity consistency.",
-          "path": "test/invariant/FutarchyLiquidityManagerInvariant.t.sol"
+          "description": "The initialized invariant harness interleaves deposits, activation, fees, donations, redemptions, CTF settlement, and emergency arm, disarm, and permissionless execution; settlement remains available during emergency mode, every successful deposit and redemption checks survivor-favoring liquidity and six-token balance ratios, and global invariants enforce conditional binding, adapter-liquidity consistency, known custody of all six issued tokens, zero managed residue at zero share supply, and zero position liquidity after emergency execution.",
+          "path": "test/invariant/FutarchyLiquidityManagerInvariant.t.sol",
+          "symbol": "invariant_conditionalAccountingIsConsistent"
+        },
+        {
+          "description": "Independent integer properties prove that deposit floor/ceiling rounding cannot dilute either base asset and that partial liquidity, idle, and fee floor rounding favors survivors.",
+          "path": "test/VaultShareRoundingMath.t.sol",
+          "symbol": "testFuzz_depositRoundingCannotDiluteEitherAsset"
+        },
+        {
+          "description": "The survivor-favoring redemption rounding property is pinned independently from the deposit property.",
+          "path": "test/VaultShareRoundingMath.t.sol",
+          "symbol": "testFuzz_partialRedemptionRoundingFavorsSurvivors"
         },
         {
           "description": "Deeper invariant pass command is documented for pre-deploy review.",
@@ -134,7 +226,7 @@
           "path": ".github/workflows/ci.yml"
         },
         {
-          "description": "CI exercises the limited deploy preflight wrapper and checks that fork preflight cannot run without a selected final proposal.",
+          "description": "CI exercises the limited deploy preflight wrapper; rejects identical base tokens and validation-policy token mismatches; and checks that fork preflight cannot run without a selected final proposal.",
           "path": "tools/check-preflight-limited-deploy.sh",
           "ciStep": "Limited preflight guard"
         }
@@ -147,7 +239,7 @@
       "status": "ready-to-audit",
       "evidence": [
         {
-          "description": "Deployment script reads JSON config instead of hard-coded production addresses and records config/deployed-code hashes in the deployment output.",
+          "description": "Deployment script reads JSON config instead of hard-coded production addresses, rejects configured code-less token and protocol dependencies before broadcast, and records config/deployed-code hashes in the deployment output.",
           "path": "script/DeployFutarchyLiquidityManager.s.sol"
         },
         {
@@ -159,7 +251,7 @@
           "path": "config/gnosis.example.json"
         },
         {
-          "description": "Strict deploy config validation rejects placeholder addresses and disabled validation for production inputs.",
+          "description": "Strict deploy config validation rejects placeholder addresses, disabled validation, identical company/collateral tokens, and validation-policy tokens that differ from the manager pair.",
           "path": "tools/validate-configs.sh"
         },
         {
@@ -230,14 +322,14 @@
     {
       "id": "limited-funds-deploy",
       "title": "Limited-funds deployment readiness",
-      "status": "canary-live",
+      "status": "awaits-final-inputs",
       "evidence": [
         {
           "description": "Limited deploy preflight runs strict config validation, renders Safe JSON plus Markdown summaries, and binds fork tests to final proposal/company/collateral addresses.",
           "path": "tools/preflight-limited-deploy.sh"
         },
         {
-          "description": "Preflight guard checks strict validation, artifact rendering, and final-proposal enforcement for fork preflight.",
+          "description": "Preflight guard checks strict validation including base/policy token consistency, artifact rendering, and final-proposal enforcement for fork preflight.",
           "path": "tools/check-preflight-limited-deploy.sh",
           "ciStep": "Limited preflight guard"
         },
@@ -250,21 +342,36 @@
           "path": "docs/readiness.md"
         },
         {
+          "description": "The production-successor specification records the immutable burn-liveness, atomicity, redemption, gas, and fork-proof gates that must replace the Algebra prototype.",
+          "path": "docs/production-amm-successor.md"
+        },
+        {
+          "description": "The caller-bound v4 bundle factory atomically deploys and irreversibly binds the initialization-only gate, proposal source, spot adapter, direct conditional adapter, and manager while preventing another wallet from consuming the creator's predicted addresses.",
+          "path": "test/V4FutarchyLiquidityManagerFactory.t.sol",
+          "symbol": "test_creatorBoundSaltCannotBeConsumedByAnotherWallet"
+        },
+        {
+          "description": "The pinned Ethereum-mainnet lifecycle fork proves the factory-deployed v4 successor completes real CTF activation, two conditional positions, settlement, and full removal through the official PoolManager.",
+          "path": "test/fork/V4FutarchyLiquidityManagerLifecycleMainnetFork.t.sol",
+          "symbol": "testFork_factoryBundleCompletesRealCtfTwoPoolLifecycle"
+        },
+        {
           "description": "Deployment runbook documents limited-funds deployment order.",
           "path": "docs/deployment.md"
         },
         {
-          "description": "Committed Gnosis FAO canary config binds the reviewed ownerless guard and hash-pinned permissionless factory.",
-          "path": "config/gnosis.fao-canary.json"
+          "description": "The historical Gnosis FAO canary config binds the reviewed ownerless guard and hash-pinned permissionless factory; it is quarantined under config/quarantine because it carries the compromised 0x693E key, and is retained as canary evidence only, not the selected production path.",
+          "path": "config/quarantine/gnosis.fao-canary.json"
         },
         {
-          "description": "On-chain canary receipt records transaction hashes, runtime hashes, bundle addresses, and bounded bootstrap exposure.",
+          "description": "The historical Gnosis on-chain canary receipt records transaction hashes, runtime hashes, bundle addresses, and bounded bootstrap exposure.",
           "path": "deployments/flm.gnosis.fao-canary.json"
         }
       ],
       "remaining": [
-        "Run a bounded spot-to-conditional-to-settlement canary against a selected validated proposal and retain its operation artifacts.",
-        "Complete external review and independently select production owner/proposal-manager/bootstrap roles before scaling beyond disposable canary value."
+        "Fix and independently reproduce the final Ethereum tokens, roles, tick policy, creator-bound salt, predicted addresses, runtime hashes, deployment calldata, and Safe batch; then rerun every gate against that exact manifest.",
+        "Run a bounded mainnet spot-to-conditional-to-settlement canary against a selected validated proposal and retain its operation artifacts.",
+        "Complete external contract and legal review, independently select production roles, and obtain explicit real-funds authorization before any canary or funded deployment."
       ]
     }
   ]

@@ -48,6 +48,17 @@ contract MockRealityETH {
         _settled[questionId] = true;
     }
 
+    function setQuestionState(bytes32 questionId, uint32 finalizeTs, bool pendingArbitration)
+        external
+    {
+        _questions[questionId].finalizeTs = finalizeTs;
+        _questions[questionId].isPendingArbitration = pendingArbitration;
+    }
+
+    function setBestAnswer(bytes32 questionId, bytes32 answer) external {
+        _questions[questionId].bestAnswer = answer;
+    }
+
     function resultForOnceSettled(bytes32 questionId) external view returns (bytes32) {
         require(_settled[questionId], "not settled");
         return _results[questionId];

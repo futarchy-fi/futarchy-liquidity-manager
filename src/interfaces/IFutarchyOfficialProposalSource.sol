@@ -5,6 +5,22 @@ pragma solidity ^0.8.20;
 /// @dev The manager consumes `officialProposalExtended` so it can validate exact outcome tokens and
 /// pools before migrating liquidity.
 interface IFutarchyOfficialProposalSource {
+    /// @notice True once the activation binding has irreversibly committed validation policy.
+    function proposalValidationConfigFrozen() external view returns (bool);
+
+    /// @notice Static proposal fields captured once and passed atomically into FLM activation.
+    struct ProposalActivationData {
+        uint256 proposalId;
+        address proposal;
+        bytes32 conditionId;
+        address proposalToken;
+        address collateralToken;
+        address yesCompanyToken;
+        address noCompanyToken;
+        address yesCurrencyToken;
+        address noCurrencyToken;
+    }
+
     /// @notice Full proposal shape needed by the liquidity manager.
     struct OfficialProposalData {
         uint256 proposalId;
@@ -12,6 +28,7 @@ interface IFutarchyOfficialProposalSource {
         address creator;
         bool exists;
         bool settled;
+        bytes32 conditionId;
         address proposalToken;
         address collateralToken;
         address yesCompanyToken;

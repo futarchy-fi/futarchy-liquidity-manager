@@ -206,8 +206,9 @@ contract BuildLiquidityOperationBatch is Script {
         config.maxOpeningDelay = uint32(json.readUint(string.concat(base, ".maxOpeningDelay")));
         config.minTimeout = uint32(json.readUint(string.concat(base, ".minTimeout")));
         config.maxTimeout = uint32(json.readUint(string.concat(base, ".maxTimeout")));
+        config.minConditionalLifetime =
+            uint32(json.readUint(string.concat(base, ".minConditionalLifetime")));
         config.maxMinBond = json.readUint(string.concat(base, ".maxMinBond"));
-        config.requirePools = json.readBool(string.concat(base, ".requirePools"));
     }
 
     function _approvalsAndCall(
@@ -467,11 +468,11 @@ contract BuildLiquidityOperationBatch is Script {
             "- Max timeout: `",
             vm.toString(json.readUint(string.concat(base, ".maxTimeout"))),
             "`\n",
+            "- Min conditional lifetime: `",
+            vm.toString(json.readUint(string.concat(base, ".minConditionalLifetime"))),
+            "`\n",
             "- Max min bond: `",
             vm.toString(json.readUint(string.concat(base, ".maxMinBond"))),
-            "`\n",
-            "- Require pools: `",
-            vm.toString(json.readBool(string.concat(base, ".requirePools"))),
             "`\n\n"
         );
     }

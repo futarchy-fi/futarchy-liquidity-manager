@@ -18,8 +18,10 @@ contract DeployFutarchyLiquidityManagerFactory is Script {
 
     string internal constant PROPOSAL_SOURCE_ARTIFACT =
         "src/sources/FutarchyOfficialProposalSource.sol:FutarchyOfficialProposalSource";
-    string internal constant ADAPTER_ARTIFACT =
+    string internal constant SPOT_ADAPTER_ARTIFACT =
         "src/adapters/SwaprAlgebraLiquidityAdapter.sol:SwaprAlgebraLiquidityAdapter";
+    string internal constant CONDITIONAL_ADAPTER_ARTIFACT =
+        "src/adapters/SwaprAlgebraDirectConditionalAdapter.sol:SwaprAlgebraDirectConditionalAdapter";
     string internal constant MANAGER_ARTIFACT =
         "src/core/FutarchyLiquidityManager.sol:FutarchyLiquidityManager";
 
@@ -38,7 +40,9 @@ contract DeployFutarchyLiquidityManagerFactory is Script {
             IPoolStabilityGuard(vm.envAddress("FLM_POOL_STABILITY_GUARD"));
         IWrappedNative wrappedNative = IWrappedNative(vm.envAddress("FLM_WRAPPED_NATIVE"));
         bytes32 proposalSourceCreationCodeHash = keccak256(vm.getCode(PROPOSAL_SOURCE_ARTIFACT));
-        bytes32 adapterCreationCodeHash = keccak256(vm.getCode(ADAPTER_ARTIFACT));
+        bytes32 spotAdapterCreationCodeHash = keccak256(vm.getCode(SPOT_ADAPTER_ARTIFACT));
+        bytes32 conditionalAdapterCreationCodeHash =
+            keccak256(vm.getCode(CONDITIONAL_ADAPTER_ARTIFACT));
         bytes32 managerCreationCodeHash = keccak256(vm.getCode(MANAGER_ARTIFACT));
 
         vm.startBroadcast(privateKey);
@@ -51,7 +55,8 @@ contract DeployFutarchyLiquidityManagerFactory is Script {
             DEFAULT_TICK_LOWER,
             DEFAULT_TICK_UPPER,
             proposalSourceCreationCodeHash,
-            adapterCreationCodeHash,
+            spotAdapterCreationCodeHash,
+            conditionalAdapterCreationCodeHash,
             managerCreationCodeHash
         );
         vm.stopBroadcast();
@@ -65,7 +70,8 @@ contract DeployFutarchyLiquidityManagerFactory is Script {
             address(poolStabilityGuard),
             address(wrappedNative),
             proposalSourceCreationCodeHash,
-            adapterCreationCodeHash,
+            spotAdapterCreationCodeHash,
+            conditionalAdapterCreationCodeHash,
             managerCreationCodeHash
         );
 
@@ -78,7 +84,8 @@ contract DeployFutarchyLiquidityManagerFactory is Script {
         console2.log("Pool stability guard:", address(poolStabilityGuard));
         console2.log("Wrapped native/collateral:", address(wrappedNative));
         console2.logBytes32(proposalSourceCreationCodeHash);
-        console2.logBytes32(adapterCreationCodeHash);
+        console2.logBytes32(spotAdapterCreationCodeHash);
+        console2.logBytes32(conditionalAdapterCreationCodeHash);
         console2.logBytes32(managerCreationCodeHash);
     }
 
@@ -91,7 +98,8 @@ contract DeployFutarchyLiquidityManagerFactory is Script {
         address poolStabilityGuard,
         address wrappedNative,
         bytes32 proposalSourceCreationCodeHash,
-        bytes32 adapterCreationCodeHash,
+        bytes32 spotAdapterCreationCodeHash,
+        bytes32 conditionalAdapterCreationCodeHash,
         bytes32 managerCreationCodeHash
     ) internal {
         string memory key = "deployment";
@@ -103,7 +111,10 @@ contract DeployFutarchyLiquidityManagerFactory is Script {
         vm.serializeAddress(key, "poolStabilityGuard", poolStabilityGuard);
         vm.serializeAddress(key, "wrappedNative", wrappedNative);
         vm.serializeBytes32(key, "proposalSourceCreationCodeHash", proposalSourceCreationCodeHash);
-        vm.serializeBytes32(key, "adapterCreationCodeHash", adapterCreationCodeHash);
+        vm.serializeBytes32(key, "spotAdapterCreationCodeHash", spotAdapterCreationCodeHash);
+        vm.serializeBytes32(
+            key, "conditionalAdapterCreationCodeHash", conditionalAdapterCreationCodeHash
+        );
         string memory output =
             vm.serializeBytes32(key, "managerCreationCodeHash", managerCreationCodeHash);
         vm.writeJson(output, path);

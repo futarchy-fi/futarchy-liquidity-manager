@@ -21,11 +21,15 @@ mkdir -p "$OUT_DIR"
 DEPLOY_CONFIG="$OUT_DIR/deploy.json"
 SIMULATED_DEPLOY_CONFIG="$OUT_DIR/deploy-simulated.json"
 DEPLOYMENT_OUTPUT="$OUT_DIR/deployment-output.json"
-SIMULATED_DEPLOYMENT_OUTPUT="$OUT_DIR/simulated-deployment-output.json"
 BATCH_CONFIG="$OUT_DIR/bootstrap.json"
 BAD_BATCH_CONFIG="$OUT_DIR/bootstrap-bad-manager.json"
+BAD_PAIR_CONFIG="$OUT_DIR/deploy-identical-base.json"
+BAD_VALIDATION_CONFIG="$OUT_DIR/deploy-bad-validation-pair.json"
 LOG_FILE="$OUT_DIR/no-proposal.log"
 BAD_LINK_LOG_FILE="$OUT_DIR/bad-link.log"
+BAD_PAIR_LOG_FILE="$OUT_DIR/identical-base.log"
+BAD_VALIDATION_LOG_FILE="$OUT_DIR/bad-validation-pair.log"
+EOA_COORDINATOR_LOG_FILE="$OUT_DIR/eoa-coordinator.log"
 
 jq '
   .organization = "0x1010101010101010101010101010101010101010"
@@ -38,11 +42,12 @@ jq '
   | .poolStabilityGuard = "0x4545454545454545454545454545454545454545"
   | .deployDeadlineProxy = false
   | .validation.enabled = true
-  | .validation.expectedProposalToken = "0x5555555555555555555555555555555555555555"
-  | .validation.expectedCollateralToken = "0x6666666666666666666666666666666666666666"
+  | .validation.expectedProposalToken = "0x3333333333333333333333333333333333333333"
+  | .validation.expectedCollateralToken = .wrappedNative
   | .validation.trustedOracle = "0x7777777777777777777777777777777777777777"
   | .validation.realitio = "0x8888888888888888888888888888888888888888"
   | .validation.trustedArbitrator = "0x9999999999999999999999999999999999999999"
+  | .validation.minConditionalLifetime = 86400
   | .validation.maxMinBond = 1
 ' config/gnosis.example.json > "$DEPLOY_CONFIG"
 
@@ -95,11 +100,36 @@ jq '
   | .validation.trustedOracle = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
   | .validation.realitio = "0xcccccccccccccccccccccccccccccccccccccccc"
   | .validation.trustedArbitrator = "0xdddddddddddddddddddddddddddddddddddddddd"
+  | .validation.minConditionalLifetime = 86400
   | .validation.maxMinBond = 1
 ' config/batches/bootstrap.example.json > "$BATCH_CONFIG"
 
 jq '.manager = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"' \
   "$BATCH_CONFIG" > "$BAD_BATCH_CONFIG"
+
+jq '
+  .companyToken = .wrappedNative
+  | .validation.expectedProposalToken = .wrappedNative
+' "$DEPLOY_CONFIG" > "$BAD_PAIR_CONFIG"
+
+jq '.validation.expectedProposalToken = "0x5555555555555555555555555555555555555555"' \
+  "$DEPLOY_CONFIG" > "$BAD_VALIDATION_CONFIG"
+
+if bash tools/validate-configs.sh --deploy "$BAD_PAIR_CONFIG" \
+  >"$BAD_PAIR_LOG_FILE" 2>&1; then
+  echo "limited preflight check failed: config accepted identical base tokens" >&2
+  exit 1
+fi
+
+grep -q 'strict deployment config' "$BAD_PAIR_LOG_FILE"
+
+if bash tools/validate-configs.sh --deploy "$BAD_VALIDATION_CONFIG" \
+  >"$BAD_VALIDATION_LOG_FILE" 2>&1; then
+  echo "limited preflight check failed: config accepted mismatched validation tokens" >&2
+  exit 1
+fi
+
+grep -q 'strict deployment config' "$BAD_VALIDATION_LOG_FILE"
 
 FLM_BATCH_TEMPLATE_CHECK_OUT="$OUT_DIR/generated" \
   bash tools/preflight-limited-deploy.sh \
@@ -110,14 +140,19 @@ FLM_BATCH_TEMPLATE_CHECK_OUT="$OUT_DIR/generated" \
 jq '.factory = "0x0000000000000000000000000000000000000000"' \
   "$DEPLOY_CONFIG" > "$SIMULATED_DEPLOY_CONFIG"
 
-PRIVATE_KEY=1 \
-FLM_DEPLOY_CONFIG="$SIMULATED_DEPLOY_CONFIG" \
-FLM_DEPLOY_OUTPUT="$SIMULATED_DEPLOYMENT_OUTPUT" \
-  forge script script/DeployFutarchyLiquidityManager.s.sol --chain-id 100 >/dev/null
+if PRIVATE_KEY=1 \
+  FLM_DEPLOY_CONFIG="$SIMULATED_DEPLOY_CONFIG" \
+  FLM_DEPLOY_OUTPUT="$OUT_DIR/unused-deployment-output.json" \
+  forge script script/DeployFutarchyLiquidityManager.s.sol --chain-id 100 \
+    >"$EOA_COORDINATOR_LOG_FILE" 2>&1;
+then
+  echo "limited preflight check failed: deploy accepted an EOA lifecycle coordinator" >&2
+  exit 1
+fi
 
-bash tools/check-deployment-artifacts.sh \
-  --deploy "$SIMULATED_DEPLOY_CONFIG" \
-  --deployment-output "$SIMULATED_DEPLOYMENT_OUTPUT"
+grep -Eq \
+  'proposalManager must be a contract|call to non-contract address 0x1212121212121212121212121212121212121212' \
+  "$EOA_COORDINATOR_LOG_FILE"
 
 if bash tools/check-deployment-artifacts.sh \
   --deploy "$DEPLOY_CONFIG" \

@@ -1,6 +1,6 @@
 {
   "chainId": 100,
-  "name": "FLM sync migrate or settle",
+  "name": "FLM settle captured proposal",
   "createdFromSafeAddress": "0x0000000000000000000000000000000000000000",
   "createdFromOwnerAddress": "0x0000000000000000000000000000000000000000",
   "operation": "sync",
@@ -28,7 +28,7 @@
     "maxOpeningDelay": 604800,
     "minTimeout": 3600,
     "maxTimeout": 604800,
-    "maxMinBond": 0,
-    "requirePools": true
+    "minConditionalLifetime": 86400,
+    "maxMinBond": 0
   }
 }

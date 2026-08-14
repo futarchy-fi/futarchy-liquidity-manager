@@ -6,6 +6,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IFutarchyLiquidityAdapter} from "../interfaces/IFutarchyLiquidityAdapter.sol";
+import {IUniswapV3FactoryLike} from "../interfaces/IUniswapV3FactoryLike.sol";
 import {
     IUniswapV3NonfungiblePositionManager
 } from "../interfaces/IUniswapV3NonfungiblePositionManager.sol";
@@ -22,6 +23,7 @@ contract UniswapV3LiquidityAdapter is IFutarchyLiquidityAdapter {
     uint256 public constant MIN_USAGE_BPS = 9950;
 
     IUniswapV3NonfungiblePositionManager public immutable POSITION_MANAGER;
+    IUniswapV3FactoryLike public immutable FACTORY;
     int24 public immutable DEFAULT_TICK_LOWER;
     int24 public immutable DEFAULT_TICK_UPPER;
     address public MANAGER;
@@ -32,15 +34,20 @@ contract UniswapV3LiquidityAdapter is IFutarchyLiquidityAdapter {
 
     error InvalidAssetTransfer();
     error InvalidPosition();
+    error InvalidPool();
     error InvalidTokenOrder();
     error InvalidTickRange();
     error ManagerAlreadyBound();
+    error InsufficientTokenUsage();
+    error PoolAlreadyExists(address pool);
+    error PositionAlreadyExists();
     error PositionNotFound();
     error InsufficientPositionLiquidity();
     error UnauthorizedBindingAuthority();
     error UnauthorizedManager();
     error UnsupportedData();
     error ZeroAddress();
+    error ZeroAmount();
 
     event ManagerBound(address indexed manager);
     event PositionMinted(bytes32 indexed pairKey, uint256 indexed tokenId, uint128 liquidity);
@@ -59,8 +66,11 @@ contract UniswapV3LiquidityAdapter is IFutarchyLiquidityAdapter {
                 || defaultTickLower >= defaultTickUpper || defaultTickLower % TICK_SPACING != 0
                 || defaultTickUpper % TICK_SPACING != 0
         ) revert InvalidTickRange();
+        address factory = positionManager.factory();
+        if (factory == address(0)) revert ZeroAddress();
 
         POSITION_MANAGER = positionManager;
+        FACTORY = IUniswapV3FactoryLike(factory);
         DEFAULT_TICK_LOWER = defaultTickLower;
         DEFAULT_TICK_UPPER = defaultTickUpper;
         _bindingAuthority = msg.sender;
@@ -78,6 +88,65 @@ contract UniswapV3LiquidityAdapter is IFutarchyLiquidityAdapter {
         if (manager == address(0)) revert ZeroAddress();
         MANAGER = manager;
         emit ManagerBound(manager);
+    }
+
+    function addFreshFullRangeLiquidity(
+        address token0,
+        address token1,
+        uint256 amount0,
+        uint256 amount1,
+        uint160 sqrtPriceX96
+    )
+        external
+        onlyManager
+        returns (address pool, uint128 liquidityMinted, uint256 amount0Used, uint256 amount1Used)
+    {
+        if (amount0 == 0 || amount1 == 0) revert ZeroAmount();
+        bytes32 key = _pairKey(token0, token1);
+        if (positionTokenId[key] != 0) revert PositionAlreadyExists();
+
+        address existingPool = FACTORY.getPool(token0, token1, FEE);
+        if (existingPool != address(0)) revert PoolAlreadyExists(existingPool);
+
+        pool =
+            POSITION_MANAGER.createAndInitializePoolIfNecessary(token0, token1, FEE, sqrtPriceX96);
+        if (pool == address(0) || FACTORY.getPool(token0, token1, FEE) != pool) {
+            revert InvalidPool();
+        }
+
+        uint256 balance0Before = _pullExactAndApprove(token0, amount0);
+        uint256 balance1Before = _pullExactAndApprove(token1, amount1);
+        uint256 amount0Min = _minimumFreshAmount(amount0);
+        uint256 amount1Min = _minimumFreshAmount(amount1);
+        uint256 tokenId;
+        (tokenId, liquidityMinted, amount0Used, amount1Used) = POSITION_MANAGER.mint(
+            IUniswapV3NonfungiblePositionManager.MintParams({
+                token0: token0,
+                token1: token1,
+                fee: FEE,
+                tickLower: DEFAULT_TICK_LOWER,
+                tickUpper: DEFAULT_TICK_UPPER,
+                amount0Desired: amount0,
+                amount1Desired: amount1,
+                amount0Min: amount0Min,
+                amount1Min: amount1Min,
+                recipient: address(this),
+                deadline: block.timestamp
+            })
+        );
+        if (
+            tokenId == 0 || liquidityMinted == 0 || amount0Used < amount0Min
+                || amount1Used < amount1Min || amount0Used > amount0 || amount1Used > amount1
+        ) revert InsufficientTokenUsage();
+        if (_positionLiquidity(tokenId, token0, token1) != liquidityMinted) {
+            revert InvalidPosition();
+        }
+        if (FACTORY.getPool(token0, token1, FEE) != pool) revert InvalidPool();
+
+        positionTokenId[key] = tokenId;
+        emit PositionMinted(key, tokenId, liquidityMinted);
+        _refundAndClear(token0, balance0Before, amount0, amount0Used);
+        _refundAndClear(token1, balance1Before, amount1, amount1Used);
     }
 
     function addFullRangeLiquidity(
@@ -134,20 +203,23 @@ contract UniswapV3LiquidityAdapter is IFutarchyLiquidityAdapter {
         _refundAndClear(token1, balance1Before, amount1Desired, amount1Used);
     }
 
-    function removeLiquidity(address token0, address token1, uint128 liquidity, bytes calldata data)
+    function removeLiquidityDetailed(address token0, address token1, uint128 liquidity)
         external
         onlyManager
-        returns (uint256 amount0Out, uint256 amount1Out)
+        returns (Removal memory removed)
     {
-        _requireEmptyData(data);
         bytes32 key = _pairKey(token0, token1);
         uint256 tokenId = positionTokenId[key];
         if (tokenId == 0) revert PositionNotFound();
 
         uint128 currentLiquidity = _positionLiquidity(tokenId, token0, token1);
-        if (liquidity == 0 || liquidity > currentLiquidity) revert InsufficientPositionLiquidity();
+        if (liquidity > currentLiquidity) revert InsufficientPositionLiquidity();
 
-        POSITION_MANAGER.decreaseLiquidity(
+        (removed.fees0, removed.fees1) = _collectToManager(tokenId, token0, token1);
+        _assertNoOwedTokens(tokenId);
+        if (liquidity == 0) return removed;
+
+        (removed.principal0, removed.principal1) = POSITION_MANAGER.decreaseLiquidity(
             IUniswapV3NonfungiblePositionManager.DecreaseLiquidityParams({
                 tokenId: tokenId,
                 liquidity: liquidity,
@@ -157,20 +229,11 @@ contract UniswapV3LiquidityAdapter is IFutarchyLiquidityAdapter {
             })
         );
 
-        uint256 balance0Before = IERC20(token0).balanceOf(msg.sender);
-        uint256 balance1Before = IERC20(token1).balanceOf(msg.sender);
-        (amount0Out, amount1Out) = POSITION_MANAGER.collect(
-            IUniswapV3NonfungiblePositionManager.CollectParams({
-                tokenId: tokenId,
-                recipient: msg.sender,
-                amount0Max: type(uint128).max,
-                amount1Max: type(uint128).max
-            })
-        );
-        if (
-            IERC20(token0).balanceOf(msg.sender) - balance0Before != amount0Out
-                || IERC20(token1).balanceOf(msg.sender) - balance1Before != amount1Out
-        ) revert InvalidAssetTransfer();
+        (uint256 collected0, uint256 collected1) = _collectToManager(tokenId, token0, token1);
+        if (collected0 != removed.principal0 || collected1 != removed.principal1) {
+            revert InvalidAssetTransfer();
+        }
+        _assertNoOwedTokens(tokenId);
         emit LiquidityRemoved(key, tokenId, liquidity);
 
         if (liquidity == currentLiquidity) {
@@ -178,53 +241,6 @@ contract UniswapV3LiquidityAdapter is IFutarchyLiquidityAdapter {
             positionTokenId[key] = 0;
             emit PositionBurned(key, tokenId);
         }
-    }
-
-    function compoundPosition(address token0, address token1, bytes calldata data)
-        external
-        onlyManager
-        returns (uint128 liquidityAdded)
-    {
-        _requireEmptyData(data);
-        bytes32 key = _pairKey(token0, token1);
-        uint256 tokenId = positionTokenId[key];
-        if (tokenId == 0) return 0;
-        _positionLiquidity(tokenId, token0, token1);
-
-        uint256 balance0Before = IERC20(token0).balanceOf(address(this));
-        uint256 balance1Before = IERC20(token1).balanceOf(address(this));
-        (uint256 amount0Collected, uint256 amount1Collected) = POSITION_MANAGER.collect(
-            IUniswapV3NonfungiblePositionManager.CollectParams({
-                tokenId: tokenId,
-                recipient: address(this),
-                amount0Max: type(uint128).max,
-                amount1Max: type(uint128).max
-            })
-        );
-        if (
-            IERC20(token0).balanceOf(address(this)) - balance0Before != amount0Collected
-                || IERC20(token1).balanceOf(address(this)) - balance1Before != amount1Collected
-        ) revert InvalidAssetTransfer();
-        if (amount0Collected == 0 && amount1Collected == 0) return 0;
-
-        _approve(token0, amount0Collected);
-        _approve(token1, amount1Collected);
-        uint256 amount0Used;
-        uint256 amount1Used;
-        (liquidityAdded, amount0Used, amount1Used) = POSITION_MANAGER.increaseLiquidity(
-            IUniswapV3NonfungiblePositionManager.IncreaseLiquidityParams({
-                tokenId: tokenId,
-                amount0Desired: amount0Collected,
-                amount1Desired: amount1Collected,
-                amount0Min: _minimumAmount(amount0Collected),
-                amount1Min: _minimumAmount(amount1Collected),
-                deadline: block.timestamp
-            })
-        );
-        emit LiquidityIncreased(key, tokenId, liquidityAdded);
-
-        _refundAndClear(token0, balance0Before, amount0Collected, amount0Used);
-        _refundAndClear(token1, balance1Before, amount1Collected, amount1Used);
     }
 
     function getPositionTokenId(address token0, address token1) external view returns (uint256) {
@@ -244,6 +260,10 @@ contract UniswapV3LiquidityAdapter is IFutarchyLiquidityAdapter {
 
     function _minimumAmount(uint256 desired) internal pure returns (uint256) {
         return Math.mulDiv(desired, MIN_USAGE_BPS, BPS_DENOMINATOR);
+    }
+
+    function _minimumFreshAmount(uint256 desired) internal pure returns (uint256) {
+        return Math.mulDiv(desired, MIN_USAGE_BPS, BPS_DENOMINATOR, Math.Rounding.Up);
     }
 
     function _pullExactAndApprove(address token, uint256 amount)
@@ -283,7 +303,13 @@ contract UniswapV3LiquidityAdapter is IFutarchyLiquidityAdapter {
         if (asset.allowance(address(this), address(POSITION_MANAGER)) != 0) {
             asset.safeApprove(address(POSITION_MANAGER), 0);
         }
-        if (refund > 0) asset.safeTransfer(msg.sender, refund);
+        if (refund > 0) {
+            uint256 recipientBefore = asset.balanceOf(msg.sender);
+            asset.safeTransfer(msg.sender, refund);
+            if (asset.balanceOf(msg.sender) != recipientBefore + refund) {
+                revert InvalidAssetTransfer();
+            }
+        }
         if (asset.balanceOf(address(this)) != balanceBefore) revert InvalidAssetTransfer();
     }
 
@@ -303,5 +329,33 @@ contract UniswapV3LiquidityAdapter is IFutarchyLiquidityAdapter {
             positionToken0 != token0 || positionToken1 != token1 || fee != FEE
                 || tickLower != DEFAULT_TICK_LOWER || tickUpper != DEFAULT_TICK_UPPER
         ) revert InvalidPosition();
+    }
+
+    function _collectToManager(uint256 tokenId, address token0, address token1)
+        internal
+        returns (uint256 amount0, uint256 amount1)
+    {
+        uint256 balance0Before = IERC20(token0).balanceOf(MANAGER);
+        uint256 balance1Before = IERC20(token1).balanceOf(MANAGER);
+        (amount0, amount1) = POSITION_MANAGER.collect(
+            IUniswapV3NonfungiblePositionManager.CollectParams({
+                tokenId: tokenId,
+                recipient: MANAGER,
+                amount0Max: type(uint128).max,
+                amount1Max: type(uint128).max
+            })
+        );
+        uint256 balance0After = IERC20(token0).balanceOf(MANAGER);
+        uint256 balance1After = IERC20(token1).balanceOf(MANAGER);
+        if (
+            balance0After < balance0Before || balance1After < balance1Before
+                || balance0After - balance0Before != amount0
+                || balance1After - balance1Before != amount1
+        ) revert InvalidAssetTransfer();
+    }
+
+    function _assertNoOwedTokens(uint256 tokenId) internal view {
+        (,,,,,,,,,, uint128 tokensOwed0, uint128 tokensOwed1) = POSITION_MANAGER.positions(tokenId);
+        if (tokensOwed0 != 0 || tokensOwed1 != 0) revert InvalidAssetTransfer();
     }
 }

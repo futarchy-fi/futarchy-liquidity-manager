@@ -1,5 +1,12 @@
 # FAO Integration Boundary
 
+The current Swapr Algebra implementation is a no-funds prototype. FAO must not route treasury or LP
+assets into it: permissionless pool precreation, mutable liquidity-cooldown griefing, and activation
+gas fragility remain unresolved. The Ethereum-mainnet v4 successor has a gate and direct adapter,
+plus atomic caller-bound factory wiring. Its full source/CTF/two-pool lifecycle passes on a pinned
+mainnet fork, but the final production dependency set and deployment manifest remain unselected.
+The integration flow below specifies interfaces, not deployment approval.
+
 FAO should consume this package as a generic liquidity module. This repository should not import
 FAO sale, arbitration, SnapshotX, frontend, or SDK contracts.
 
@@ -11,19 +18,23 @@ FAO-side code or operations should:
 - hold the organization-specific sale, arbitration, SnapshotX, and governance logic outside this
   repository;
 - call `initializeFromBootstrap` from the configured `bootstrapRecipient`;
-- configure `FutarchyOfficialProposalSource` validation before setting a real official proposal;
+- constructor-configure `FutarchyOfficialProposalSource` validation before its activation target is
+  bound;
 - assign a proposal manager for proposal-source operations when ownership should remain separate
   from day-to-day metadata updates;
-- set only proposals whose creator equals the configured `officialProposer`;
+- make the immutable lifecycle coordinator derive proposal id and address from the canonical FAO
+  factory or evaluation pipeline. The proposal ABI has no creator getter, so the source's stored
+  `creator` is integration attribution rather than independent authentication;
 - generate operation batches from explicit JSON and audit calldata before execution.
 
 ## Minimal Bootstrap Flow
 
-1. Deploy one `AlgebraPoolStabilityGuard` for the target Algebra factory, or reuse its reviewed
-   deployment across every FAO/FLM manager on that chain.
+1. For prototype simulation only, deploy one `AlgebraPoolStabilityGuard` for the target Algebra
+   factory, or reuse its reviewed deployment across every FAO/FLM manager on that chain.
 2. Deploy `FutarchyOfficialProposalSource`.
 3. Optionally deploy `DeadlineBoundedRealityProxy` for new FLM-grade proposal factories.
-4. Deploy one `SwaprAlgebraLiquidityAdapter` for spot and one for conditional pools.
+4. Deploy one `SwaprAlgebraLiquidityAdapter` for spot and one
+   `SwaprAlgebraDirectConditionalAdapter` for fresh conditional pools.
 5. Deploy `FutarchyLiquidityManager` with the shared guard address.
 6. Irreversibly bind both adapters to the manager from their deployment authority.
 7. Approve company tokens from `bootstrapRecipient` to the manager.
@@ -36,16 +47,16 @@ FAO-side code or operations should:
 
 ## Proposal Flow
 
-1. Create or identify the futarchy proposal.
-2. Ensure YES/NO outcome pools exist if validation requires pools.
-3. Configure proposal validation bounds for the token pair, CTF oracle, Reality contract,
-   arbitrator, opening delay, timeout, and min bond.
-4. Call `setOfficialProposal`.
-5. Call `sync` to migrate 80% of spot liquidity into conditional pools. The call fails closed if
-   the established spot pool lacks 30 minutes of history or its current tick is more than 50 ticks
-   from that TWAP. Newly seeded YES/NO pools do not need pre-existing 30-minute history.
-6. After settlement, call `sync` again to return conditional liquidity to spot. The same spot-pool
-   guard runs before conditional positions are removed.
+1. Create the futarchy proposal, CTF condition, and canonical wrappers. The two conditional pools
+   must still be fresh; precreating them makes activation revert.
+2. Before bundle binding, configure proposal validation bounds for the token pair, CTF oracle,
+   Reality contract, arbitrator, opening delay, timeout, min bond, and conditional lifetime.
+3. Through the immutable lifecycle coordinator, call `setOfficialProposal`. The source write,
+   manager activation, guarded spot removal, CTF split, both fresh pool initializations, and both
+   first positions either succeed together or all revert. There is no later activation `sync`.
+4. After CTF reports an exact binary payout, anyone may call `manager.sync`. It resolves only the
+   captured condition, ignores later source mutation, and leaves recovered base inventory idle and
+   share-owned; no unproven off-ratio spot join runs.
 
 ## Out Of Scope
 

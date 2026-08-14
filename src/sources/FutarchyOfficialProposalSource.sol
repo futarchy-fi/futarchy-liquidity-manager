@@ -17,12 +17,45 @@ interface IProposalSettlementOracle {
     function isSettled(address proposal) external view returns (bool);
 }
 
+interface IOfficialProposalActivationTarget {
+    function activateOfficialProposal(
+        IFutarchyOfficialProposalSource.ProposalActivationData calldata proposal
+    ) external;
+
+    function capturedOfficialProposal()
+        external
+        view
+        returns (IFutarchyOfficialProposalSource.ProposalActivationData memory proposal);
+
+    function PROPOSAL_SOURCE() external view returns (address);
+
+    function canActivateOfficialProposal() external view returns (bool);
+
+    function COMPANY_TOKEN() external view returns (address);
+
+    function WRAPPED_NATIVE() external view returns (address);
+
+    function CONDITIONAL_ROUTER() external view returns (address);
+}
+
+interface IConditionalRouterBinding {
+    function CONDITIONAL_TOKENS() external view returns (address);
+}
+
+interface IRealityOracleBinding {
+    function conditionalTokens() external view returns (address);
+
+    function realitio() external view returns (address);
+
+    function maxQuestionDuration() external view returns (uint256);
+}
+
 /// @title FutarchyOfficialProposalSource
-/// @notice Owner/manager source of a single official proposal with optional oracle-based
-/// settlement.
-/// @dev This enforces "one live official proposal" at a time. When validation is enabled, the
-/// owner or proposal manager can only set proposals whose on-chain shape matches the configured
-/// token, CTF, Reality, arbitrator, timing, bond, and pool policy.
+/// @notice Source of a single official proposal with atomic manager activation and optional
+/// oracle-based settlement.
+/// @dev The immutable lifecycle coordinator is the only official-proposal writer. When validation
+/// is enabled, proposals must match the configured token, CTF, Reality, arbitrator, timing, and
+/// bond policy.
 contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Ownable2Step {
     enum ProposalValidationFailure {
         None,
@@ -30,7 +63,6 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         WrongCollateralPair,
         MissingOutcomeToken,
         DuplicateOutcomeToken,
-        MissingPool,
         WrongConditionId,
         WrongOutcomeSlotCount,
         MissingRealityQuestion,
@@ -38,12 +70,15 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         OpeningTimeTooFar,
         TimeoutTooLow,
         TimeoutTooHigh,
-        MinBondTooHigh
+        MinBondTooHigh,
+        QuestionNotPristine,
+        OpeningTimeTooSoon,
+        ConditionalLifetimeTooShort
     }
 
     /// @notice Stored official proposal slot.
     struct OfficialProposal {
-        uint256 id;
+        uint96 id;
         address proposal;
         address creator;
         bool exists;
@@ -51,7 +86,8 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
     }
 
     /// @notice On-chain policy used to admit official proposals.
-    /// @dev Validation is optional for test/staging, but should be enabled for production.
+    /// @dev A zero `realitio` selects condition-only validation; otherwise the full Reality policy
+    /// is enforced in addition to the token, wrapper, and CTF condition checks.
     struct ProposalValidationConfig {
         bool enabled;
         address expectedProposalToken;
@@ -63,8 +99,8 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         uint32 maxOpeningDelay;
         uint32 minTimeout;
         uint32 maxTimeout;
+        uint32 minConditionalLifetime;
         uint256 maxMinBond;
-        bool requirePools;
     }
 
     /// @notice Resolved proposal view including current settlement status and pool addresses.
@@ -74,6 +110,7 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         address creator;
         bool exists;
         bool settled;
+        bytes32 conditionId;
         address proposalToken;
         address collateralToken;
         address yesCompanyToken;
@@ -93,30 +130,46 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         address noCompanyToken;
         address yesCurrencyToken;
         address noCurrencyToken;
-        address yesPool;
-        address noPool;
         bytes32 questionId;
         bytes32 conditionId;
     }
 
     IAlgebraFactoryLike public immutable ALGEBRA_FACTORY;
+    uint32 public constant MIN_CONDITIONAL_LIFETIME = 1 days;
+    address public immutable BINDING_AUTHORITY;
+    address public immutable LIFECYCLE_COORDINATOR;
     address public proposalManager;
     address public officialProposer;
     address public settlementOracle;
+    address public activationTarget;
     ProposalValidationConfig public proposalValidationConfig;
 
     OfficialProposal private _official;
+    bool private _settingOfficialProposal;
 
     error ZeroAddress();
     error OnlyOwnerOrProposalManager();
+    error OnlyBindingAuthority();
+    error OnlyLifecycleCoordinator();
+    error InvalidLifecycleCoordinator();
+    error InvalidActivationTarget();
+    error ActivationTargetAlreadyBound();
+    error ActivationTargetUnbound();
+    error ActivationUnavailable();
+    error ReentrantOfficialProposal();
+    error InvalidProposalId();
+    error InvalidOfficialProposer();
     error InvalidProposalValidationConfig();
-    error ActiveOfficialProposalExists();
+    error ProposalValidationConfigFrozen();
+    error CapturedProposalMismatch();
     error ProposalValidationFailed(ProposalValidationFailure failure);
 
     event ProposalManagerUpdated(address indexed oldManager, address indexed newManager);
     event OfficialProposerUpdated(address indexed oldProposer, address indexed newProposer);
     event SettlementOracleUpdated(address indexed oldOracle, address indexed newOracle);
     event ProposalValidationConfigUpdated(ProposalValidationConfig config);
+    event ProposalValidationConfigFrozenAtBinding(bytes32 indexed configHash);
+    event ActivationTargetBound(address indexed target);
     event OfficialProposalSet(
         uint256 indexed proposalId, address indexed proposal, address indexed creator
     );
@@ -136,7 +189,10 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         ) {
             revert ZeroAddress();
         }
+        if (initialProposalManager.code.length == 0) revert InvalidLifecycleCoordinator();
 
+        BINDING_AUTHORITY = msg.sender;
+        LIFECYCLE_COORDINATOR = initialProposalManager;
         proposalManager = initialProposalManager;
         officialProposer = initialOfficialProposer;
         ALGEBRA_FACTORY = algebraFactory;
@@ -154,6 +210,18 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         _;
     }
 
+    modifier onlyLifecycleCoordinator() {
+        if (msg.sender != LIFECYCLE_COORDINATOR) revert OnlyLifecycleCoordinator();
+        _;
+    }
+
+    modifier nonReentrantOfficialProposal() {
+        if (_settingOfficialProposal) revert ReentrantOfficialProposal();
+        _settingOfficialProposal = true;
+        _;
+        _settingOfficialProposal = false;
+    }
+
     function _requireOwnerOrProposalManager() internal view {
         if (msg.sender != owner() && msg.sender != proposalManager) {
             revert OnlyOwnerOrProposalManager();
@@ -169,9 +237,36 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         emit ProposalManagerUpdated(old, newProposalManager);
     }
 
+    /// @notice Irreversibly binds the manager activated by official-proposal writes.
+    /// @dev Only the contract that deployed this source may bind the target. The reciprocal source
+    /// and activation-readiness methods are checked before the binding is stored.
+    function bindActivationTarget(address target) external {
+        if (msg.sender != BINDING_AUTHORITY) revert OnlyBindingAuthority();
+        if (activationTarget != address(0)) revert ActivationTargetAlreadyBound();
+        if (target == address(0) || target.code.length == 0) revert InvalidActivationTarget();
+
+        IOfficialProposalActivationTarget targetLike = IOfficialProposalActivationTarget(target);
+        try targetLike.PROPOSAL_SOURCE() returns (address proposalSource) {
+            if (proposalSource != address(this)) revert InvalidActivationTarget();
+        } catch {
+            revert InvalidActivationTarget();
+        }
+        try targetLike.canActivateOfficialProposal() returns (bool) {}
+        catch {
+            revert InvalidActivationTarget();
+        }
+
+        _validateFrozenPolicy(targetLike);
+
+        activationTarget = target;
+        emit ProposalValidationConfigFrozenAtBinding(keccak256(
+                abi.encode(proposalValidationConfig)
+            ));
+        emit ActivationTargetBound(target);
+    }
+
     /// @notice Updates the only proposal creator whose proposals should be considered official.
-    /// @dev Owner/manager-only. The liquidity manager still checks that the current official
-    /// proposal creator equals its immutable `OFFICIAL_PROPOSER`.
+    /// @dev Owner/manager-only. Future official writes must identify this creator exactly.
     function setOfficialProposer(address newOfficialProposer) external onlyOwnerOrProposalManager {
         if (newOfficialProposer == address(0)) revert ZeroAddress();
         address old = officialProposer;
@@ -194,36 +289,70 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         external
         onlyOwnerOrProposalManager
     {
+        if (activationTarget != address(0)) revert ProposalValidationConfigFrozen();
         _setProposalValidationConfig(config);
     }
 
+    /// @notice Returns whether the activation binding has irreversibly committed the policy.
+    function proposalValidationConfigFrozen() external view returns (bool) {
+        return activationTarget != address(0);
+    }
+
     /// @notice Sets the current official proposal.
-    /// @dev Owner/manager-only. Reverts while a previous official proposal exists and is not
-    /// settled. If validation is enabled, the proposal must pass `validateProposal`.
+    /// @dev Lifecycle-coordinator-only. The source write and target activation are atomic. If
+    /// validation is enabled, the proposal must pass `validateProposal`.
     /// @param proposalId External proposal identifier used by the integration.
     /// @param proposal Futarchy proposal contract address.
     /// @param creator Creator address reported by the integration/proposal system.
     function setOfficialProposal(uint256 proposalId, address proposal, address creator)
         external
-        onlyOwnerOrProposalManager
+        onlyLifecycleCoordinator
+        nonReentrantOfficialProposal
     {
         if (proposal == address(0) || creator == address(0)) revert ZeroAddress();
-        if (_official.exists && !_isSettled(_official)) revert ActiveOfficialProposalExists();
-        (bool valid, ProposalValidationFailure failure) = validateProposal(proposal);
-        if (!valid) revert ProposalValidationFailed(failure);
+        if (proposalId > type(uint96).max) revert InvalidProposalId();
+        if (creator != officialProposer) revert InvalidOfficialProposer();
+        address target = activationTarget;
+        if (target == address(0)) revert ActivationTargetUnbound();
+        if (!IOfficialProposalActivationTarget(target).canActivateOfficialProposal()) {
+            revert ActivationUnavailable();
+        }
+        (ValidationProposal memory snapshot, ProposalValidationFailure failure) =
+            _readProposalForValidation(proposal);
+        if (failure == ProposalValidationFailure.None && proposalValidationConfig.enabled) {
+            failure = _validateProposalSnapshot(snapshot, proposalValidationConfig);
+        }
+        if (failure != ProposalValidationFailure.None) revert ProposalValidationFailed(failure);
 
-        _official.id = proposalId;
+        _official.id = uint96(proposalId);
         _official.proposal = proposal;
         _official.creator = creator;
         _official.exists = true;
         _official.manualSettled = false;
 
+        IFutarchyOfficialProposalSource.ProposalActivationData memory activation =
+            IFutarchyOfficialProposalSource.ProposalActivationData({
+                proposalId: proposalId,
+                proposal: proposal,
+                conditionId: snapshot.conditionId,
+                proposalToken: snapshot.proposalToken,
+                collateralToken: snapshot.collateralToken,
+                yesCompanyToken: snapshot.yesCompanyToken,
+                noCompanyToken: snapshot.noCompanyToken,
+                yesCurrencyToken: snapshot.yesCurrencyToken,
+                noCurrencyToken: snapshot.noCurrencyToken
+            });
+        IOfficialProposalActivationTarget targetLike = IOfficialProposalActivationTarget(target);
+        targetLike.activateOfficialProposal(activation);
+        if (
+            keccak256(abi.encode(targetLike.capturedOfficialProposal()))
+                != keccak256(abi.encode(activation))
+        ) revert CapturedProposalMismatch();
         emit OfficialProposalSet(proposalId, proposal, creator);
     }
 
-    /// @notice Clears the official proposal slot.
-    /// @dev Owner/manager-only emergency/admin action. Clearing while the manager is in conditional
-    /// mode can make `sync` back to spot revert until the active proposal is restored and settled.
+    /// @notice Clears the registry slot without changing the manager's stored active binding.
+    /// @dev Owner/manager-only emergency/admin action. CTF settlement remains source-independent.
     function clearOfficialProposal() external onlyOwnerOrProposalManager {
         delete _official;
         emit OfficialProposalCleared();
@@ -237,8 +366,8 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
     }
 
     /// @notice Returns a compact view of the current official proposal.
-    /// @dev This omits wrapped outcome tokens. The liquidity manager uses
-    /// `officialProposalExtended` instead.
+    /// @dev This omits wrapped outcome tokens. Registry consumers that need the full atomically
+    /// captured manager binding use `officialProposalExtended` instead.
     function officialProposal()
         external
         view
@@ -278,6 +407,7 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         proposalData.creator = p.creator;
         proposalData.exists = p.exists;
         proposalData.settled = p.settled;
+        proposalData.conditionId = p.conditionId;
         proposalData.proposalToken = p.proposalToken;
         proposalData.collateralToken = p.collateralToken;
         proposalData.yesCompanyToken = p.yesCompanyToken;
@@ -314,16 +444,23 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         (p, failure) = _readProposalForValidation(proposal);
         if (failure != ProposalValidationFailure.None) return (false, failure);
 
-        failure = _validateTokenAndPoolShape(p, config);
-        if (failure != ProposalValidationFailure.None) return (false, failure);
+        failure = _validateProposalSnapshot(p, config);
+        return (failure == ProposalValidationFailure.None, failure);
+    }
+
+    function _validateProposalSnapshot(
+        ValidationProposal memory p,
+        ProposalValidationConfig memory config
+    ) internal view returns (ProposalValidationFailure failure) {
+        failure = _validateTokenShape(p, config);
+        if (failure != ProposalValidationFailure.None) return failure;
 
         failure = _validateConditionShape(p, config);
-        if (failure != ProposalValidationFailure.None) return (false, failure);
+        if (failure != ProposalValidationFailure.None) return failure;
 
+        if (config.realitio == address(0)) return ProposalValidationFailure.None;
         failure = _validateRealityQuestion(p.questionId, config);
-        if (failure != ProposalValidationFailure.None) return (false, failure);
-
-        return (true, failure);
+        return failure;
     }
 
     function _readProposalForValidation(address proposal)
@@ -378,10 +515,10 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         return (p, ProposalValidationFailure.None);
     }
 
-    function _validateTokenAndPoolShape(
+    function _validateTokenShape(
         ValidationProposal memory p,
         ProposalValidationConfig memory config
-    ) internal view returns (ProposalValidationFailure) {
+    ) internal pure returns (ProposalValidationFailure) {
         if (
             p.proposalToken != config.expectedProposalToken
                 || p.collateralToken != config.expectedCollateralToken
@@ -394,15 +531,16 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
         ) {
             return ProposalValidationFailure.MissingOutcomeToken;
         }
-        if (p.yesCompanyToken == p.noCompanyToken || p.yesCurrencyToken == p.noCurrencyToken) {
+        if (
+            p.yesCompanyToken == p.noCompanyToken || p.yesCompanyToken == p.yesCurrencyToken
+                || p.yesCompanyToken == p.noCurrencyToken || p.noCompanyToken == p.yesCurrencyToken
+                || p.noCompanyToken == p.noCurrencyToken || p.yesCurrencyToken == p.noCurrencyToken
+                || p.yesCompanyToken == p.proposalToken || p.yesCompanyToken == p.collateralToken
+                || p.noCompanyToken == p.proposalToken || p.noCompanyToken == p.collateralToken
+                || p.yesCurrencyToken == p.proposalToken || p.yesCurrencyToken == p.collateralToken
+                || p.noCurrencyToken == p.proposalToken || p.noCurrencyToken == p.collateralToken
+        ) {
             return ProposalValidationFailure.DuplicateOutcomeToken;
-        }
-        if (config.requirePools) {
-            p.yesPool = ALGEBRA_FACTORY.poolByPair(p.yesCompanyToken, p.yesCurrencyToken);
-            p.noPool = ALGEBRA_FACTORY.poolByPair(p.noCompanyToken, p.noCurrencyToken);
-            if (p.yesPool == address(0) || p.noPool == address(0)) {
-                return ProposalValidationFailure.MissingPool;
-            }
         }
         return ProposalValidationFailure.None;
     }
@@ -442,8 +580,8 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
             address arbitrator,
             uint32 openingTs,
             uint32 timeout,
-            uint32,
-            bool,
+            uint32 finalizeTs,
+            bool isPendingArbitration,
             uint256,
             bytes32,
             bytes32,
@@ -456,6 +594,12 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
             if (arbitrator != config.trustedArbitrator) {
                 return ProposalValidationFailure.UntrustedArbitrator;
             }
+            if (finalizeTs != 0 || isPendingArbitration) {
+                return ProposalValidationFailure.QuestionNotPristine;
+            }
+            if (openingTs <= block.timestamp) {
+                return ProposalValidationFailure.OpeningTimeTooSoon;
+            }
             if (openingTs > block.timestamp + config.maxOpeningDelay) {
                 return ProposalValidationFailure.OpeningTimeTooFar;
             }
@@ -464,6 +608,9 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
             }
             if (timeout > config.maxTimeout) {
                 return ProposalValidationFailure.TimeoutTooHigh;
+            }
+            if (uint256(openingTs) + timeout < block.timestamp + config.minConditionalLifetime) {
+                return ProposalValidationFailure.ConditionalLifetimeTooShort;
             }
             if (minBond > config.maxMinBond) {
                 return ProposalValidationFailure.MinBondTooHigh;
@@ -492,9 +639,15 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
                 config.expectedProposalToken == address(0)
                     || config.expectedCollateralToken == address(0)
                     || config.conditionalTokens == address(0) || config.trustedOracle == address(0)
-                    || config.realitio == address(0) || config.trustedArbitrator == address(0)
-                    || config.maxOpeningDelay == 0 || config.maxTimeout == 0
-                    || config.minTimeout > config.maxTimeout
+                    || (config.realitio != address(0)
+                        && (config.trustedArbitrator == address(0)
+                            || config.maxOpeningDelay == 0
+                            || config.minTimeout == 0
+                            || config.maxTimeout == 0
+                            || config.minTimeout > config.maxTimeout
+                            || config.minConditionalLifetime < MIN_CONDITIONAL_LIFETIME
+                            || uint256(config.maxOpeningDelay) + config.maxTimeout
+                                < config.minConditionalLifetime))
             ) {
                 revert InvalidProposalValidationConfig();
             }
@@ -502,6 +655,68 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
 
         proposalValidationConfig = config;
         emit ProposalValidationConfigUpdated(config);
+    }
+
+    function _validateFrozenPolicy(IOfficialProposalActivationTarget targetLike) internal view {
+        ProposalValidationConfig memory config = proposalValidationConfig;
+        if (!config.enabled) revert InvalidProposalValidationConfig();
+
+        address companyToken;
+        address collateralToken;
+        address conditionalRouter;
+        try targetLike.COMPANY_TOKEN() returns (address value) {
+            companyToken = value;
+        } catch {
+            revert InvalidActivationTarget();
+        }
+        try targetLike.WRAPPED_NATIVE() returns (address value) {
+            collateralToken = value;
+        } catch {
+            revert InvalidActivationTarget();
+        }
+        try targetLike.CONDITIONAL_ROUTER() returns (address value) {
+            conditionalRouter = value;
+        } catch {
+            revert InvalidActivationTarget();
+        }
+        if (
+            companyToken != config.expectedProposalToken
+                || collateralToken != config.expectedCollateralToken
+                || conditionalRouter.code.length == 0
+        ) revert InvalidProposalValidationConfig();
+
+        address routerConditionalTokens;
+        try IConditionalRouterBinding(conditionalRouter).CONDITIONAL_TOKENS() returns (
+            address value
+        ) {
+            routerConditionalTokens = value;
+        } catch {
+            revert InvalidProposalValidationConfig();
+        }
+        if (routerConditionalTokens != config.conditionalTokens) {
+            revert InvalidProposalValidationConfig();
+        }
+
+        if (config.realitio == address(0)) return;
+        IRealityOracleBinding oracle = IRealityOracleBinding(config.trustedOracle);
+        try oracle.conditionalTokens() returns (address value) {
+            if (value != config.conditionalTokens) revert InvalidProposalValidationConfig();
+        } catch {
+            revert InvalidProposalValidationConfig();
+        }
+        try oracle.realitio() returns (address value) {
+            if (value != config.realitio) revert InvalidProposalValidationConfig();
+        } catch {
+            revert InvalidProposalValidationConfig();
+        }
+
+        // Legacy FutarchyRealityProxy has no force deadline. New bounded proxies expose this
+        // optional getter and may not make NO forceable before the committed minimum lifetime.
+        try oracle.maxQuestionDuration() returns (uint256 duration) {
+            if (duration < config.minConditionalLifetime) {
+                revert InvalidProposalValidationConfig();
+            }
+        } catch {}
     }
 
     function _resolveOfficialProposalView() internal view returns (ProposalView memory p) {
@@ -516,14 +731,18 @@ contract FutarchyOfficialProposalSource is IFutarchyOfficialProposalSource, Owna
             return p;
         }
 
-        IFutarchyProposalCore proposal = IFutarchyProposalCore(p.proposal);
-        p.proposalToken = proposal.collateralToken1();
-        p.collateralToken = proposal.collateralToken2();
-
-        (p.yesCompanyToken,) = proposal.wrappedOutcome(0);
-        (p.noCompanyToken,) = proposal.wrappedOutcome(1);
-        (p.yesCurrencyToken,) = proposal.wrappedOutcome(2);
-        (p.noCurrencyToken,) = proposal.wrappedOutcome(3);
+        IFutarchyOfficialProposalSource.ProposalActivationData memory captured =
+            IOfficialProposalActivationTarget(activationTarget).capturedOfficialProposal();
+        if (captured.proposalId != p.proposalId || captured.proposal != p.proposal) {
+            revert CapturedProposalMismatch();
+        }
+        p.conditionId = captured.conditionId;
+        p.proposalToken = captured.proposalToken;
+        p.collateralToken = captured.collateralToken;
+        p.yesCompanyToken = captured.yesCompanyToken;
+        p.noCompanyToken = captured.noCompanyToken;
+        p.yesCurrencyToken = captured.yesCurrencyToken;
+        p.noCurrencyToken = captured.noCurrencyToken;
 
         p.yesPool = ALGEBRA_FACTORY.poolByPair(p.yesCompanyToken, p.yesCurrencyToken);
         p.noPool = ALGEBRA_FACTORY.poolByPair(p.noCompanyToken, p.noCurrencyToken);

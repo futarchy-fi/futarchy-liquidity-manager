@@ -1,0 +1,15 @@
+{
+  "chainId": 100,
+  "name": "FLM atomic operator activation",
+  "createdFromSafeAddress": "0x0000000000000000000000000000000000000000",
+  "createdFromOwnerAddress": "0x0000000000000000000000000000000000000000",
+  "proposalSource": "0x0000000000000000000000000000000000000000",
+  "proposalId": 0,
+  "proposal": "0x0000000000000000000000000000000000000000",
+  "creator": "0x0000000000000000000000000000000000000000",
+  "preActivationTargets": [
+    "0x0000000000000000000000000000000000000000"
+  ],
+  "preActivationValues": [0],
+  "preActivationData": ["0x"]
+}

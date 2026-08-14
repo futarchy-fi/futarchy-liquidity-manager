@@ -7,11 +7,20 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {
     IUniswapV3NonfungiblePositionManager
 } from "../../src/interfaces/IUniswapV3NonfungiblePositionManager.sol";
+import {MockUniswapV3FactoryLike} from "./MockUniswapV3FactoryLike.sol";
 
 contract MockUniswapV3NonfungiblePositionManager is IUniswapV3NonfungiblePositionManager {
     using SafeERC20 for IERC20;
 
+    error PoolCreationFailed();
+    error PoolInitializationFailed();
+
     uint256 internal constant BPS_DENOMINATOR = 10_000;
+    address public immutable factory;
+
+    constructor() {
+        factory = address(new MockUniswapV3FactoryLike());
+    }
 
     struct Position {
         address token0;
@@ -36,6 +45,8 @@ contract MockUniswapV3NonfungiblePositionManager is IUniswapV3NonfungiblePositio
     uint256 public collectCalls;
     uint256 public burnCalls;
     uint256 public poolInitializationCalls;
+    uint160 public lastPoolSqrtPriceX96;
+    uint8 public poolLifecycleFailure;
 
     uint24 public lastFee;
     uint256 public lastAmount0Min;
@@ -46,6 +57,11 @@ contract MockUniswapV3NonfungiblePositionManager is IUniswapV3NonfungiblePositio
     function setUsageBps(uint16 value) external {
         require(value <= BPS_DENOMINATOR, "usage bps");
         usageBps = value;
+    }
+
+    function setPoolLifecycleFailure(uint8 value) external {
+        require(value <= 2, "pool failure");
+        poolLifecycleFailure = value;
     }
 
     function mint(MintParams calldata params)
@@ -210,13 +226,19 @@ contract MockUniswapV3NonfungiblePositionManager is IUniswapV3NonfungiblePositio
         position.tokensOwed1 += uint128(amount1);
     }
 
-    /// @dev Exists only so tests can prove the adapter never invokes pool initialization.
-    function createAndInitializePoolIfNecessary(address, address, uint24, uint160)
-        external
-        returns (address)
-    {
+    function createAndInitializePoolIfNecessary(
+        address token0,
+        address token1,
+        uint24 fee,
+        uint160 sqrtPriceX96
+    ) external payable returns (address) {
+        if (poolLifecycleFailure == 1) revert PoolCreationFailed();
+        address pool = address(0xBEEF);
+        MockUniswapV3FactoryLike(factory).setPool(token0, token1, fee, pool);
+        if (poolLifecycleFailure == 2) revert PoolInitializationFailed();
         poolInitializationCalls++;
-        return address(0xBEEF);
+        lastPoolSqrtPriceX96 = sqrtPriceX96;
+        return pool;
     }
 
     function _useInputs(

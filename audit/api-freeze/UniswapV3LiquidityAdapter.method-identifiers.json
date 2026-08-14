@@ -2,6 +2,7 @@
   "BPS_DENOMINATOR()": "e1a45218",
   "DEFAULT_TICK_LOWER()": "820c161e",
   "DEFAULT_TICK_UPPER()": "94e49769",
+  "FACTORY()": "2dd31000",
   "FEE()": "c57981b5",
   "MANAGER()": "1b2df850",
   "MAX_TICK()": "6882a888",
@@ -9,10 +10,10 @@
   "MIN_USAGE_BPS()": "e1af7944",
   "POSITION_MANAGER()": "1bea83fe",
   "TICK_SPACING()": "46ca626b",
+  "addFreshFullRangeLiquidity(address,address,uint256,uint256,uint160)": "da87b159",
   "addFullRangeLiquidity(address,address,uint256,uint256,bytes)": "de2e6c74",
   "bindManager(address)": "3c72b923",
-  "compoundPosition(address,address,bytes)": "9e308266",
   "getPositionTokenId(address,address)": "af07ae85",
   "positionTokenId(bytes32)": "607f1402",
-  "removeLiquidity(address,address,uint128,bytes)": "e51af905"
+  "removeLiquidityDetailed(address,address,uint128)": "1f660058"
 }

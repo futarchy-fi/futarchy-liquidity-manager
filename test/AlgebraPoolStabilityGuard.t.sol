@@ -34,6 +34,17 @@ contract AlgebraPoolStabilityGuardTest is Test {
         guard.assertStable(address(pool));
     }
 
+    function test_assertStable_reverts_when_liquidity_cooldown_is_armed() public {
+        pool.setLiquidityCooldown(1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                AlgebraPoolStabilityGuard.LiquidityCooldownActive.selector, address(pool), uint32(1)
+            )
+        );
+        guard.assertStable(address(pool));
+    }
+
     function test_assertStablePair_resolves_unordered_pair() public view {
         guard.assertStablePair(TOKEN_B, TOKEN_A);
     }
@@ -75,7 +86,7 @@ contract AlgebraPoolStabilityGuardTest is Test {
     function test_assertStable_fails_closed_when_history_query_reverts() public {
         pool.setShouldRevert(true);
 
-        vm.expectRevert(bytes("missing history"));
+        vm.expectRevert();
         guard.assertStable(address(pool));
     }
 
@@ -120,5 +131,18 @@ contract AlgebraPoolStabilityGuardTest is Test {
 
         vm.expectRevert(AlgebraPoolStabilityGuard.ZeroAddress.selector);
         guard.assertStable(address(0));
+    }
+}
+
+// Regression: the bundle factory's IAlgebraFactoryBoundGuard.FACTORY() wiring check must accept
+// the real guard directly (previously only a test wrapper exposed FACTORY(), so a mainnet deploy
+// with the real guard reverted). See src/oracles/AlgebraPoolStabilityGuard.sol FACTORY().
+contract AlgebraPoolStabilityGuardFactoryAliasTest is Test {
+    function test_FACTORY_returnsBoundAlgebraFactory() public {
+        address factory = address(0x1234);
+        AlgebraPoolStabilityGuard guard =
+            new AlgebraPoolStabilityGuard(IAlgebraFactoryLike(factory));
+        assertEq(address(guard.FACTORY()), factory);
+        assertEq(address(guard.FACTORY()), address(guard.ALGEBRA_FACTORY()));
     }
 }

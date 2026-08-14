@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {UniswapV3LiquidityAdapter} from "../../src/adapters/UniswapV3LiquidityAdapter.sol";
+import {IFutarchyLiquidityAdapter} from "../../src/interfaces/IFutarchyLiquidityAdapter.sol";
 import {IUniswapV3FactoryLike} from "../../src/interfaces/IUniswapV3FactoryLike.sol";
 import {
     IUniswapV3NonfungiblePositionManager
@@ -21,6 +22,16 @@ interface ISepoliaNonfungiblePositionManager is IUniswapV3NonfungiblePositionMan
     ) external payable returns (address pool);
 
     function ownerOf(uint256 tokenId) external view returns (address owner);
+}
+
+interface IUniswapV3SwapPool {
+    function swap(
+        address recipient,
+        bool zeroForOne,
+        int256 amountSpecified,
+        uint160 sqrtPriceLimitX96,
+        bytes calldata data
+    ) external returns (int256 amount0, int256 amount1);
 }
 
 contract UniswapV3SepoliaForkTest is Test {
@@ -41,6 +52,7 @@ contract UniswapV3SepoliaForkTest is Test {
     int24 private constant FULL_RANGE_LOWER = -887_270;
     int24 private constant FULL_RANGE_UPPER = 887_270;
     uint160 private constant Q96 = 79_228_162_514_264_337_593_543_950_336;
+    uint160 private constant MIN_SQRT_RATIO_PLUS_ONE = 4_295_128_740;
 
     function testFork_adapterRoundTripsThroughRealPositionManager() public {
         if (!vm.envOr("RUN_SEPOLIA_FORK_TESTS", false)) return;
@@ -52,7 +64,6 @@ contract UniswapV3SepoliaForkTest is Test {
         MockMintableERC20 tokenB = new MockMintableERC20("Fork token B", "FTB");
         (MockMintableERC20 token0, MockMintableERC20 token1) =
             address(tokenA) < address(tokenB) ? (tokenA, tokenB) : (tokenB, tokenA);
-        npm.createAndInitializePoolIfNecessary(address(token0), address(token1), FEE, Q96);
 
         UniswapV3LiquidityAdapter adapter =
             new UniswapV3LiquidityAdapter(npm, FULL_RANGE_LOWER, FULL_RANGE_UPPER);
@@ -64,8 +75,10 @@ contract UniswapV3SepoliaForkTest is Test {
         uint256 balance0Before = token0.balanceOf(address(this));
         uint256 balance1Before = token1.balanceOf(address(this));
 
-        (uint128 firstLiquidity,,) =
-            adapter.addFullRangeLiquidity(address(token0), address(token1), 10 ether, 10 ether, "");
+        (address pool, uint128 firstLiquidity,,) = adapter.addFreshFullRangeLiquidity(
+            address(token0), address(token1), 10 ether, 10 ether, Q96
+        );
+        assertGt(pool.code.length, 0);
         uint256 tokenId = adapter.getPositionTokenId(address(token0), address(token1));
         assertGt(tokenId, 0);
         assertEq(npm.ownerOf(tokenId), address(adapter));
@@ -77,23 +90,61 @@ contract UniswapV3SepoliaForkTest is Test {
 
         (,,,,,,, uint128 currentLiquidity,,,,) = npm.positions(tokenId);
         assertEq(currentLiquidity, firstLiquidity + secondLiquidity);
-        (uint256 partial0, uint256 partial1) =
-            adapter.removeLiquidity(address(token0), address(token1), currentLiquidity / 3, "");
-        assertGt(partial0, 0);
-        assertGt(partial1, 0);
+        IUniswapV3SwapPool(pool)
+            .swap(
+                address(this),
+                true,
+                1 ether,
+                MIN_SQRT_RATIO_PLUS_ONE,
+                abi.encode(pool, address(token0), address(token1))
+            );
+
+        IFutarchyLiquidityAdapter.Removal memory feeRemoval =
+            adapter.removeLiquidityDetailed(address(token0), address(token1), 0);
+        assertEq(feeRemoval.principal0, 0);
+        assertEq(feeRemoval.principal1, 0);
+        assertGt(feeRemoval.fees0 + feeRemoval.fees1, 0);
+        (,,,,,,, uint128 liquidityAfterFeeCollection,,,,) = npm.positions(tokenId);
+        assertEq(liquidityAfterFeeCollection, currentLiquidity);
+        assertEq(adapter.getPositionTokenId(address(token0), address(token1)), tokenId);
+
+        IFutarchyLiquidityAdapter.Removal memory partialRemoval =
+            adapter.removeLiquidityDetailed(address(token0), address(token1), currentLiquidity / 3);
+        assertEq(partialRemoval.fees0 + partialRemoval.fees1, 0);
+        assertGt(partialRemoval.principal0 + partialRemoval.fees0, 0);
+        assertGt(partialRemoval.principal1 + partialRemoval.fees1, 0);
 
         (,,,,,,, currentLiquidity,,,,) = npm.positions(tokenId);
-        (uint256 final0, uint256 final1) =
-            adapter.removeLiquidity(address(token0), address(token1), currentLiquidity, "");
-        assertGt(final0, 0);
-        assertGt(final1, 0);
+        IFutarchyLiquidityAdapter.Removal memory finalRemoval =
+            adapter.removeLiquidityDetailed(address(token0), address(token1), currentLiquidity);
+        assertGt(finalRemoval.principal0 + finalRemoval.fees0, 0);
+        assertGt(finalRemoval.principal1 + finalRemoval.fees1, 0);
         assertEq(adapter.getPositionTokenId(address(token0), address(token1)), 0);
         vm.expectRevert();
         npm.ownerOf(tokenId);
 
+        vm.expectRevert(
+            abi.encodeWithSelector(UniswapV3LiquidityAdapter.PoolAlreadyExists.selector, pool)
+        );
+        adapter.addFreshFullRangeLiquidity(address(token0), address(token1), 1 ether, 1 ether, Q96);
+
         assertApproxEqAbs(token0.balanceOf(address(this)), balance0Before, 10);
         assertApproxEqAbs(token1.balanceOf(address(this)), balance1Before, 10);
         _assertAdapterEmpty(adapter, token0, token1);
+    }
+
+    function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data)
+        external
+    {
+        (address pool, address token0, address token1) =
+            abi.decode(data, (address, address, address));
+        require(msg.sender == pool, "pool");
+        if (amount0Delta > 0) {
+            require(IERC20(token0).transfer(pool, uint256(amount0Delta)), "token0");
+        }
+        if (amount1Delta > 0) {
+            require(IERC20(token1).transfer(pool, uint256(amount1Delta)), "token1");
+        }
     }
 
     function testFork_guardAcceptsMaturePoolAndRejectsFreshRealPool() public {

@@ -1,0 +1,7 @@
+{
+  "ADAPTER()": "121193f0",
+  "BINDING_AUTHORITY()": "219e3f3b",
+  "POOL_MANAGER()": "62308e85",
+  "beforeInitialize(address,(address,address,uint24,int24,address),uint160)": "dc98354e",
+  "bindAdapter(address)": "f7960840"
+}

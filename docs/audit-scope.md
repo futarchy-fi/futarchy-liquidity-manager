@@ -1,5 +1,11 @@
 # Audit Scope
 
+The current Swapr Algebra path is a no-funds prototype. A factory owner may enable mutable
+`liquidityCooldown`, after which repeated third-party dust mints reset the shared position timestamp
+and can indefinitely block spot and conditional burns. This unresolved trust boundary prevents the
+bundle from satisfying the administrator-independent position-removal liveness required by
+redemption.
+
 ## Objective
 
 Make futarchy liquidity provision operationally simple without giving a proposal manager the
@@ -12,12 +18,46 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   intentionally unexposed.
 - `FutarchyOfficialProposalSource`: admits at most one official live proposal and can enforce
   on-chain proposal validation before the manager migrates liquidity.
-- `DeadlineBoundedRealityProxy`: CTF oracle proxy for new FLM-grade proposals that can resolve
-  normally through Reality or force a deterministic NO after a bounded deadline.
-- `AlgebraPoolStabilityGuard`: shared, immutable 30-minute TWAP check that rejects migration when
-  the established spot pool's current tick differs from its average by more than 50 ticks.
+- `DeadlineBoundedRealityProxy`: CTF oracle proxy for new FLM-grade proposals that relays a
+  finalized Reality result even on the deadline path, or forces deterministic NO after a bounded
+  deadline only while Reality remains unresolved.
+- `UniV3PoolStabilityGuard`: immutable 30-minute TWAP check for the selected Ethereum spot path. A
+  pinned fork proves the configured fee/factory, required observation history, and 50-tick bound
+  against the official v3 factory. `AlgebraPoolStabilityGuard` remains legacy prototype scope.
 - `FutarchyLiquidityManagerFactory`: permissionless atomic bundle deployer pinned to immutable bare
   creation-code hashes and shared protocol dependencies.
+- `V4InitializationGate`: partial Ethereum-mainnet successor seam. It reserves pool initialization
+  for one irreversibly bound adapter and deliberately exposes no liquidity callbacks. The v4
+  bundle factory deploys it at the mined address and binds it in the same transaction.
+- `V4ConditionalLiquidityAdapter`: manager-bound direct v4 position owner. It atomically initializes
+  and adds a fresh full-range position, settles exact PoolManager deltas, separates fee pokes from
+  principal removal, and rejects dependency-codehash or fee-report drift. A pinned full-mainnet
+  fixture covers the source, canonical CTF, deployed wrapper factory, both v4 positions, settlement,
+  symmetric and single-leg live v4 donations before and after a one-third unresolved redemption,
+  in-kind unmatched outcome payout, both resolutions of the donated single leg, pro-rata fee
+  allocation, and final-holder conservation together with the real v3 spot position manager and
+  production guard. A late second-position removal fault after the proportional first official-v4
+  unwind proves shares, positions, spot identity, and all six custody balances roll back. The
+  identical retry faults the canonical company-side CTF merge and proves per-underlying isolation:
+  collateral still merges, the company slice is paid as exact YES/NO wrappers, and those wrappers
+  remain independently redeemable/consumable after resolution without breaking final conservation.
+  A late collateral-side CTF merge fault after company merge/winner recovery also proves that both
+  removed v4 positions, the captured binding, protocol custody, wrapper supply, and allowances roll
+  back before an identical permissionless settlement succeeds.
+  Its direct adapter fork additionally proves that the pinned owner's maximum
+  protocol-fee configuration and a third party's otherwise identical position cannot block or
+  consume the FLM position's partial or final removal.
+- `V4FutarchyLiquidityManagerFactory`: permissionless atomic v4 bundle deployer. It hash-pins all
+  five child creation codes and deploys the entire bundle at creator-bound CREATE2 addresses. Its
+  exact prediction view remains stable across unrelated permissionless deployments. It wires the
+  source's pool lookup directly to the v4 conditional adapter and completes all irreversible
+  bindings before returning. Final-address deployment configuration and production dependency
+  selection remain outside the implemented surface. The full-stack fork also faults official-v3
+  spot removal, both canonical CTF splits, wrapper conversion on each underlying, and each
+  official-PoolManager initialization and first-liquidity boundary independently. A final fault at
+  the source capture read occurs only after manager activation completes. Each verifies the complete
+  source, protocol-custody, spot-NFT, wrapper, and conditional-position rollback envelope and proves
+  an identical retry succeeds.
 
 ## External Dependencies
 
@@ -27,45 +67,91 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
 - Futarchy proposal contract exposing collateral, wrapped outcomes, question id, and condition id.
 - Conditional Tokens Framework.
 - Reality.eth.
-- Algebra/Swapr pool factory.
-- Algebra pool observations with at least 30 minutes of usable spot-pool history.
+- Official Ethereum Uniswap v3 position manager/factory and a spot pool with at least 30 minutes of
+  usable observations; a fresh pool needs observation cardinality raised before its first mint.
+- Official Ethereum Uniswap v4 PoolManager and the exact-permission initialization gate.
+- Canonical CTF Wrapped1155 factory.
+- Algebra/Swapr dependencies only for historical prototype and regression coverage.
 - Liquidity adapter contracts.
 - Conditional split/merge/redeem router.
 
 ## Security Properties To Review
 
 - LP shares remain proportional through deposits, withdrawals, migration, and settlement.
-- Every share change fully unwinds active positions first, so accrued AMM fees and tracked idle
-  balances enter the same pro-rata balance vector. Later deposits cannot dilute existing value and
-  a partial redeemer cannot collect fees or outcome balances belonging to remaining holders.
+- Manager construction rejects an identical company/collateral token before either two-asset share
+  accounting or bundle deployment can become live.
+- Manager and factory construction reject code-less token, router, adapter, guard, and AMM
+  dependencies before a permanently unusable direct deployment or bundle can persist.
+- The v4 factory rejects immutable spot ticks outside the v3 adapter's bounds or 10-tick alignment
+  before a permanently unusable factory can persist.
+- A spot deposit fully consolidates the spot position before pricing new shares, so accrued fees,
+  donations, and idle balances cannot be diluted. Redemption snapshots idle assets and removes only
+  proportional liquidity and fees; a partial redeemer cannot collect value belonging to survivors.
 - Deposits are accepted only in spot mode and only in the vault's existing two-asset proportion.
 - Conditional redemption touches only the withdrawing fraction. Matched complete sets are merged
-  when possible; router failure and unmatched balances fall back to in-kind outcome tokens.
+  when possible; router failure and unmatched balances fall back to in-kind outcome tokens. A
+  failed in-kind wrapper transfer must restore all prior wrapper payments and the complete exit.
+  Failure of either final ERC20 recipient transfer or post-unwrap native delivery must roll back
+  the preceding removals, share burn, merges, payouts, unwrap, and custody changes atomically.
+  Forwarded native payout gas must not permit a nested lifecycle operation; rejecting reentry must
+  not block the outer exact exit.
+- Stateful fee and donation sequences cannot dilute an existing holder: every successful deposit
+  and redemption must preserve or increase each remaining liquidity and six-token balance claim
+  per share. All issued test assets remain in modeled manager, adapter, router, or holder custody,
+  and zero share supply leaves no balance under manager or adapter control. The same randomized
+  campaign arms, disarms, and executes emergency mode while retaining settlement and redemption,
+  and requires executed emergency mode to leave no position liquidity.
+- The manager persists the verified settlement winner with the last captured wrappers. Any later
+  donation in that resolved snapshot is converted before a spot-mode sync, deposit, redemption, or
+  activation, so it is priced for current shares and cannot be orphaned by pointer replacement.
 - Proposal manager cannot select arbitrary unsafe proposals once validation is enabled.
+- The proposal source completes an official write only if the activation target reports an exact
+  capture of every source-validated proposal field; any mismatch rolls back both contracts.
+- The source and manager independently require the two base assets and four outcome wrappers to be
+  six distinct accounting tokens before the manager consults the spot guard or moves liquidity.
 - Validation rejects far-future opening times, excessive min bonds, bad timeout bounds, wrong
   arbitrators, wrong CTF oracle, non-binary conditions, wrong collateral, missing outcomes, and
-  missing pools.
+  non-pristine questions. The manager-bound adapter separately rejects pre-existing conditional
+  pools during atomic activation.
 - Deadline proxy gives new FLM-grade proposals a bounded liveness path.
 - Emergency exit only unwinds positions into the manager. It neither burns shares nor transfers
-  shareholder assets, and redemption remains available while emergency mode is armed or executed.
+  shareholder assets, the redemption entry point remains enabled while emergency mode is armed or
+  executed, and anyone may execute the unwind after the owner-authorized delay. A nonfinal
+  redemption still reverts without burning shares if every active-liquidity slice floors to zero.
+  Arming or execution never blocks
+  permissionless settlement of a captured CTF condition. The pinned-mainnet lifecycle proves this
+  against donated official-v4 positions and canonical CTF even after the source registry is
+  cleared, with zero caller gain and final shareholder conservation. It also faults the second
+  emergency removal after the first official-v4 unwind and proves the whole attempt rolls back
+  before an identical outsider retry succeeds, then proves a shareholder can redeem proportional
+  base value with no outcome residue while canonical CTF is still unresolved.
+- The pinned-mainnet spot-mode emergency paths arm before proposal activation and separately fault
+  principal removal after fee collection and NFT burn after fee collection, full principal
+  removal, and principal collection. Both prove the NFT/liquidity,
+  manager/adapter/v3-pool/NPM balances, shares, and emergency flag restore. Each identical retry
+  has zero caller gain and recovers both bootstrap assets within two wei through final shareholder
+  redemption.
 - Adapters cannot over-pull tokens from the manager.
-- Both migration directions fail closed before removing liquidity if the shared spot-pool guard
-  cannot read valid history or detects more than 50 ticks of current-to-TWAP deviation.
+- Source-atomic conditional activation fails closed before persistent state changes if the shared
+  spot-pool guard cannot read valid history or detects more than 50 ticks of deviation.
 - New YES/NO pools are not required to have 30 minutes of history before first seeding. Their adds
   remain bounded by the manager's symmetric 50-bps unused-inventory check against inventory
   removed from the TWAP-anchored spot position.
-- Every post-deposit or post-redemption re-add first requires the exact pair to pass the immutable
-  stability guard. Ratio-fit inventory is deployed while asymmetric fee inventory stays idle and
-  share-owned. Redemption catches missing history or an unstable pair and leaves all surviving
-  holder assets idle for a permissionless retry.
+- Redemption performs no re-add and consults no stability guard. Settlement resolves the stored CTF
+  assets before any optional spot action and currently leaves recovered base inventory idle and
+  share-owned. Later donations to the still-current resolved wrapper snapshot follow the same
+  recovery path before a subsequent spot sync, deposit, redemption, or activation.
 - The factory accepts no caller-supplied constructor suffixes: it verifies bare creation-code
-  hashes, appends all wiring itself, enforces the EIP-3860 limit, and rolls back partial bundles.
+  hashes, appends all wiring itself, enforces the EIP-3860 limit, and rolls back partial bundles,
+  including invalid identical-base-token and code-less-company-token manager deployments.
+- The atomic rollback matrix in `readiness.md` maps every named source, CTF split, pool lifecycle,
+  first-liquidity, outer coordinator, and bundle boundary to direct fault injection and the state
+  envelope checked after the revert.
 
 ## Permissions
 
 - `FutarchyLiquidityManager.owner`
   - can arm/disarm emergency exit;
-  - can unwind all positions only after `EMERGENCY_EXIT_DELAY`;
   - can sweep residual assets to `BOOTSTRAP_RECIPIENT` only when total share supply is zero.
 - `BOOTSTRAP_RECIPIENT`
   - is the only account allowed to call `initializeFromBootstrap`;
@@ -75,28 +161,50 @@ power to freeze or redirect LP funds through arbitrary or never-settling conditi
   - can perform every proposal-source operation available to the proposal manager.
 - `FutarchyOfficialProposalSource.proposalManager`
   - can set the official proposer;
-  - can configure validation;
-  - can set/clear the official proposal;
+  - can configure validation only before activation-target binding;
+  - can clear the official proposal but cannot set one;
   - can mark manual settlement if no settlement oracle is configured.
+- `FutarchyOfficialProposalSource.LIFECYCLE_COORDINATOR`
+  - is immutable and is the only caller allowed to atomically set and activate an official
+    proposal.
 - Any account
   - can deposit to spot;
   - can redeem its own FLM shares;
-  - can call `sync` when conditions are met;
-  - can retry restoration of share-owned idle balances.
+  - can call `sync` to settle a captured condition when CTF reports an exact binary payout;
+  - can execute an owner-armed emergency unwind after `EMERGENCY_EXIT_DELAY`.
 
 ## Trust Assumptions
 
 - The selected liquidity adapter is in audit scope. The manager checks that add-liquidity calls do
-  not report more input used than provided, but adapter custody and protocol interactions still
-  require adapter review.
-- Deposits require exact ERC20 balance deltas; fee-on-transfer assets are rejected. Rebasing assets
-  are not a supported company-token or collateral configuration.
-- The conditional router is trusted to split and settle the expected proposal positions. A failed
-  redemption-time complete-set merge falls back to transferring that exact outcome-token slice.
-- The immutable stability guard is shared by deployments using the same Algebra factory. Its
-  factory, 30-minute window, and 50-tick bound have no owner or runtime setters.
+  not report more input used than provided and that every removal receipt equals the exact assets
+  received. It classifies the entire exact delta from a zero-liquidity call as fees and the exact
+  delta from the immediately following nonzero call as principal, so it does not trust the
+  adapter's returned field labels. Adapter zero-liquidity semantics, custody, and protocol
+  interactions still require adapter review. NFT-adapter adds independently enforce exact input
+  balance deltas, reconcile reported use to refunds, restore pre-call token custody, and clear
+  downstream position-manager allowances.
+- Deposits, CTF collateral receipts, adapter inputs and refunds, every ERC20 recipient payout, and
+  zero-supply sweeps require exact balance deltas. Fee-on-transfer behavior therefore reverts
+  without minting undercollateralized positions, losing refund value, or burning shares, including
+  if enabled only after bootstrap. Rebasing assets are not a supported company-token or collateral
+  configuration.
+- Native collateral is wrapped during payable deposits. The manager rejects direct native
+  transfers and accepts unwrap proceeds only from its immutable wrapped-collateral contract.
+  Unavoidable forced native currency is outside the six-token accounting model and remains
+  unsweepable while shares exist.
+- The immutable conditional router verifies canonical wrapper identity and exact split/settlement
+  deltas. The manager independently requires exact merge, winner-redemption, and losing-consumption
+  deltas during settlement; a failed redemption-time merge falls back to transferring that exact
+  outcome-token slice.
+- The immutable stability guard pins its v3 factory and fee. Its 30-minute window and 50-tick bound
+  have no owner or runtime setters.
 - The official proposal source owner or proposal manager is trusted to configure validation
   correctly before setting a production official proposal.
+- The immutable lifecycle coordinator is the sole authority that can set and atomically activate
+  an official proposal. The proposal contract ABI does not expose creator identity, so the
+  `creator` argument is integration attribution, not independent source-side authentication. The
+  coordinator must derive proposal address and id from its reviewed canonical factory or pipeline;
+  direct owner, EOA, and mutable proposal-manager admission is forbidden and regression-tested.
 - If manual settlement is used, the owner or proposal manager is trusted for settlement timing. For
   bounded liveness, prefer a settlement oracle or `DeadlineBoundedRealityProxy` path.
 - `BOOTSTRAP_RECIPIENT` should be controlled by the organization integration, normally a Safe or
