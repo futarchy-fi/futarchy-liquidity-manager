@@ -104,7 +104,8 @@ slippage parameters therefore cannot be selected by a depositor, redeemer, or em
 - `setOfficialProposal`
   - Transaction: `proposalSource.setOfficialProposal`.
   - Must be submitted by the immutable lifecycle coordinator. The source write, manager
-    activation, CTF split, both fresh pool initializations, and both first positions are atomic.
+    activation, and CTF split are atomic. The two fresh pool initializations and first positions
+    follow through separate permissionless `manager.migrateSide` calls.
   - Uses `proposalId`, `proposal`, and `creator`.
 - `setProposalValidationConfig`
   - Transaction: `proposalSource.setProposalValidationConfig`.

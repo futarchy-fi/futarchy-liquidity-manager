@@ -7,27 +7,38 @@ this repo** in the private operator manifest — this file is procedure only.
 
 ## Roles
 
-All four authority roles are the GIP-145 Safe (2-of-3): owner, coordinator
-(proposalManager), bootstrapRecipient, officialProposer. The deployer is a
-throwaway EOA. The compromised `0x693E…` key holds **no** role and is denylisted
-in `tools/validate-configs.sh`.
+The GIP-145 Safe (2-of-3) owns the manager and proposal source, is the bootstrap
+recipient, and holds all funded shares. The launcher is owned by the `0xEB…`
+operator and is configured as both the source's immutable lifecycle coordinator
+(`proposalManager` at construction) and `officialProposer`. The `0x645A…`
+deployer holds no contract role after deployment. The compromised `0x693E…` key
+holds **no** role and is denylisted in `tools/validate-configs.sh`.
 
 ## 1. Deploy (one-shot)
 
-Deploy is broadcast by the throwaway deployer EOA (not the Safe); the Gnosis
-factory uses nonce-based CREATE, so the manager address is only known after the
-factory + bundle land. Order:
+Deploy is broadcast by the deployer EOA (not the Safe); the Gnosis factory uses
+nonce-based CREATE, so the manager address is only known after the factory and
+bundle land. Order:
 
-1. **Guard first** (its address feeds the config):
+1. **Launcher first.** Deploy it with the `0xEB…` operator as owner and record
+   its address. Do not grant it Organization editor permission.
+   ```
+   PRIVATE_KEY=<deployer> FLM_LAUNCHER_OWNER=<0xEB operator> \
+     FLM_LAUNCHER_DEPLOY_OUTPUT=<private path> \
+     forge script script/DeployFLMMarketLauncher.s.sol \
+     --fork-url <gnosis rpc> --broadcast
+   ```
+2. **Guard** (its address feeds the config):
    ```
    PRIVATE_KEY=<deployer> FLM_ALGEBRA_FACTORY=<algebra factory> \
      forge script script/DeployAlgebraPoolStabilityGuard.s.sol \
      --fork-url <gnosis rpc> --broadcast
    ```
-2. Write the deployed guard address into the operator config's
-   `poolStabilityGuard`. Then `tools/validate-configs.sh --deploy <config>` must
-   pass — it refuses zero/placeholder guard and any compromised key.
-3. **Stack**:
+3. Deploy the hash-pinned factory for the reviewed creation code. Write the
+   launcher into `proposalManager` and `officialProposer`, the Safe into `owner`
+   and `bootstrapRecipient`, and the deployed factory/guard into the operator
+   config. Then `tools/validate-configs.sh --deploy <config>` must pass.
+4. **Stack**:
    ```
    PRIVATE_KEY=<deployer> FLM_DEPLOY_CONFIG=<config> \
      FLM_DEPLOY_OUTPUT=<private path> \
@@ -35,13 +46,18 @@ factory + bundle land. Order:
      --fork-url <gnosis rpc> --broadcast
    ```
    The output JSON has the deployed `manager` + `proposalSource`.
-4. Copy `manager` into the private bootstrap batch (replace the placeholder in
+5. The `0xEB…` owner calls
+   `launcher.bind(source, manager, factory, organization, GNO, sDAI, category,
+   language)` once. This is launcher wiring only; it does not create or link a
+   market and requires no Organization editor role.
+6. Copy `manager` into the private bootstrap batch (replace the placeholder in
    every tx target + approve spender) before signing §2.
-5. Deploy the cooldown watcher (§5) before funding.
+7. Deploy the cooldown watcher (§5) before funding.
 
-The full deploy wiring is rehearsed against real Gnosis dependencies by
-`test/fork/FlmOperatorLifecycleFork.t.sol` (deploys guard + factory + bundle with
-the Safe as coordinator, runs bootstrap→activation→settlement→redeem).
+`test/fork/FlmOperatorLifecycleFork.t.sol` covers the manager/source lifecycle
+against real Gnosis dependencies. `test/fork/FlmLauncherOneSigFork.t.sol`
+covers launcher wiring and the existing-market lifecycle without an
+Organization editor grant.
 
 ## 2. Bootstrap (once, per manager)
 
@@ -52,18 +68,26 @@ after one clean full cycle.
 
 ## 3. Activation (per proposal)
 
-Submit **bundled**: proposal-create → pool-create → `setOfficialProposal` in one
-transaction, so no third party can front-create the YES/NO pool at a bad price
-in between (the deferred precreation-veto risk — griefing costs the attacker,
-never you, and the bundle closes the window). Activation is atomic: any failure
-(CTF split, pool create, first mint) reverts the whole transition with no state
-change, so a griefed attempt is simply retried with a fresh proposal.
+The launcher calls `activateExistingMarket(proposalId, proposal)` for an
+already-created proposal. This path does not create a proposal, write
+Organization metadata, or require the launcher to be an Organization editor.
+The source validates the proposal and atomically starts the manager migration;
+then anyone calls `migrateSide(true)` and `migrateSide(false)` to create the two
+fresh conditional positions.
 
-**Before signing `setOfficialProposal`:** derive conditionId and the four
-wrapped-outcome tokens from the canonical Seer factory for this proposal and
-confirm they match what the batch encodes. The stored `creator` is
-coordinator-supplied attribution, not a second on-chain auth factor — this check
-is what makes it trustworthy.
+**Before activation:** derive the condition id and four wrapped-outcome tokens
+from the canonical proposal and confirm the source's `validateProposal` result.
+Both YES/NO Algebra pools must be absent: the fresh-only conditional adapter
+cannot adopt an existing pool, and manager activation reverts before moving
+spot funds if either pool already exists. The stored `creator` is
+coordinator-supplied attribution, not a second on-chain authentication factor.
+
+Activation and the two permissionless `migrateSide` calls are separate to stay
+within the Gnosis gas budget. A third party can therefore create a pool after a
+successful activation but before its side migrates. If that happens,
+`migrateSide` reverts and redemptions remain disabled while migration is active;
+the owner Safe must call `abortMigration()` to merge the outcome tokens and
+restore spot liquidity. Do not retry that proposal with this fresh-only adapter.
 
 ## 4. Settlement
 

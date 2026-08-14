@@ -12,7 +12,7 @@ import {
     FutarchyLiquidityManager,
     IWrappedNative
 } from "../../src/core/FutarchyLiquidityManager.sol";
-import {FLMMarketLauncher} from "../../src/factories/FLMMarketLauncher.sol";
+import {FLMMarketLauncher, IFutarchyFactory} from "../../src/factories/FLMMarketLauncher.sol";
 import {
     FutarchyLiquidityManagerFactory
 } from "../../src/factories/FutarchyLiquidityManagerFactory.sol";
@@ -97,7 +97,7 @@ contract FlmLauncherOneSigForkTest is Test {
 
     function testFork_ownerLaunchesVisibleMarketAndConditionalFlpRedeems() public {
         if (!vm.envOr("RUN_GNOSIS_FORK_TESTS", false)) return;
-        Fixture memory fixture = _newFixture();
+        Fixture memory fixture = _newFixture(true);
         _bootstrap(fixture.manager);
 
         FLMMarketLauncher.MarketParams memory p = _params(uint32(block.timestamp + 1 days));
@@ -151,7 +151,7 @@ contract FlmLauncherOneSigForkTest is Test {
 
     function testFork_unboundedOpeningTimeMakesActivationRevertAndPreservesPending() public {
         if (!vm.envOr("RUN_GNOSIS_FORK_TESTS", false)) return;
-        Fixture memory fixture = _newFixture();
+        Fixture memory fixture = _newFixture(true);
         _bootstrap(fixture.manager);
 
         (address proposal,,) =
@@ -172,7 +172,7 @@ contract FlmLauncherOneSigForkTest is Test {
 
     function testFork_launchedMarketSettlesBackToSpot() public {
         if (!vm.envOr("RUN_GNOSIS_FORK_TESTS", false)) return;
-        Fixture memory fixture = _newFixture();
+        Fixture memory fixture = _newFixture(true);
         _bootstrap(fixture.manager);
 
         (address proposal,,) =
@@ -198,7 +198,41 @@ contract FlmLauncherOneSigForkTest is Test {
         assertEq(fixture.manager.spotLiquidity(), spotLiquidityBeforeSettlement);
     }
 
-    function _newFixture() private returns (Fixture memory fixture) {
+    function testFork_existingMarketActivatesWithoutOrganizationEditor() public {
+        if (!vm.envOr("RUN_GNOSIS_FORK_TESTS", false)) return;
+        Fixture memory fixture = _newFixture(false);
+        _bootstrap(fixture.manager);
+
+        address proposal = IFutarchyFactory(FUTARCHY_FACTORY)
+            .createProposal(
+                IFutarchyFactory.CreateParams({
+                marketName: "Existing FLM fork test",
+                companyToken: GNO,
+                currencyToken: SDAI,
+                category: "governance",
+                language: "en_US",
+                minBond: 1 ether,
+                openingTime: uint32(block.timestamp + 1 days)
+            })
+            );
+
+        fixture.launcher.activateExistingMarket(42, proposal);
+        fixture.manager.migrateSide(true);
+        fixture.manager.migrateSide(false);
+
+        assertFalse(fixture.organization.editor(address(fixture.launcher)));
+        assertEq(fixture.organization.metadataCount(), 0);
+        assertTrue(fixture.manager.inConditionalMode());
+        assertEq(fixture.manager.activeProposal(), proposal);
+        assertEq(fixture.manager.activeProposalId(), 42);
+
+        uint256 shares = fixture.manager.totalSupply() / 2;
+        (uint256 gnoOut, uint256 sdaiOut) = fixture.manager.redeem(shares, address(this), false);
+        assertGt(gnoOut, 0);
+        assertGt(sdaiOut, 0);
+    }
+
+    function _newFixture(bool grantEditor) private returns (Fixture memory fixture) {
         vm.createSelectFork(
             vm.envOr("GNOSIS_RPC_URL", string("https://rpc.gnosischain.com")), GNOSIS_FORK_BLOCK
         );
@@ -247,7 +281,7 @@ contract FlmLauncherOneSigForkTest is Test {
                 "governance",
                 "en_US"
             );
-        fixture.organization.setEditor(address(fixture.launcher));
+        if (grantEditor) fixture.organization.setEditor(address(fixture.launcher));
         vm.deal(address(fixture.launcher), 10 ether);
     }
 
